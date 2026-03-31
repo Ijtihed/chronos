@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CHRONOS</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: Georgia, "Times New Roman", serif;
+            background: #0e0e0e;
+            color: #c8b88a;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        header {
+            padding: 16px 24px;
+            border-bottom: 1px solid #282420;
+            background: #121210;
+        }
+
+        header h1 {
+            font-size: 1em;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            color: #d8ccaa;
+            font-weight: 400;
+        }
+
+        .era-line {
+            font-size: 0.82em;
+            color: #706850;
+            margin-top: 4px;
+        }
+
+        #narrative {
+            flex: 1;
+            overflow-y: auto;
+            padding: 28px 24px;
+            line-height: 1.7;
+        }
+
+        .intro p { margin-bottom: 12px; }
+        .intro ul { margin: 6px 0 12px 22px; list-style: disc; }
+        .intro li { margin-bottom: 4px; color: #a89870; }
+
+        .turn-block {
+            margin-bottom: 28px;
+            padding-top: 20px;
+            border-top: 1px solid #1e1c18;
+        }
+
+        .turn-label {
+            font-size: 0.72em;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: #504830;
+            margin-bottom: 10px;
+        }
+
+        .player-line {
+            font-style: italic;
+            color: #887858;
+            margin-bottom: 10px;
+        }
+
+        .action-narration {
+            margin-bottom: 14px;
+            color: #b8a880;
+        }
+
+        .parsed-badge {
+            display: inline-block;
+            font-family: "SF Mono", "Fira Code", monospace;
+            font-size: 0.72em;
+            color: #585040;
+            background: #161614;
+            border: 1px solid #1e1c18;
+            padding: 2px 8px;
+            border-radius: 3px;
+            margin-bottom: 14px;
+        }
+
+        .npc-block {
+            margin-bottom: 14px;
+            padding: 14px 18px;
+            border-left: 2px solid #2a2620;
+            background: #12110f;
+        }
+
+        .npc-label {
+            font-size: 0.72em;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: #706040;
+            margin-bottom: 6px;
+        }
+
+        .npc-voice {
+            line-height: 1.7;
+            color: #c0b088;
+        }
+
+        .tension-line {
+            font-size: 0.78em;
+            color: #585040;
+            margin-top: 10px;
+        }
+        .tension-high { color: #a07840; }
+        .tension-critical { color: #b05030; }
+
+        .state-toggle {
+            font-size: 0.72em;
+            color: #3a3428;
+            cursor: pointer;
+            margin-top: 8px;
+            user-select: none;
+        }
+        .state-toggle:hover { color: #605840; }
+
+        .state-dump {
+            display: none;
+            font-family: "SF Mono", "Fira Code", monospace;
+            font-size: 0.68em;
+            color: #3a3428;
+            white-space: pre-wrap;
+            margin-top: 6px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        #input-bar {
+            padding: 14px 24px;
+            border-top: 1px solid #282420;
+            background: #121210;
+            display: flex;
+            gap: 10px;
+        }
+
+        #player-input {
+            flex: 1;
+            background: #181816;
+            border: 1px solid #282420;
+            color: #c8b88a;
+            padding: 11px 14px;
+            font-family: Georgia, serif;
+            font-size: 0.95em;
+            border-radius: 3px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        #player-input:focus { border-color: #484030; }
+        #player-input::placeholder { color: #3a3428; }
+
+        #submit-btn {
+            background: #1e1c18;
+            border: 1px solid #282420;
+            color: #a09070;
+            padding: 11px 22px;
+            font-family: Georgia, serif;
+            font-size: 0.95em;
+            cursor: pointer;
+            border-radius: 3px;
+            transition: background 0.2s;
+        }
+        #submit-btn:hover { background: #282420; }
+        #submit-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+        .loading-text { color: #504830; font-style: italic; }
+        .error-text { color: #a05040; }
+
+        strong { color: #d0c090; font-weight: 600; }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Chronos</h1>
+        <div class="era-line" id="era-info">Loading...</div>
+    </header>
+
+    <div id="narrative">
+        <div id="intro" class="intro"></div>
+        <div id="turns"></div>
+    </div>
+
+    <div id="input-bar">
+        <input
+            type="text"
+            id="player-input"
+            placeholder="What do you do?"
+            autocomplete="off"
+            disabled
+        >
+        <button id="submit-btn" disabled>Act</button>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

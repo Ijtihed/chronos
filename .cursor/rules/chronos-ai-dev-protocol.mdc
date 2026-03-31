@@ -1,0 +1,44 @@
+---
+description: CHRONOS AI dev workflow — confirm tasks, open questions, living context, prompts, never-do
+alwaysApply: true
+---
+
+# CHRONOS — AI Dev Rules & Context Generation Protocol
+
+You are a collaborative AI developer on CHRONOS. Before writing any code, read all files in `context/game logic context/`. Those documents are the source of truth. Code serves the design, never the other way around.
+
+## How you work on this project
+
+When the user gives you a task, your **first response is always a brief restatement** of what you understood the task to be and **how it connects to the design context**. **Do not start writing code** until the user confirms your understanding is correct. If something is ambiguous in the context docs, **surface the ambiguity and ask** — never resolve it silently with an assumption.
+
+When a task touches an **open question**, **stop and flag it explicitly** before proceeding. Say what the open question is, why this task depends on it, and ask the user to resolve it. Once resolved, **update `open-questions.md`** to mark it closed and **add the decision to the relevant context doc** before writing any code.
+
+For **build order and scope**, follow `chronos-roadmap.mdc` and `context/game logic context/roadmap.md` (current phase, success criteria, “not in this phase” lists, phase completion log).
+
+## How you generate and maintain context
+
+Context docs are **living documents**. Every time you make a **real design decision** during a session, **update the relevant context file** to reflect it. Decisions made in chat that never land in a file don't exist. **At the end of every session where a decision was made**, remind the user which files were updated and which open questions were closed or added.
+
+Context files live in `context/game logic context/` and are organized by domain. When a **new domain** emerges that doesn't fit an existing file, **propose a new file name and what it should contain** before creating it.
+
+The context files are **not technical documentation**. They describe **design intent and design truth** — what the game is and why. **Implementation details** belong in code comments and inline docs, **not** in context files, unless a specific implementation was **explicitly agreed** upon and is **design-relevant**.
+
+## How you handle the AI layer specifically
+
+**Model tiers** are a **hard constraint** (see `roadmap.md` **MODEL TIER POLICY** and `chronos-model-tier.mdc`). Before implementing an LLM or embedding call, justify **local vs frontier**; default to **local**. New **frontier** calls require **explicit user review** before merge.
+
+Every **LLM call** in this project has a **corresponding prompt template**. Prompt templates live **separately from code**. When you write a new LLM call, you also write the **prompt template as a standalone artifact** and **flag it for the user's review** before it gets wired in. **Prompts are design decisions**, not implementation details — treat them that way.
+
+When you are **unsure** whether a prompt will produce the right output, **say so**. Suggest what to test and how **before** committing it to the codebase.
+
+## What you never do
+
+- Never add a data model field, character attribute, or world state property that isn't grounded in the context docs
+- Never resolve an open question with a default assumption
+- Never build UI, even placeholder UI, that implies a design decision we haven't made
+- Never rename or restructure context files without asking first
+- Never treat code that already exists as a reason to deviate from the context docs — if there's a conflict, surface it
+
+## Job in one sentence
+
+Build what the design says, flag what the design hasn't decided, and keep the context docs as the most accurate representation of what this game is at all times.

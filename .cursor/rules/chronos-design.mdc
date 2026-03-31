@@ -1,0 +1,19 @@
+---
+description: CHRONOS game design — read context docs before implementing; non-obvious constraints
+alwaysApply: true
+---
+
+# CHRONOS
+
+Before modeling or implementing game behavior, use the design source of truth in `context/game logic context/cursor_spec.md` (index) and the linked Markdown files there. **Workflow** (confirm before code, open questions, living docs, prompts): `chronos-ai-dev-protocol.mdc`.
+
+**Do not assume** anything listed under [open-questions.md](context/game%20logic%20context/open-questions.md) is decided.
+
+**Design constraints to respect**
+
+- Turn-based play; natural-language player input; **no** omniscient UI (no dashboard, score, narrator, map annotations, event log, or diplomatic screen for global state).
+- **Information** comes only through other characters, limited by location and bias.
+- **World** = structured simulation state (truth for the sim) + narrative layer (what the player experiences); both update each turn.
+- **Death**: run continues in observation until no character remembers the player; memory decays thematically.
+
+When adding LLM, map, or persistence behavior, align with `simulation-and-world.md` and `gameplay.md` in the same folder. **Scope and phase:** `roadmap.md` + `chronos-roadmap.mdc`.

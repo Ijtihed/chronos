@@ -1,0 +1,34 @@
+---
+description: CHRONOS iteration roadmap — phase gates, success criteria, living updates
+alwaysApply: true
+---
+
+# CHRONOS — Roadmap rules
+
+Read `context/game logic context/roadmap.md` before planning or implementing features. **Code and scope follow the current phase** unless the user explicitly approves otherwise.
+
+## Phase discipline
+
+- **Order:** Do not treat Phase N+1 as started until Phase N’s **success criteria** are **met and confirmed** (not merely tasks checked off). If unsure which phase the project is in, ask; if `roadmap.md` phase log is empty, assume **Phase 0** until the user says otherwise.
+- **Scope:** Stay within the current phase’s **“What exists”** and avoid shipping items listed under **“What is explicitly NOT in this phase”** unless the user explicitly expands scope and updates `roadmap.md`.
+- **Roadmap blockers:** Before work that depends on them, verify resolution of questions in roadmap **“OPEN QUESTIONS THAT AFFECT THE ROADMAP”** (mirrored in `open-questions.md` under roadmap-blocking). If unresolved, **stop and flag** per `chronos-ai-dev-protocol.mdc`.
+- **Drift:** If existing code implements a future-phase feature while an earlier phase is unfinished, **surface the conflict**; do not treat legacy code as permission to skip the roadmap.
+
+## Maintaining the roadmap (living doc)
+
+When a phase **completes** (success criteria verified):
+
+1. Use that phase’s **Definition of success** and **How to verify** in `roadmap.md` as the checklist — note in the completion log **which** checks ran (manual, scripted, measurement) and any omissions.
+2. Fill the **Phase completion log** in `roadmap.md`: date, criteria verdict, planned vs actual, carryover.
+3. Update success criterion **checkboxes** in that phase to reflect reality (`[x]` where truly met).
+4. If reality diverged from the plan, **briefly document** what changed and why in the completion log — not only in chat.
+
+When **scope or stack** changes by explicit decision:
+
+- Update the affected **phase sections** or **FINAL PRODUCT** in `roadmap.md` in the same session.
+- If a new **roadmap-blocking** question appears, add it to `roadmap.md` *and* `open-questions.md`.
+
+## Consistency with other context
+
+- **Design truth** remains `overview.md`, `gameplay.md`, `simulation-and-world.md`. If the roadmap and those files **conflict**, **surface it**; do not silently prefer one over the other.
+- **`open-questions.md`** remains the master list for unresolved design items; roadmap-blocking items must stay **in sync** with the roadmap section (or linked in one place — currently both list phase-related blockers).

@@ -1,0 +1,25 @@
+---
+description: CHRONOS model tiers — local-first (Ollama), minimal frontier; justify every LLM call
+alwaysApply: true
+---
+
+# CHRONOS — Model tier policy (hard constraint)
+
+The full policy lives in `context/game logic context/roadmap.md` under **MODEL TIER POLICY**. Treat it as binding for every **LLM / embedding** integration, not a preference.
+
+## Before writing any LLM or embedding call
+
+1. **State the tier:** local (Ollama) vs frontier — and **why** this call belongs there.
+2. **Frontier:** If the call is not “IO layer: natural language → structured action,” you must **explain why local is insufficient for this specific task** (with an explicit test or failure mode). If you cannot justify it, **default to local**.
+3. **User review:** **Never introduce a new frontier call** without **flagging it for the user’s review first** (in addition to the prompt-template review in `chronos-ai-dev-protocol.mdc`).
+
+## Phase 0 (current roadmap baseline)
+
+- **Frontier (only if user approves the call):** parsing player input → structured action — small, cheap call (~200 tokens), haiku/mini tier only.
+- **Local (Ollama) for everything else:** NPC POV / responses, world-state narrative updates, any generation beyond the action parser.
+- **Default local model:** `llama3.1:8b`.
+- **Embeddings:** `nomic-embed-text` (local), if/when embeddings are used.
+
+## Cost and architecture
+
+If design would push **per-run cost** above **$0.10–0.30** as described in `roadmap.md`, **surface it** — the architecture is wrong for project policy.
