@@ -54,45 +54,51 @@ The **full path** from browser → backend → action representation → world m
 
 ## PHASE 1 — Playable Text Loop
 
-**Goal:** A complete single run is possible from start to finish. Player is generated, acts, finds NPCs, dies, fades from memory, run ends. Everything is text. No map yet.
+**Goal:** A complete single run is possible from start to finish. Player is generated, makes unconstrained macro decisions, finds NPCs, dies, fades from memory, run ends. Everything is text. No map yet.
 
 ### What exists at the end of this phase
 
-- Run initialization: random era selected from a starter set, player character generated with archetype + backstory appropriate to that era
-- 15–30 NPCs seeded in the starting region with archetypes, locations, and relationships
-- Full turn loop: player acts (or skips) → world responds → structured state + narrative layer both update
-- Inaction mechanic: skipping a turn causes the character to act autonomously based on archetype and situation
-- Travel mechanic: player can move between locations, costing turns, with world advancing in transit
-- POV system: NPCs generate perspectives on events, locked behind travel (player must go to them)
+- **Total player agency:** No action menus, no suggestions, no hand-holding. The player types any decision at any scale. The game never tells the player what to do.
+- **Macro decision scale:** Decisions operate at weeks/months/years — alliances, betrayals, revolts, economic manipulation, flight. Not bar conversations or item management.
+- **Selective NPC reactions:** Not every NPC reacts to every action. The game decides whose perspective genuinely matters. Most actions produce 1-3 reactions, not a firehose.
+- Run initialization: random era selected from a starter set of 5, player character generated with archetype + backstory
+- 8–15 NPCs seeded across multiple locations with archetypes, social classes, and relationships
+- Full turn loop: player types a decision → world responds → structured state + narrative layer both update
+- Inaction: if the player types "wait" or "do nothing," their character acts autonomously based on archetype
+- Travel mechanic: player can move between locations, costing turns, with world advancing in transit. NPCs at the destination react to arrival.
+- POV system gated by geography: only NPCs at the player's current location respond
 - Anachronism handling: modern language silently mapped to era-appropriate intent
-- Memory system: characters track their memory of the player, decay begins on player death
-- Death mechanic: player enters observation mode, can travel but not act, run ends when last memory is gone
-- Historical Knowledge Engine v1: RAG over Gutenberg + Wikipedia corpus for the active era, Chroma local vector DB
-- Starter era set: at minimum 5 eras fully ingested into the knowledge corpus
-- Basic web UI: text input, narrative output, current location, list of nearby NPCs (names only, no portraits)
+- Memory system: NPCs track memory of the player (0.0–1.0), decay begins on player death
+- Death mechanic: hybrid aging + consequence. After death, player enters observation mode (travel only). Run ends when last NPC memory reaches 0.
+- Historical Knowledge Engine v1: RAG over Gutenberg + Wikipedia corpus, Chroma local vector DB
+- Starter eras: Roman Late Empire (~410), Viking Age (~870), Crusader States (~1190), Black Death (~1348), Fall of Constantinople (~1453)
+- SQLite session persistence
+- Present-tense stream UI: blank text input, location bar with travel links, death/observation/erasure states
 
 ### Success criteria
 
-- [ ] A full run can complete from character generation to end-of-memory
-- [ ] At least 3 different eras are playable
+- [ ] A full run can complete from character generation to erasure without soft-locks
+- [ ] At least 3 different eras produce runs that feel historically distinct
 - [ ] NPC perspectives feel distinct from each other (archetype, social position, bias are evident)
-- [ ] Inaction produces meaningfully different outcomes than acting
+- [ ] The player can type anything — the game handles it without breaking
+- [ ] Only genuinely affected NPCs react to any given action (not everyone nearby)
 - [ ] The death + memory fade mechanic lands emotionally — the ending feels like erasure, not a game over screen
 
 ### Definition of success
 
-A **full run** is reproducible: new run → play until **last memory dies** without cheats. **Travel** gates POV: you cannot read distant NPC reactions without moving. **Skip turn** changes state differently than an explicit action. **RAG** answers world consequence queries for at least **5** ingested eras; **3+** eras are **playably** different in practice (not only a dropdown). Emotional bar: end state reads as **fade / erasure**, not “GAME OVER.”
+A **full run** is reproducible: new run, play until **last memory dies** without cheats. The player has **total freedom** -- any typed decision is interpreted and produces consequences, at macro scale. **Travel** gates POV: you cannot read distant NPC reactions without moving. **Selective reactions**: after a player action, only **relevant** NPCs respond (not all nearby). **RAG** answers world consequence queries for at least **5** ingested eras; **3+** eras are **playably** different in practice. Emotional bar: end state reads as **fade / erasure**, not a game over.
 
 ### How to verify
 
-1. **Run lifecycle** — Start 3 runs (different era seeds if random). Each: reach **player death** → **observation** (travel OK, no influence) → **run end** when no character remembers PC. Log turn count at end; ensure no soft-lock.
-2. **Eras** — Play at least **3** distinct eras end-to-end (or to mid-game + forced death for time); confirm corpus/RAG loads era-specific context (metadata or logged retrieval).
-3. **NPC distinction** — Same event, **3** NPCs with different archetypes: collect POVs **after** travel; qualitatively score bias/voice differentiation (rubric: e.g. class, fear, loyalty visible in 3/3).
-4. **Inaction** — Same situation: one turn **explicit act** vs one turn **skip**; world state + narrative must **diverge** in a way tied to autonomous behavior (not identical filler).
-5. **Travel-gated POV** — Without traveling to NPC B, **no** POV from B about a remote event; after travel, POV unlocks. Fails if global event log appears.
-6. **Anachronism** — Input modern phrasing (“DM the senator”); outcome narrative should **not** break fourth wall; structured intent should map to period-appropriate action.
-7. **RAG v1** — For fixed query set per era (small golden set), retrieval returns **non-empty** relevant chunks from Chroma; consequence text cites or aligns with retrieved themes (manual review).
-8. **Death & memory** — After death, verify memory fields decay over turns; last loss triggers **run end** and UI copy matches **erasure** framing (peer review or designer sign-off).
+1. **Run lifecycle** -- Start 3 runs (different era seeds). Each: reach **player death**, then **observation** (travel OK, no influence), then **run end** when no character remembers PC. Log turn count; ensure no soft-lock.
+2. **Eras** -- Play at least **3** distinct eras end-to-end; confirm corpus/RAG loads era-specific context.
+3. **Player freedom** -- Enter **5** wildly different actions (flee the city, start a revolt, hoard wealth, forge an alliance, do nothing). All should parse and produce coherent consequences.
+4. **Selective NPC reactions** -- After an action, count responding NPCs. Should be **1-3**, not the full list.
+5. **NPC distinction** -- Same event, **3** NPCs with different archetypes: collect POVs **after** travel; qualitatively score bias/voice differentiation.
+6. **Travel-gated POV** -- Without traveling to NPC B, **no** POV from B about a remote event; after travel, POV unlocks.
+7. **Anachronism** -- Input modern phrasing; outcome narrative should **not** break fourth wall.
+8. **RAG v1** -- For fixed query set per era, retrieval returns **non-empty** relevant chunks from Chroma.
+9. **Death and memory** -- After death, verify memory fields decay over turns; last loss triggers **run end** and UI matches **erasure** framing.
 
 ### What is explicitly NOT in this phase
 
@@ -287,7 +293,7 @@ All **20** era buckets are **playable** with ingested corpus + smoke-tested arch
 
 **What the game is at completion:**
 
-A single-player, turn-based historical simulation. You are assigned a random minor figure in a random era after 0 AD. You make macro decisions in natural language. The world responds based on historically grounded AI reasoning. The only way to understand your impact is to travel and find the people you affected. When you die, the world forgets you slowly. Every run is unique. The map is real. The illustrations are generated from your specific moment. The history is not scripted.
+A single-player, turn-based historical simulation. You are assigned a random minor figure in a random era after 0 AD. You make unconstrained macro decisions in natural language. The game never tells you what to do. The world responds based on historically grounded AI reasoning. The only way to understand your impact is to travel and find the people you affected. When you die, the world forgets you slowly. Every run is unique. The map is real. The illustrations are generated from your specific moment. The history is not scripted.
 
 **The stack at completion (as agreed):**
 
@@ -304,7 +310,6 @@ A single-player, turn-based historical simulation. You are assigned a random min
 > These must be resolved before the phase they impact begins.
 
 - **Session length target** — affects pacing design in Phase 5. A 30-minute run and a multi-day run are fundamentally different.
-- **UI metaphor for the text interface** — affects Phase 1 UI build. Journal? Dispatch? Stream of consciousness? Resolve before Phase 1 UI work begins.
 - **Diffusion model provider** — affects Phase 3 architecture. Resolve at Phase 3 kickoff.
 - **NPC relationship graph granularity** — affects Phase 5 scope significantly. Resolve before Phase 5 begins.
 

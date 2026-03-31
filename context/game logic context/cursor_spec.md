@@ -8,7 +8,9 @@
 
 **Phase 0 — Proof of Life: COMPLETE** (2026-03-31). See [roadmap.md](roadmap.md) Phase 0 completion log for details.
 
-**Next: Phase 1 — Playable Text Loop.** Full run from character generation to end-of-memory. Requires resolving the **UI metaphor** open question before UI work begins.
+**Phase 1 — Playable Text Loop: IN PROGRESS.** Full run lifecycle built: 5 eras, character generation, travel, death, memory decay, erasure, RAG/HKE v1, SQLite persistence. Pending: playtesting against success criteria.
+
+**Design principles locked in:** Total player agency (no hand-holding), macro decision scale (alliances/revolts/flight, not bar conversations), selective NPC reactions (game decides who cares), present-tense stream UI.
 
 ## Read in this order
 
