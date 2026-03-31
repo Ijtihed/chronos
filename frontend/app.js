@@ -214,6 +214,20 @@ window.doTravel = async function (destId) {
       }
     }
 
+    if (data.arrival_reactions && data.arrival_reactions.length) {
+      for (const r of data.arrival_reactions) {
+        h += `<div class="npc-block">`;
+        h += `<div class="npc-label">${esc(r.npc_name)}</div>`;
+        h += `<div class="npc-voice">${esc(r.pov)}</div>`;
+        h += `</div>`;
+      }
+    }
+
+    const loc = state.locations.find((l) => l.id === state.player.location);
+    if (loc) {
+      h += tensionHtml(loc.political_tension);
+    }
+
     block.innerHTML = h;
     updateLocationBar();
     eraInfo.textContent = `${state.era.name} \u2014 ${state.current_year} AD`;

@@ -277,6 +277,32 @@ async def travel(run_id: str, req: TravelRequest):
             }
             npc.stored_povs = []
 
+    arrival_action = {
+        "action_type": "travel",
+        "target": new_loc.name,
+        "intent": f"Arrived in {new_loc.name} after traveling from {player_loc.name}",
+        "era_description": (
+            f"{state.player.name} arrives in {new_loc.name} after "
+            f"{travel_turns} turns on the road from {player_loc.name}. "
+            f"The journey was long and the world has changed."
+        ),
+    }
+
+    arrival_povs = []
+    if state.run_status == "active" and nearby:
+        pov_tasks = [generate_npc_pov(npc, arrival_action, state) for npc in nearby]
+        pov_results = await asyncio.gather(*pov_tasks, return_exceptions=True)
+        for npc, pov in zip(nearby, pov_results):
+            pov_text = pov if isinstance(pov, str) else f"[{npc.name} is silent]"
+            arrival_povs.append(
+                {
+                    "npc_id": npc.id,
+                    "npc_name": npc.name,
+                    "npc_role": npc.role,
+                    "pov": pov_text,
+                }
+            )
+
     await save_session(state)
 
     return {
@@ -291,6 +317,7 @@ async def travel(run_id: str, req: TravelRequest):
             for n in nearby
         ],
         "stored_povs": stored_povs,
+        "arrival_reactions": arrival_povs,
     }
 
 
