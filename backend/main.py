@@ -138,12 +138,14 @@ async def take_turn(run_id: str, req: TurnRequest):
 
     death_result = await check_death(state, parsed)
 
-    nearby = npcs_near_player(state)
-    pov_tasks = [generate_npc_pov(npc, parsed, state) for npc in nearby]
+    relevant_npcs = _filter_relevant_npcs(
+        npcs_near_player(state), parsed.get("npc_impacts", [])
+    )
+    pov_tasks = [generate_npc_pov(npc, parsed, state) for npc in relevant_npcs]
     pov_results = await asyncio.gather(*pov_tasks, return_exceptions=True)
 
     npc_responses = []
-    for npc, pov in zip(nearby, pov_results):
+    for npc, pov in zip(relevant_npcs, pov_results):
         pov_text = pov if isinstance(pov, str) else f"[{npc.name} is silent]"
         npc_responses.append(
             {
@@ -385,6 +387,36 @@ async def _get_compat_state() -> WorldState:
 # ------------------------------------------------------------------
 # Internal
 # ------------------------------------------------------------------
+
+def _filter_relevant_npcs(nearby_npcs, npc_impacts):
+    """Only return NPCs the game determined are relevant to this action.
+
+    Falls back to all nearby NPCs if no impacts have the 'relevant' field.
+    """
+    if not npc_impacts:
+        return nearby_npcs
+
+    relevant_names = set()
+    has_relevant_field = False
+    for impact in npc_impacts:
+        if not isinstance(impact, dict):
+            continue
+        if "relevant" in impact:
+            has_relevant_field = True
+            if impact.get("relevant"):
+                relevant_names.add((impact.get("name") or "").lower())
+
+    if not has_relevant_field:
+        return nearby_npcs
+
+    if not relevant_names:
+        return nearby_npcs[:1] if nearby_npcs else []
+
+    return [
+        npc for npc in nearby_npcs
+        if any(rn in npc.name.lower() for rn in relevant_names)
+    ]
+
 
 async def _load_or_404(run_id: str) -> WorldState:
     state = await load_session(run_id)

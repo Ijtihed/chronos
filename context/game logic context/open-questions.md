@@ -37,3 +37,6 @@ Bullets for tracking resolution in prose (move to “Closed” subsection below 
 - [x] **UI metaphor** — Present-tense stream. The world advances, pauses at decision points (game-initiated or player-initiated). No journal/dispatch framing. (2026-03-31)
 - [x] **Death mechanism** — Hybrid aging + consequence. Turns advance the calendar; the player ages toward a lifespan ceiling. Risky actions can kill early. Both paths must feel narratively earned. (2026-03-31)
 - [x] **Phase 1 starter eras** — Roman Late Empire (~410), Viking Age (~870), Crusader States (~1190), Black Death (~1348), Fall of Constantinople (~1453). (2026-03-31)
+- [x] **Player agency model** — Total freedom, no suggested actions, no menus, no hand-holding. Player types any decision at any scale. The game never tells the player what to do. (2026-03-31)
+- [x] **Decision scale** — Macro-level. Big life choices: alliances, betrayals, fleeing, revolting, sacrificing wealth. Not bar conversations or item pickups. Turns represent weeks/months/years. (2026-03-31)
+- [x] **NPC reaction filtering** — The game decides whose perspective matters per action. Not every NPC reacts to everything. Only characters genuinely affected by the action respond. (2026-03-31)

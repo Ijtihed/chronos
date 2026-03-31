@@ -59,6 +59,15 @@ class TestActionParserSubstitution:
         raw = load_prompt(PROMPTS_DIR / "action_parser.md")
         assert "npc_impacts" in raw
         assert "sentiment" in raw
+        assert "relevant" in raw
+
+    def test_does_not_constrain_action_types(self):
+        raw = load_prompt(PROMPTS_DIR / "action_parser.md")
+        assert "not from a fixed list" in raw
+
+    def test_emphasizes_total_freedom(self):
+        raw = load_prompt(PROMPTS_DIR / "action_parser.md")
+        assert "total freedom" in raw.lower()
 
     def test_includes_story_so_far_placeholder(self):
         raw = load_prompt(PROMPTS_DIR / "action_parser.md")

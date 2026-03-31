@@ -4,7 +4,6 @@ const introEl = $("#intro");
 const turnsEl = $("#turns");
 const input = $("#player-input");
 const actBtn = $("#act-btn");
-const skipBtn = $("#skip-btn");
 const startScreen = $("#start-screen");
 const startBtn = $("#start-btn");
 const startLoading = $("#start-loading");
@@ -96,21 +95,18 @@ function setInputState(mode) {
   if (mode === "active") {
     input.disabled = false;
     actBtn.disabled = false;
-    skipBtn.disabled = false;
-    input.placeholder = "What do you do?";
+    input.placeholder = "";
     show(inputBar);
   } else if (mode === "observing") {
     input.disabled = true;
     actBtn.disabled = true;
-    skipBtn.disabled = true;
-    input.placeholder = "You can only observe now. Use travel links above.";
+    input.placeholder = "";
     show(inputBar);
   } else if (mode === "ended") {
     hide(inputBar);
   } else if (mode === "loading") {
     input.disabled = true;
     actBtn.disabled = true;
-    skipBtn.disabled = true;
   }
 }
 
@@ -144,28 +140,6 @@ async function submitTurn() {
     } else {
       setInputState("active");
     }
-  } catch (e) {
-    block.querySelector(".loading-text").innerHTML = `<span class="error-text">${esc(e.message)}</span>`;
-    setInputState("active");
-  }
-}
-
-async function submitSkip() {
-  setInputState("loading");
-
-  const block = appendBlock(
-    `<div class="turn-label">Turn ${(state?.turn || 0) + 1}</div>` +
-      `<div class="player-line">\u00bb [inaction]</div>` +
-      `<div class="loading-text">The world turns\u2026</div>`
-  );
-
-  try {
-    const res = await fetch(`/api/run/${runId}/skip`, { method: "POST" });
-    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || `HTTP ${res.status}`);
-    const data = await res.json();
-    state = data.world_state;
-    renderTurnResult(block, "[inaction]", data);
-    setInputState("active");
   } catch (e) {
     block.querySelector(".loading-text").innerHTML = `<span class="error-text">${esc(e.message)}</span>`;
     setInputState("active");
@@ -315,7 +289,6 @@ input.addEventListener("keydown", (e) => {
   if (e.key === "Enter" && !input.disabled) submitTurn();
 });
 actBtn.addEventListener("click", () => { if (!actBtn.disabled) submitTurn(); });
-skipBtn.addEventListener("click", () => { if (!skipBtn.disabled) submitSkip(); });
 startBtn.addEventListener("click", startNewRun);
 newRunBtn.addEventListener("click", () => {
   turnsEl.innerHTML = "";

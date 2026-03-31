@@ -2,7 +2,7 @@
 
 > **Model tier:** LOCAL (Ollama llama3.1:8b) — frontier stub for Phase 0
 > **When frontier is enabled:** swap to haiku/mini-tier API call (~200 tokens)
-> **Purpose:** Convert player natural language into a structured action JSON, including how each NPC is affected
+> **Purpose:** Convert player natural language into a structured action JSON, determine which NPCs are affected
 
 ---
 
@@ -23,10 +23,10 @@ $story_so_far
 The player typed:
 "$player_input"
 
-Interpret this as a concrete action in the world. Consider the story so far when interpreting the player's intent — their action may reference or build on previous events. If the player uses modern language, translate the intent into era-appropriate terms without correcting them.
+The player has total freedom. They can attempt anything — negotiate with foreign powers, flee, hoard resources, start a revolt, do nothing, or anything else. Interpret their intent faithfully, at whatever scale they intend. If they use modern language, translate the intent into era-appropriate terms without correcting them. Do not constrain or redirect their decision.
 
-For npc_impacts: judge how EVERY person present would feel about this action given their role, personality, and the story so far. An action can affect people who are not the direct target — for example, hoarding grain harms the entire town. Use "positive" if the action helps or pleases them, "negative" if it harms or angers them, "neutral" if they are indifferent.
+For npc_impacts: decide which characters are ACTUALLY affected by this action. Not everyone reacts to everything. A grain deal matters to the garrison commander and the deacon feeding refugees — it does not matter to a distant fisherman. Only include NPCs whose lives are genuinely touched by this action. Set "relevant" to true ONLY for those whose reaction the player should hear. Most actions affect 1-3 people, not everyone.
 
 Respond with ONLY a JSON object, no other text:
 
-{"action_type": "speak" or "trade" or "travel" or "observe" or "petition" or "prepare" or "other", "target": "name of person, place, or thing the action is directed at, or null", "intent": "brief summary of what the player is trying to accomplish", "era_description": "one sentence describing how this action plays out in the year $year AD in $location_name, written in third person", "npc_impacts": [{"name": "full NPC name", "sentiment": "positive" or "negative" or "neutral", "reason": "one-line reason for this reaction"}]}
+{"action_type": "a short label describing the nature of this action — use whatever fits, not from a fixed list", "target": "name of person, place, or thing the action is directed at, or null", "intent": "brief summary of what the player is trying to accomplish", "era_description": "one sentence describing how this action plays out in the year $year AD in $location_name, written in third person", "npc_impacts": [{"name": "full NPC name", "sentiment": "positive" or "negative" or "neutral", "relevant": true or false, "reason": "one-line reason"}]}
