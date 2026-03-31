@@ -20,7 +20,7 @@ Per [roadmap.md](roadmap.md) **OPEN QUESTIONS THAT AFFECT THE ROADMAP**:
 
 Bullets for tracking resolution in prose (move to “Closed” subsection below when done):
 
-- [ ] UI metaphor for the text interface
+- [x] UI metaphor for the text interface
 - [ ] Diffusion model provider and hosting (local / API)
 - [ ] Session length target
 - [ ] NPC relationship graph granularity
@@ -34,3 +34,6 @@ Bullets for tracking resolution in prose (move to “Closed” subsection below 
 
 - [x] **Phase 0 era selection** — Roman Late Empire, ~410 AD (Ariminum). Chosen for richest Project Gutenberg coverage. (2026-03-31)
 - [x] **Phase 0 model tier for action parser** — Local Ollama (`llama3.1:8b`) as frontier stub. Frontier swap point labeled in code; will enable when/if local parsing proves insufficient. (2026-03-31)
+- [x] **UI metaphor** — Present-tense stream. The world advances, pauses at decision points (game-initiated or player-initiated). No journal/dispatch framing. (2026-03-31)
+- [x] **Death mechanism** — Hybrid aging + consequence. Turns advance the calendar; the player ages toward a lifespan ceiling. Risky actions can kill early. Both paths must feel narratively earned. (2026-03-31)
+- [x] **Phase 1 starter eras** — Roman Late Empire (~410), Viking Age (~870), Crusader States (~1190), Black Death (~1348), Fall of Constantinople (~1453). (2026-03-31)

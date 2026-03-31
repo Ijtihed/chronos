@@ -17,9 +17,12 @@
         }
 
         header {
-            padding: 16px 24px;
+            padding: 14px 24px;
             border-bottom: 1px solid #282420;
             background: #121210;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
 
         header h1 {
@@ -30,11 +33,24 @@
             font-weight: 400;
         }
 
-        .era-line {
+        .era-line { font-size: 0.82em; color: #706850; margin-top: 3px; }
+
+        .header-right { display: flex; gap: 10px; align-items: center; }
+
+        .btn {
+            background: #1e1c18;
+            border: 1px solid #282420;
+            color: #a09070;
+            padding: 6px 14px;
+            font-family: Georgia, serif;
             font-size: 0.82em;
-            color: #706850;
-            margin-top: 4px;
+            cursor: pointer;
+            border-radius: 3px;
+            transition: background 0.2s;
         }
+        .btn:hover { background: #282420; }
+        .btn:disabled { opacity: 0.3; cursor: not-allowed; }
+        .btn-primary { border-color: #3a3428; color: #c8b88a; }
 
         #narrative {
             flex: 1;
@@ -44,12 +60,10 @@
         }
 
         .intro p { margin-bottom: 12px; }
-        .intro ul { margin: 6px 0 12px 22px; list-style: disc; }
-        .intro li { margin-bottom: 4px; color: #a89870; }
 
         .turn-block {
-            margin-bottom: 28px;
-            padding-top: 20px;
+            margin-bottom: 24px;
+            padding-top: 18px;
             border-top: 1px solid #1e1c18;
         }
 
@@ -58,19 +72,11 @@
             letter-spacing: 0.12em;
             text-transform: uppercase;
             color: #504830;
-            margin-bottom: 10px;
+            margin-bottom: 8px;
         }
 
-        .player-line {
-            font-style: italic;
-            color: #887858;
-            margin-bottom: 10px;
-        }
-
-        .action-narration {
-            margin-bottom: 14px;
-            color: #b8a880;
-        }
+        .player-line { font-style: italic; color: #887858; margin-bottom: 10px; }
+        .action-narration { margin-bottom: 12px; color: #b8a880; }
 
         .parsed-badge {
             display: inline-block;
@@ -81,12 +87,12 @@
             border: 1px solid #1e1c18;
             padding: 2px 8px;
             border-radius: 3px;
-            margin-bottom: 14px;
+            margin-bottom: 12px;
         }
 
         .npc-block {
-            margin-bottom: 14px;
-            padding: 14px 18px;
+            margin-bottom: 12px;
+            padding: 12px 16px;
             border-left: 2px solid #2a2620;
             background: #12110f;
         }
@@ -96,105 +102,140 @@
             letter-spacing: 0.06em;
             text-transform: uppercase;
             color: #706040;
-            margin-bottom: 6px;
+            margin-bottom: 5px;
         }
 
-        .npc-voice {
-            line-height: 1.7;
-            color: #c0b088;
-        }
+        .npc-voice { line-height: 1.7; color: #c0b088; }
 
-        .tension-line {
-            font-size: 0.78em;
-            color: #585040;
-            margin-top: 10px;
-        }
+        .tension-line { font-size: 0.78em; color: #585040; margin-top: 8px; }
         .tension-high { color: #a07840; }
         .tension-critical { color: #b05030; }
 
-        .state-toggle {
-            font-size: 0.72em;
-            color: #3a3428;
-            cursor: pointer;
-            margin-top: 8px;
-            user-select: none;
+        .death-block {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #3a2820;
+            background: #1a1210;
+            text-align: center;
         }
-        .state-toggle:hover { color: #605840; }
+        .death-block p { color: #a08060; line-height: 1.8; }
 
-        .state-dump {
-            display: none;
-            font-family: "SF Mono", "Fira Code", monospace;
-            font-size: 0.68em;
-            color: #3a3428;
-            white-space: pre-wrap;
-            margin-top: 6px;
-            max-height: 300px;
-            overflow-y: auto;
+        .erasure-block {
+            margin: 40px auto;
+            max-width: 500px;
+            text-align: center;
+            padding: 30px;
         }
+        .erasure-block p { color: #706050; line-height: 2; font-style: italic; }
+
+        .location-bar {
+            padding: 8px 24px;
+            background: #141412;
+            border-bottom: 1px solid #1e1c18;
+            font-size: 0.8em;
+            color: #585040;
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .location-bar .loc-name { color: #a09070; }
+        .location-bar .nearby-label { color: #484030; }
 
         #input-bar {
-            padding: 14px 24px;
+            padding: 12px 24px;
             border-top: 1px solid #282420;
             background: #121210;
             display: flex;
-            gap: 10px;
+            gap: 8px;
+            flex-wrap: wrap;
         }
 
         #player-input {
             flex: 1;
+            min-width: 200px;
             background: #181816;
             border: 1px solid #282420;
             color: #c8b88a;
-            padding: 11px 14px;
+            padding: 10px 14px;
             font-family: Georgia, serif;
             font-size: 0.95em;
             border-radius: 3px;
             outline: none;
-            transition: border-color 0.2s;
         }
         #player-input:focus { border-color: #484030; }
         #player-input::placeholder { color: #3a3428; }
-
-        #submit-btn {
-            background: #1e1c18;
-            border: 1px solid #282420;
-            color: #a09070;
-            padding: 11px 22px;
-            font-family: Georgia, serif;
-            font-size: 0.95em;
-            cursor: pointer;
-            border-radius: 3px;
-            transition: background 0.2s;
-        }
-        #submit-btn:hover { background: #282420; }
-        #submit-btn:disabled { opacity: 0.3; cursor: not-allowed; }
 
         .loading-text { color: #504830; font-style: italic; }
         .error-text { color: #a05040; }
 
         strong { color: #d0c090; font-weight: 600; }
+
+        #start-screen {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            flex: 1;
+            gap: 20px;
+        }
+        #start-screen h2 {
+            font-weight: 400;
+            letter-spacing: 0.15em;
+            color: #a09070;
+        }
+        #start-screen p { color: #585040; max-width: 400px; text-align: center; line-height: 1.7; }
+
+        .travel-options {
+            margin-top: 10px;
+            font-size: 0.82em;
+        }
+        .travel-link {
+            color: #706850;
+            cursor: pointer;
+            text-decoration: underline;
+            text-decoration-color: #3a3428;
+        }
+        .travel-link:hover { color: #a09070; }
+
+        .memory-indicator {
+            font-size: 0.72em;
+            color: #3a3428;
+            margin-top: 6px;
+        }
+
+        .hidden { display: none; }
     </style>
 </head>
 <body>
     <header>
-        <h1>Chronos</h1>
-        <div class="era-line" id="era-info">Loading...</div>
+        <div>
+            <h1>Chronos</h1>
+            <div class="era-line" id="era-info"></div>
+        </div>
+        <div class="header-right">
+            <button class="btn" id="new-run-btn">New Run</button>
+        </div>
     </header>
 
-    <div id="narrative">
+    <div id="start-screen">
+        <h2>CHRONOS</h2>
+        <p>A turn-based historical simulation. You will be assigned a random character in a random era. The world moves forward whether you act or not.</p>
+        <button class="btn btn-primary" id="start-btn">Begin</button>
+        <div class="loading-text hidden" id="start-loading">Generating your world...</div>
+    </div>
+
+    <div id="location-bar" class="location-bar hidden"></div>
+
+    <div id="narrative" class="hidden">
         <div id="intro" class="intro"></div>
         <div id="turns"></div>
     </div>
 
-    <div id="input-bar">
-        <input
-            type="text"
-            id="player-input"
-            placeholder="What do you do?"
-            autocomplete="off"
-            disabled
-        >
-        <button id="submit-btn" disabled>Act</button>
+    <div id="input-bar" class="hidden">
+        <input type="text" id="player-input" placeholder="What do you do?" autocomplete="off" disabled>
+        <button class="btn" id="act-btn" disabled>Act</button>
+        <button class="btn" id="skip-btn" disabled>Skip</button>
     </div>
 
     <script src="app.js"></script>

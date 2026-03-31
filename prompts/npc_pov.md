@@ -17,6 +17,9 @@ Your relationship to the merchant $player_name: $relationship_to_player
 Here is what has happened in this story so far:
 $story_so_far
 
+Historical context from primary sources (use to ground your response):
+$historical_context
+
 What just happened this turn:
 $era_description_of_action
 

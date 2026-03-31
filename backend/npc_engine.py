@@ -8,8 +8,14 @@ from __future__ import annotations
 from pathlib import Path
 from string import Template
 
+from backend.hke.retrieve import retrieve_context
 from backend.llm import chat, load_prompt
-from backend.world_state import NPC, WorldState, build_story_summary
+from backend.world_state import (
+    NPC,
+    WorldState,
+    build_story_summary,
+    get_player_location,
+)
 
 _TEMPLATE_PATH = Path(__file__).resolve().parent.parent / "prompts" / "npc_pov.md"
 
@@ -20,6 +26,11 @@ async def generate_npc_pov(
     raw_template = load_prompt(_TEMPLATE_PATH)
     template = Template(raw_template)
 
+    player_loc = get_player_location(state)
+
+    query = action.get("era_description", action.get("intent", ""))
+    historical_context = retrieve_context(state.era.name, query) if query else ""
+
     prompt = template.safe_substitute(
         npc_name=npc.name,
         npc_role=npc.role,
@@ -28,9 +39,10 @@ async def generate_npc_pov(
         relationship_to_player=npc.relationship_to_player,
         player_name=state.player.name,
         era_description=state.era.description,
-        location_name=state.location.name,
-        year=state.era.year,
+        location_name=player_loc.name,
+        year=state.current_year or state.era.year_start,
         story_so_far=build_story_summary(state),
+        historical_context=historical_context or "No additional historical sources available.",
         era_description_of_action=action.get(
             "era_description", "Something has happened in town."
         ),

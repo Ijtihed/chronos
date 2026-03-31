@@ -3,3 +3,6 @@ uvicorn[standard]
 httpx
 pydantic
 python-dotenv
+aiosqlite
+chromadb
+beautifulsoup4

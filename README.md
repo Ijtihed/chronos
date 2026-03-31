@@ -1,24 +1,19 @@
-# CHRONOS — Phase 0 (Proof of Life)
+# CHRONOS — Phase 1 (Playable Text Loop)
 
-Turn-based historical simulation. Phase 0 proves the core loop: player input -> structured action -> world state update -> NPC perspective generation -> UI.
-
-**Era:** Roman Late Empire, ~410 AD — Ariminum on the Adriatic coast as Alaric's Visigoths march on Rome.
+Turn-based historical simulation. A complete run: random era, generated characters, travel, inaction, death by aging or consequence, memory decay to erasure.
 
 ## Prerequisites
 
 - Python 3.9+
 - [Ollama](https://ollama.ai) with `llama3.1:8b`
 
-## Setup (first time)
+## Setup
 
 ```bash
-# Create virtual environment and install deps
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 
-# Make sure Ollama is running and has the model
-ollama serve          # if not already running
 ollama pull llama3.1:8b
 ```
 
@@ -31,77 +26,86 @@ source .venv/bin/activate
 uvicorn backend.main:app --reload
 ```
 
-Then open **http://localhost:8000**.
+Open **http://localhost:8000**. Click "Begin" to start a new run.
 
-### Run all tests (no Ollama needed)
+### Ingest historical corpus (RAG)
 
 ```bash
 source .venv/bin/activate
-pip install -r requirements-dev.txt    # first time only
-python -m pytest tests/ -v --ignore=tests/test_live.py
+
+# Ingest one era
+python -m backend.hke.ingest --era roman_late_empire
+
+# Ingest all 5 eras
+python -m backend.hke.ingest --all
 ```
 
-### Run live tests (requires Ollama running with llama3.1:8b)
+### Run tests (no Ollama needed)
 
 ```bash
 source .venv/bin/activate
+pip install -r requirements-dev.txt
+python -m pytest tests/ --ignore=tests/test_live.py -v
+```
+
+### Run live tests (requires Ollama)
+
+```bash
 python -m pytest tests/test_live.py -v
 ```
 
-### Run the full test suite
+### Full test suite
 
 ```bash
-source .venv/bin/activate
 python -m pytest tests/ -v
-```
-
-Live tests auto-skip if Ollama is unreachable.
-
-### Reset the game (via API)
-
-```bash
-curl -X POST http://localhost:8000/api/reset
-```
-
-### Check health
-
-```bash
-curl http://localhost:8000/api/health
 ```
 
 ## Project structure
 
 ```
-backend/          Python server (FastAPI)
-  main.py           API endpoints
-  world_state.py    Data models, initial state, mutation logic
-  action_parser.py  Natural language -> structured action (LLM)
-  npc_engine.py     NPC POV generation (LLM)
-  llm.py            Shared Ollama client
-frontend/         Browser UI (vanilla HTML/JS)
-prompts/          LLM prompt templates (design artifacts, not code)
-tests/            Test suite
-context/          Game design docs (source of truth)
+backend/              Python server (FastAPI)
+  main.py               API endpoints
+  world_state.py         Data models, state mutation
+  action_parser.py       NL -> structured action (LLM)
+  npc_engine.py          NPC POV generation (LLM + RAG)
+  character_gen.py       Character generation at run init (LLM)
+  world_engine.py        World advancement, autonomous NPC actions
+  death_engine.py        Death check, memory decay, erasure
+  persistence.py         SQLite session storage
+  eras/                  Era configs (5 eras)
+  hke/                   Historical Knowledge Engine (RAG)
+    ingest.py              Corpus download + chunking CLI
+    store.py               Chroma vector DB
+    retrieve.py            Context retrieval for prompts
+frontend/             Browser UI (vanilla HTML/JS)
+prompts/              LLM prompt templates
+tests/                Test suite
+context/              Game design docs
 ```
 
-## Model tier (Phase 0)
+## Eras
 
-All LLM calls are **local** (Ollama `llama3.1:8b`). No frontier API keys needed. The action parser is a frontier *stub* — designed to swap to haiku/mini-tier when enabled. See `prompts/` for prompt templates.
+| Era | Year | Region |
+|-----|------|--------|
+| Roman Late Empire | ~410 | Italia |
+| Viking Age | ~870 | Scandinavia / North Sea |
+| Crusader States | ~1190 | Levant |
+| Black Death | ~1348 | Northern Italy / Southern France |
+| Fall of Constantinople | ~1453 | Byzantine / Ottoman frontier |
 
 ## API endpoints
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/api/health` | Health check + Ollama status |
-| GET | `/api/state` | Current world state |
-| POST | `/api/turn` | Submit player action, get response |
-| POST | `/api/reset` | Reset to initial state |
+| POST | `/api/run` | Create new run (random era, LLM-generated characters) |
+| GET | `/api/run/{id}` | Get run state |
+| POST | `/api/run/{id}/turn` | Submit player action |
+| POST | `/api/run/{id}/skip` | Skip turn (character acts autonomously) |
+| POST | `/api/run/{id}/travel` | Travel to adjacent location |
+| POST | `/api/run/{id}/reset` | Reset run |
+| GET | `/api/runs` | List all runs |
+| GET | `/api/health` | Health check |
 
-## What's hardcoded (Phase 0 only)
+## Model tier
 
-Everything below gets replaced with generation in Phase 1:
-- Era (Roman Late Empire, 410 AD)
-- Player character (Marcus Aurelius Corvinus, grain merchant)
-- NPCs (Lucius Gallus, centurion; Deacon Paulus)
-- Location (Ariminum)
-- World state mutation rules (simple disposition shifts, tension timer)
+All LLM calls are **local** (Ollama `llama3.1:8b`). Embeddings use Chroma's built-in model. No frontier API keys needed. See `prompts/` for all prompt templates.

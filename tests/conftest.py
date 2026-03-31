@@ -1,4 +1,4 @@
-"""Shared fixtures for CHRONOS Phase 0 tests."""
+"""Shared fixtures for CHRONOS tests."""
 
 from __future__ import annotations
 
@@ -29,25 +29,27 @@ def sample_parsed_action() -> dict:
             "Corvinus approaches the centurion at the garrison gate "
             "and inquires about the disposition of the remaining cohorts."
         ),
+        "npc_impacts": [
+            {"name": "Lucius Gallus", "sentiment": "positive", "reason": "showing concern"},
+            {"name": "Deacon Paulus", "sentiment": "neutral", "reason": "not involved"},
+        ],
     }
 
 
 @pytest_asyncio.fixture
 async def client() -> AsyncGenerator[httpx.AsyncClient, None]:
     """Async test client hitting the FastAPI app directly (no network)."""
-    from backend import main
+    from backend import main, persistence
 
-    main._state = create_initial_state()
+    await persistence.init_db()
     async with httpx.AsyncClient(
         transport=httpx.ASGITransport(app=app),
         base_url="http://test",
     ) as c:
         yield c
-    main._state = create_initial_state()
 
 
 async def ollama_reachable() -> bool:
-    """Check if Ollama is up — used to skip live tests."""
     try:
         async with httpx.AsyncClient(timeout=3.0) as c:
             resp = await c.get("http://localhost:11434/api/tags")

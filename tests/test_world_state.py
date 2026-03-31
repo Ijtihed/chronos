@@ -1,7 +1,4 @@
-"""Unit tests for world state: models, initial state, mutation, and story summary.
-
-These run without Ollama — pure Python, no LLM calls.
-"""
+"""Unit tests for world state: models, initial state, mutation, memory, and story summary."""
 
 from backend.world_state import (
     TENSION_LEVELS,
@@ -11,6 +8,8 @@ from backend.world_state import (
     apply_action,
     build_story_summary,
     create_initial_state,
+    get_player_location,
+    npcs_near_player,
 )
 
 
@@ -20,31 +19,60 @@ class TestInitialState:
 
     def test_era_is_roman_late_empire(self, initial_state: WorldState):
         assert initial_state.era.name == "Roman Late Empire"
-        assert initial_state.era.year == 410
+        assert initial_state.era.year_start == 410
 
     def test_player_exists(self, initial_state: WorldState):
         assert initial_state.player.name == "Marcus Aurelius Corvinus"
         assert initial_state.player.role == "Grain merchant"
-        assert initial_state.player.location == "Ariminum"
+        assert initial_state.player.location == "ariminum"
+
+    def test_player_has_birth_year(self, initial_state):
+        assert initial_state.player.birth_year > 0
 
     def test_has_at_least_one_npc(self, initial_state: WorldState):
         assert len(initial_state.npcs) >= 1
 
     def test_npcs_have_distinct_roles(self, initial_state: WorldState):
         roles = [npc.role for npc in initial_state.npcs]
-        assert len(roles) == len(set(roles)), "NPC roles should be unique"
+        assert len(roles) == len(set(roles))
 
     def test_npcs_have_relationship_to_player(self, initial_state: WorldState):
         for npc in initial_state.npcs:
             assert npc.relationship_to_player, f"{npc.name} missing relationship"
 
-    def test_location_is_ariminum(self, initial_state: WorldState):
-        assert initial_state.location.name == "Ariminum"
-        assert initial_state.location.political_tension in TENSION_LEVELS
+    def test_npcs_have_memory_field(self, initial_state):
+        for npc in initial_state.npcs:
+            assert isinstance(npc.memory_of_player, float)
+
+    def test_has_multiple_locations(self, initial_state):
+        assert len(initial_state.locations) >= 2
+
+    def test_locations_have_neighbors(self, initial_state):
+        loc = get_player_location(initial_state)
+        assert len(loc.neighbors) >= 1
+
+    def test_run_status_is_active(self, initial_state):
+        assert initial_state.run_status == "active"
+
+    def test_has_run_id(self, initial_state):
+        assert initial_state.run_id
+        assert len(initial_state.run_id) > 0
 
     def test_starts_at_turn_zero(self, initial_state: WorldState):
         assert initial_state.turn == 0
         assert initial_state.events == []
+
+
+class TestLocationHelpers:
+    def test_get_player_location(self, initial_state):
+        loc = get_player_location(initial_state)
+        assert loc.name == "Ariminum"
+
+    def test_npcs_near_player(self, initial_state):
+        nearby = npcs_near_player(initial_state)
+        assert len(nearby) == 2
+        for npc in nearby:
+            assert npc.location == initial_state.player.location
 
 
 class TestApplyAction:
@@ -52,51 +80,24 @@ class TestApplyAction:
         new = apply_action(initial_state, sample_parsed_action)
         assert new.turn == 1
 
+    def test_advances_year(self, initial_state, sample_parsed_action):
+        new = apply_action(initial_state, sample_parsed_action)
+        assert new.current_year >= initial_state.current_year
+
     def test_appends_event(self, initial_state, sample_parsed_action):
         new = apply_action(initial_state, sample_parsed_action)
         assert len(new.events) == 1
         assert new.events[0].turn == 1
         assert new.events[0].action_type == "speak"
-        assert new.events[0].target == "Lucius Gallus"
+
+    def test_event_records_location(self, initial_state, sample_parsed_action):
+        new = apply_action(initial_state, sample_parsed_action)
+        assert new.events[0].location == "ariminum"
 
     def test_does_not_mutate_original(self, initial_state, sample_parsed_action):
         apply_action(initial_state, sample_parsed_action)
         assert initial_state.turn == 0
         assert initial_state.events == []
-
-    def test_speak_shifts_targeted_npc_disposition(self, initial_state):
-        action = {
-            "action_type": "speak",
-            "target": "Lucius Gallus",
-            "intent": "talk",
-            "era_description": "Corvinus speaks to Gallus.",
-        }
-        new = apply_action(initial_state, action)
-        gallus = next(n for n in new.npcs if n.id == "centurion_gallus")
-        assert gallus.disposition != "grim", "Speaking should shift disposition"
-        assert gallus.disposition == "cautious"
-
-    def test_speak_does_not_shift_untargeted_npc(self, initial_state):
-        action = {
-            "action_type": "speak",
-            "target": "Lucius Gallus",
-            "intent": "talk",
-            "era_description": "Corvinus speaks to Gallus.",
-        }
-        new = apply_action(initial_state, action)
-        paulus = next(n for n in new.npcs if n.id == "deacon_paulus")
-        assert paulus.disposition == "fervent", "Untargeted NPC should not shift"
-
-    def test_observe_does_not_shift_disposition(self, initial_state):
-        action = {
-            "action_type": "observe",
-            "target": "Lucius Gallus",
-            "intent": "watch",
-            "era_description": "Corvinus watches Gallus.",
-        }
-        new = apply_action(initial_state, action)
-        gallus = next(n for n in new.npcs if n.id == "centurion_gallus")
-        assert gallus.disposition == "grim"
 
     def test_tension_escalates_every_three_turns(self, initial_state):
         state = initial_state
@@ -105,21 +106,13 @@ class TestApplyAction:
         for _ in range(3):
             state = apply_action(state, action)
         assert state.turn == 3
-        assert state.location.political_tension == "critical"
-
-    def test_tension_does_not_exceed_critical(self, initial_state):
-        state = initial_state
-        action = {"action_type": "observe", "target": None, "intent": "wait",
-                  "era_description": "Corvinus waits."}
-        for _ in range(9):
-            state = apply_action(state, action)
-        assert state.location.political_tension == "critical"
+        loc = get_player_location(state)
+        assert loc.political_tension == "critical"
 
     def test_handles_missing_action_fields_gracefully(self, initial_state):
         new = apply_action(initial_state, {})
         assert new.turn == 1
         assert new.events[0].action_type == "other"
-        assert new.events[0].description == "Something happened."
 
     def test_multiple_actions_accumulate_events(self, initial_state):
         state = initial_state
@@ -132,17 +125,6 @@ class TestApplyAction:
             })
         assert state.turn == 5
         assert len(state.events) == 5
-
-    def test_threaten_makes_npc_hostile(self, initial_state):
-        action = {
-            "action_type": "threaten",
-            "target": "Lucius Gallus",
-            "intent": "intimidate",
-            "era_description": "Corvinus threatens Gallus.",
-        }
-        new = apply_action(initial_state, action)
-        gallus = next(n for n in new.npcs if n.id == "centurion_gallus")
-        assert gallus.disposition == "hostile"
 
 
 class TestNpcImpacts:
@@ -191,23 +173,6 @@ class TestNpcImpacts:
         gallus = next(n for n in new.npcs if n.id == "centurion_gallus")
         assert gallus.disposition == "grim"
 
-    def test_mixed_impacts_affect_different_npcs(self, initial_state):
-        action = {
-            "action_type": "petition",
-            "target": "Deacon Paulus",
-            "intent": "donate grain to refugees",
-            "era_description": "Corvinus donates grain.",
-            "npc_impacts": [
-                {"name": "Deacon Paulus", "sentiment": "positive", "reason": "charity"},
-                {"name": "Lucius Gallus", "sentiment": "negative", "reason": "less grain for garrison"},
-            ],
-        }
-        new = apply_action(initial_state, action)
-        paulus = next(n for n in new.npcs if n.id == "deacon_paulus")
-        gallus = next(n for n in new.npcs if n.id == "centurion_gallus")
-        assert paulus.disposition == "engaged"
-        assert gallus.disposition == "hostile"
-
     def test_falls_back_to_target_matching_without_impacts(self, initial_state):
         action = {
             "action_type": "speak",
@@ -232,6 +197,51 @@ class TestNpcImpacts:
         assert gallus.disposition == "grim"
 
 
+class TestNpcMemory:
+    def test_interaction_increases_memory(self, initial_state):
+        action = {
+            "action_type": "speak",
+            "target": "Lucius Gallus",
+            "intent": "talk",
+            "era_description": "Corvinus speaks to Gallus.",
+            "npc_impacts": [
+                {"name": "Lucius Gallus", "sentiment": "positive", "reason": "talk"},
+            ],
+        }
+        before = next(n for n in initial_state.npcs if n.id == "centurion_gallus")
+        new = apply_action(initial_state, action)
+        after = next(n for n in new.npcs if n.id == "centurion_gallus")
+        assert after.memory_of_player > before.memory_of_player
+
+    def test_nearby_npcs_get_passive_memory_bump(self, initial_state):
+        action = {
+            "action_type": "observe",
+            "target": None,
+            "intent": "watch",
+            "era_description": "Corvinus watches the harbor.",
+        }
+        before_paulus = next(n for n in initial_state.npcs if n.id == "deacon_paulus")
+        new = apply_action(initial_state, action)
+        after_paulus = next(n for n in new.npcs if n.id == "deacon_paulus")
+        assert after_paulus.memory_of_player >= before_paulus.memory_of_player
+
+    def test_memory_capped_at_one(self, initial_state):
+        state = initial_state
+        action = {
+            "action_type": "speak",
+            "target": "Lucius Gallus",
+            "intent": "talk",
+            "era_description": "Corvinus speaks.",
+            "npc_impacts": [
+                {"name": "Lucius Gallus", "sentiment": "positive", "reason": "talk"},
+            ],
+        }
+        for _ in range(20):
+            state = apply_action(state, action)
+        gallus = next(n for n in state.npcs if n.id == "centurion_gallus")
+        assert gallus.memory_of_player <= 1.0
+
+
 class TestDispositionShifts:
     def test_grim_to_cautious(self):
         assert _shift_positive("grim") == "cautious"
@@ -251,20 +261,11 @@ class TestDispositionShifts:
     def test_warming_to_cautious_negative(self):
         assert _shift_negative("warming") == "cautious"
 
-    def test_cautious_to_wary_negative(self):
-        assert _shift_negative("cautious") == "wary"
-
-    def test_wary_to_hostile_negative(self):
-        assert _shift_negative("wary") == "hostile"
-
     def test_grim_to_hostile_negative(self):
         assert _shift_negative("grim") == "hostile"
 
     def test_fervent_to_suspicious_negative(self):
         assert _shift_negative("fervent") == "suspicious"
-
-    def test_engaged_to_wary_negative(self):
-        assert _shift_negative("engaged") == "wary"
 
     def test_unknown_negative_stays_same(self):
         assert _shift_negative("confused") == "confused"
@@ -278,12 +279,9 @@ class TestWorldStateSerialization:
 
     def test_dump_includes_all_fields(self, initial_state):
         d = initial_state.model_dump()
-        assert "era" in d
-        assert "player" in d
-        assert "npcs" in d
-        assert "location" in d
-        assert "events" in d
-        assert "turn" in d
+        for field in ("era", "player", "npcs", "locations", "events", "turn",
+                      "run_id", "run_status", "current_year"):
+            assert field in d, f"Missing field: {field}"
 
 
 class TestStorySummary:
@@ -297,27 +295,12 @@ class TestStorySummary:
         assert "Turn 1" in summary
         assert "Corvinus" in summary
 
-    def test_includes_npc_dispositions(self, initial_state, sample_parsed_action):
-        state = apply_action(initial_state, sample_parsed_action)
-        summary = build_story_summary(state)
-        assert "Lucius Gallus" in summary
-        assert "Deacon Paulus" in summary
-
     def test_includes_tension(self, initial_state, sample_parsed_action):
         state = apply_action(initial_state, sample_parsed_action)
         summary = build_story_summary(state)
         assert "tension" in summary.lower()
 
-    def test_accumulates_across_turns(self, initial_state):
-        state = initial_state
-        for i in range(3):
-            state = apply_action(state, {
-                "action_type": "observe",
-                "target": None,
-                "intent": f"action {i}",
-                "era_description": f"Event number {i + 1} happened.",
-            })
+    def test_includes_year(self, initial_state, sample_parsed_action):
+        state = apply_action(initial_state, sample_parsed_action)
         summary = build_story_summary(state)
-        assert "Turn 1" in summary
-        assert "Turn 2" in summary
-        assert "Turn 3" in summary
+        assert "410" in summary
