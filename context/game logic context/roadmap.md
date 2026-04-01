@@ -128,10 +128,10 @@ A **full run** is reproducible: new run, play until **last memory dies** without
 
 ### Success criteria
 
-- [ ] Map loads correctly for at least 3 different eras with accurate historical borders
-- [ ] Player position and NPC positions are correctly represented
-- [ ] Border changes from world events are visibly reflected on the map over the course of a run
-- [ ] Travel feels spatial — moving across the map takes more turns than moving locally
+- [x] Map loads correctly for at least 3 different eras with accurate historical borders
+- [x] Player position and NPC positions are correctly represented
+- [ ] Border changes from world events — deferred (borders are static per era in Phase 2; dynamic borders are a future feature)
+- [x] Travel feels spatial — moving across the map takes more turns than moving locally
 
 ### Definition of success
 
@@ -399,20 +399,21 @@ Use this shape:
 
 ### Phase 1
 
-- **Completed:** 2026-04-01 (infrastructure only -- design reframe pending rebuild)
-- **Success criteria:** Partial. Core systems built (eras, travel, death, memory, RAG, persistence) but the turn loop was player-centric, not simulation-first. See context/other/lessons-learned.md.
+- **Completed:** 2026-04-01 (rebuilt simulation-first)
+- **Success criteria:** Core systems built and turn loop rebuilt to simulation-first architecture. Pending full playtest.
+  - *Infrastructure:* 5 eras, character generation, travel, death/aging, memory decay, erasure, RAG/HKE v1, SQLite persistence, unified turn endpoint — all working.
+  - *Simulation-first rebuild:* World simulates every turn (NPCs act autonomously), player action is one thread. Ambient NPC activity visible at player's location. NPCs can travel between locations. NPC perception endpoint built.
+  - *What was wrong initially:* Turn loop was player-centric (player acts, world reacts). Rebuilt to world-simulates-then-player-acts. See context/other/lessons-learned.md.
 - **Planned vs actual:**
-  - All mechanical systems shipped: 5 eras, character generation, travel, death/aging, memory decay, erasure, RAG/HKE v1, SQLite persistence, unified turn endpoint.
-  - The turn loop was built as player-acts-then-world-reacts. The design requires world-simulates-then-player-observes. This is a structural mismatch, not a bug.
-  - NPCs were static (no autonomous movement, no NPC-on-NPC interaction, no ambient activity). Design requires NPCs as autonomous subagents.
-  - Relevance filtering was too aggressive (usually 1 NPC per turn).
-- **Carryover / rebuild needed:**
-  - Turn loop must start with world advancement, not player action
-  - NPCs must act every turn at the player's location (ambient activity)
-  - NPCs must travel between locations autonomously
-  - NPC-on-NPC interactions must be visible
-  - Narrative framing must foreground the world, not the player
-  - NPC perception on hover must be built
+  - All mechanical systems shipped as planned.
+  - The simulation-first architecture was not in the original plan — it emerged from playtesting feedback. The initial build felt like a text adventure, not a simulation.
+  - NPC autonomy (travel, NPC-on-NPC interaction, ambient activity) added in the rebuild.
+  - Two-step loading flow (era preview instant, characters in background) added to fix empty loading screen.
+- **Carryover:**
+  - NPC autonomy needs playtesting — is 2-4 NPCs acting per turn enough? Too many? Too few?
+  - NPC-on-NPC interactions are generated but shallow — they name an interaction partner but don't track persistent NPC-NPC relationships yet (Phase 5).
+  - Relevance filter for player action reactions may still need tuning.
+  - Loading screen events/voices are hardcoded per era config — should eventually come from HCE Events DB.
 
 ### Phase 2
 

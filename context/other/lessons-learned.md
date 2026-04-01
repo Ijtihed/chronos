@@ -55,3 +55,7 @@ NPCs are autonomous subagents. They travel, make decisions, interact with each o
 The mistake was building code that matched a traditional game loop (player acts → world reacts) instead of code that matched the design (world simulates → player observes and sometimes acts). The design documents said the right things from the start, but the implementation defaulted to the familiar pattern.
 
 **Lesson: when the design says "the world is the story and the player is just in it," the turn loop must start with the world, not with the player.**
+
+### Resolution
+
+Rebuilt on 2026-04-01. The turn loop now starts with `simulate_turn()` which runs NPC autonomous actions before the player's action is parsed. The world engine generates ambient activity (2-4 NPCs acting visibly per turn at the player's location, plus background actions elsewhere). NPCs can decide to travel autonomously. The narrative response includes `ambient_activity[]` before the player's action consequences. NPC perception endpoint added for subjective character impressions on hover. Two-step loading flow added (era preview instant, characters generated in background).

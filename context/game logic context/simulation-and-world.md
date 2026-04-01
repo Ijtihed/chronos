@@ -59,7 +59,7 @@ This means the map is always a partial view. It shows the world as the character
 Each run seeds from a randomly selected historical era (post 0 AD). The game generates:
 
 - A player character with an archetype appropriate to that era and a short backstory
-- A starting region with 15–30 characters, their archetypes, locations, and relationships
+- A starting region with 8-15 characters, their archetypes, locations, and relationships
 - A political situation drawn from the real historical context of that era
 - A map layer based on real historical borders for that period
 

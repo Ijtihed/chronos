@@ -28,7 +28,7 @@ Each record is a flat entry:
   "year": 1347,
   "region": "Mediterranean",
   "event": "Plague arrives in Sicily via Genoese trading ships",
-  "significance": "catastrophic",
+  "significance": "civilizational",
   "type": "epidemic",
   "affects": ["trade", "population", "religion", "political_stability"],
   "canonical": true
