@@ -291,7 +291,8 @@ async function submitTurn(text) {
   const turnsContainer = $("#turns-container");
   const block = document.createElement("div");
   block.className = "mb-8";
-  block.innerHTML = `<p class="font-body italic text-[16px] text-on-secondary-container">${esc(text)}</p><p class="font-system text-[10px] text-[#2a2218] mt-2">...</p>`;
+  block.innerHTML = `<p class="font-body italic text-[16px] text-on-secondary-container">${esc(text)}</p>` +
+    `<div class="turn-spinner"><div class="turn-spinner-ring"></div><span class="turn-spinner-text">The world is happening</span></div>`;
   turnsContainer.appendChild(block);
   block.scrollIntoView({ behavior: "smooth" });
 
@@ -328,7 +329,7 @@ async function submitTurn(text) {
       ChronosMap.updateMarkers(state);
     }
   } catch (e) {
-    block.innerHTML = `<p class="font-body italic text-[16px] text-on-secondary-container">${esc(text)}</p><p class="font-system text-[10px] text-dead-tint mt-2">${esc(e.message)}</p>`;
+    block.innerHTML = `<p class="font-body italic text-[16px] text-on-secondary-container">${esc(text)}</p><p class="font-system text-[10px] text-dead-tint mt-2">Something went wrong. ${esc(e.message)}</p>`;
   } finally {
     turnInProgress = false;
     if (input) {

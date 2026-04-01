@@ -173,6 +173,32 @@
       opacity: 0.5;
     }
 
+    @keyframes spinSlow {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    .turn-spinner {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .turn-spinner-ring {
+      width: 14px;
+      height: 14px;
+      border: 1.5px solid #2a2218;
+      border-top-color: #5a4e3a;
+      border-radius: 50%;
+      animation: spinSlow 1.5s linear infinite;
+    }
+    .turn-spinner-text {
+      font-family: 'Special Elite', monospace;
+      font-size: 10px;
+      color: #3a3428;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+
     #word-tooltip {
       position: fixed;
       z-index: 9999;
@@ -417,8 +443,8 @@
   <!-- ================================================ -->
   <div id="map-container" class="hidden fixed top-[36px] left-0 right-0 bottom-0 z-[200] bg-surface">
     <div id="map" class="w-full h-full"></div>
-    <!-- Custom zoom controls -->
-    <div class="absolute bottom-6 right-6 z-[210] flex flex-col gap-2">
+    <!-- Custom zoom controls — above all Leaflet layers -->
+    <div class="fixed bottom-6 right-6 z-[999] flex flex-col gap-2">
       <button id="map-zoom-in" class="w-8 h-8 flex items-center justify-center bg-[#1a1816] text-on-secondary-container hover:text-on-surface cursor-pointer font-system text-[16px] leading-none" style="border: 1px solid #2a2218; border-radius: 2px;">+</button>
       <button id="map-zoom-out" class="w-8 h-8 flex items-center justify-center bg-[#1a1816] text-on-secondary-container hover:text-on-surface cursor-pointer font-system text-[16px] leading-none" style="border: 1px solid #2a2218; border-radius: 2px;">&minus;</button>
     </div>
