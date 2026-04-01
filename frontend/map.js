@@ -165,8 +165,11 @@ const ChronosMap = (function () {
         continue;
       }
 
-      var markerClass = visited ? "marker-visited" : "marker-unvisited";
-      var markerSize = visited ? 10 : 7;
+      // Only show NPCs the player has actually encountered (visited their location)
+      if (!visited) continue;
+
+      var markerClass = "marker-visited";
+      var markerSize = 10;
 
       if (runStatus === "dead_observing") {
         var mem = npc.memory_of_player || 0;
@@ -180,11 +183,18 @@ const ChronosMap = (function () {
       }).addTo(map);
 
       if (visited) {
-        m.bindTooltip(npc.name + " \u2014 " + npc.role, {
-          direction: "top",
-          offset: [0, -8],
-          opacity: 0.8,
-        });
+        m.bindTooltip(
+          '<span style="font-family:IM Fell English,serif;font-size:13px;color:#c8b89a;letter-spacing:0.02em;">' +
+          npc.name + '</span><br>' +
+          '<span style="font-family:Special Elite,monospace;font-size:9px;color:#5a4e3a;text-transform:uppercase;letter-spacing:0.08em;">' +
+          npc.role + '</span>',
+          {
+            direction: "top",
+            offset: [0, -8],
+            opacity: 1,
+            className: "npc-tooltip",
+          }
+        );
         (function (npcRef, marker) {
           marker.on("click", function () {
             _showPerception(npcRef, marker);
