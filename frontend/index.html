@@ -1,232 +1,350 @@
 <!DOCTYPE html>
-<html lang="en">
+<html class="dark" lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CHRONOS</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CHRONOS — The Living Manuscript</title>
 
-        body {
-            font-family: Georgia, "Times New Roman", serif;
-            background: #0e0e0e;
-            color: #c8b88a;
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
-        }
+  <link href="https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&family=Special+Elite&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 
-        #narrative {
-            flex: 1;
-            overflow-y: auto;
-            padding: 40px 24px 28px;
-            max-width: 680px;
-            margin: 0 auto;
-            width: 100%;
-            line-height: 1.8;
-        }
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <script>
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "tertiary":               "#e2c28b",
+            "surface":                "#0e0c09",
+            "surface-dim":            "#151310",
+            "surface-container":      "#2a2218",
+            "surface-container-low":  "#1e1b18",
+            "surface-container-lowest":"#100e0b",
+            "surface-container-high": "#2c2a26",
+            "on-surface":             "#c8b89a",
+            "on-secondary-container": "#7a6a54",
+            "tertiary-container":     "#8a7040",
+            "primary":                "#d5c5a6",
+            "primary-fixed":          "#f2e1c1",
+            "primary-container":      "#807258",
+            "outline-variant":        "#4d463a",
+            "dead-tint":              "#5a2e2e",
+          },
+          fontFamily: {
+            "serif-display": ['"IM Fell English"', "serif"],
+            "body":          ['"IM Fell English"', "serif"],
+            "system":        ['"Special Elite"', "monospace"],
+          },
+          borderRadius: {
+            "DEFAULT": "2px",
+            "lg": "2px",
+            "xl": "2px",
+            "full": "9999px",
+          },
+        },
+      },
+    };
+  </script>
 
-        .intro p { margin-bottom: 14px; }
+  <style>
+    body {
+      background-color: #0e0c09;
+      margin: 0;
+      overflow: hidden;
+      font-family: 'IM Fell English', serif;
+    }
 
-        .turn-block {
-            margin-bottom: 28px;
-            padding-top: 20px;
-            border-top: 1px solid #1a1816;
-        }
+    .manuscript-scroll::-webkit-scrollbar { width: 3px; }
+    .manuscript-scroll::-webkit-scrollbar-track { background: transparent; }
+    .manuscript-scroll::-webkit-scrollbar-thumb { background: #2a2218; }
 
-        .year-mark {
-            font-size: 0.7em;
-            letter-spacing: 0.1em;
-            text-transform: uppercase;
-            color: #3a3428;
-            margin-bottom: 8px;
-        }
+    .ink-underline:hover {
+      text-decoration: underline;
+      text-decoration-thickness: 1px;
+      text-underline-offset: 4px;
+    }
 
-        .player-line {
-            font-style: italic;
-            color: #706850;
-            margin-bottom: 12px;
-            font-size: 0.9em;
-        }
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      display: inline-block;
+      line-height: 1;
+      text-transform: none;
+      letter-spacing: normal;
+      word-wrap: normal;
+      white-space: nowrap;
+      direction: ltr;
+    }
 
-        .narration { margin-bottom: 14px; color: #b8a880; }
+    .screen { display: none; }
+    .screen.active { display: flex; }
 
-        .npc-block {
-            margin-bottom: 14px;
-            padding: 14px 18px;
-            border-left: 2px solid #2a2620;
-            background: #12110f;
-        }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+    .fade-in { animation: fadeIn 0.6s ease forwards; }
 
-        .npc-label {
-            font-size: 0.72em;
-            letter-spacing: 0.06em;
-            text-transform: uppercase;
-            color: #585040;
-            margin-bottom: 5px;
-        }
+    @keyframes pulseDot {
+      0%, 100% { opacity: 0.15; }
+      50%      { opacity: 0.7; }
+    }
+    .dots-pulse span:nth-child(1) { animation: pulseDot 2s ease-in-out 0s infinite; }
+    .dots-pulse span:nth-child(2) { animation: pulseDot 2s ease-in-out 0.4s infinite; }
+    .dots-pulse span:nth-child(3) { animation: pulseDot 2s ease-in-out 0.8s infinite; }
 
-        .npc-voice { line-height: 1.8; color: #c0b088; }
+    #hamburger-panel {
+      transform: translateX(100%);
+      transition: transform 0.3s ease;
+    }
+    #hamburger-panel.open { transform: translateX(0); }
 
-        .death-block {
-            margin: 30px 0;
-            padding: 24px;
-            border-top: 1px solid #2a2018;
-            border-bottom: 1px solid #2a2018;
-            text-align: center;
-        }
-        .death-block p { color: #907860; line-height: 1.9; }
+    .leaflet-container { background: #0e0c09 !important; }
 
-        .erasure-block {
-            margin: 50px auto;
-            max-width: 480px;
-            text-align: center;
-            padding: 30px;
-        }
-        .erasure-block p { color: #585040; line-height: 2.2; font-style: italic; }
+    .marker-player {
+      background: #c8a050;
+      border: 2px solid #e0c878;
+      border-radius: 50%;
+      box-shadow: 0 0 8px rgba(200,160,80,0.5);
+    }
+    .marker-visited {
+      background: #7a9070;
+      border: 2px solid #90a888;
+      border-radius: 50%;
+    }
+    .marker-unvisited {
+      background: #3a3428;
+      border: 1px solid #504838;
+      border-radius: 50%;
+      opacity: 0.6;
+    }
+    .marker-faded {
+      background: #1e1c18;
+      border: 1px solid #2a2620;
+      border-radius: 50%;
+      opacity: 0.3;
+    }
+    .polity-tooltip {
+      background: #2a2218 !important;
+      color: #c8b89a !important;
+      border: none !important;
+      font-family: 'Special Elite', monospace !important;
+      font-size: 10px !important;
+      letter-spacing: 0.05em;
+      box-shadow: none !important;
+    }
 
-        #input-bar {
-            padding: 14px 24px;
-            border-top: 1px solid #1a1816;
-            display: flex;
-            gap: 8px;
-            max-width: 680px;
-            margin: 0 auto;
-            width: 100%;
-        }
+    .player-input-field:focus { border-color: #8a7040 !important; }
 
-        #player-input {
-            flex: 1;
-            background: #141412;
-            border: 1px solid #1e1c18;
-            color: #c8b88a;
-            padding: 12px 16px;
-            font-family: Georgia, serif;
-            font-size: 0.95em;
-            border-radius: 2px;
-            outline: none;
-        }
-        #player-input:focus { border-color: #3a3428; }
-        #player-input::placeholder { color: #282420; }
-        #player-input:disabled { opacity: 0.3; }
+    .input-dead {
+      color: #5a2e2e !important;
+      border-color: rgba(90,46,46,0.3) !important;
+    }
+    .input-dead::placeholder {
+      color: #5a2e2e !important;
+      opacity: 0.5;
+    }
 
-        #act-btn {
-            background: none;
-            border: 1px solid #1e1c18;
-            color: #585040;
-            padding: 12px 18px;
-            font-family: Georgia, serif;
-            font-size: 0.95em;
-            cursor: pointer;
-            border-radius: 2px;
-        }
-        #act-btn:hover { border-color: #3a3428; color: #a09070; }
-        #act-btn:disabled { opacity: 0.2; cursor: not-allowed; }
-
-        .loading-text { color: #3a3428; font-style: italic; }
-        .error-text { color: #805040; }
-        strong { color: #d0c090; font-weight: 600; }
-
-        #start-screen {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            flex: 1;
-            gap: 24px;
-            padding: 40px;
-        }
-        #start-screen h2 {
-            font-weight: 400;
-            font-size: 1.1em;
-            letter-spacing: 0.2em;
-            text-transform: uppercase;
-            color: #706850;
-        }
-        #start-screen .begin-btn {
-            background: none;
-            border: 1px solid #282420;
-            color: #a09070;
-            padding: 10px 28px;
-            font-family: Georgia, serif;
-            font-size: 0.9em;
-            cursor: pointer;
-            border-radius: 2px;
-            letter-spacing: 0.1em;
-        }
-        #start-screen .begin-btn:hover { border-color: #484030; }
-
-        #map-container {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: 100;
-            background: #0e0e0e;
-        }
-
-        #map {
-            width: 100%;
-            height: 100%;
-        }
-
-        .leaflet-container { background: #0e0e0e; }
-
-        .marker-player {
-            background: #c8a050;
-            border: 2px solid #e0c878;
-            border-radius: 50%;
-            box-shadow: 0 0 8px rgba(200, 160, 80, 0.5);
-        }
-
-        .marker-visited {
-            background: #7a9070;
-            border: 2px solid #90a888;
-            border-radius: 50%;
-        }
-
-        .marker-unvisited {
-            background: #3a3428;
-            border: 1px solid #504838;
-            border-radius: 50%;
-            opacity: 0.6;
-        }
-
-        .marker-faded {
-            background: #1e1c18;
-            border: 1px solid #2a2620;
-            border-radius: 50%;
-            opacity: 0.3;
-        }
-
-        .hidden { display: none; }
-    </style>
+    .hidden { display: none !important; }
+  </style>
 </head>
-<body>
-    <div id="start-screen">
-        <h2>Chronos</h2>
-        <button class="begin-btn" id="start-btn">Begin</button>
-        <div class="loading-text hidden" id="start-loading">Generating your world...</div>
+
+<body class="bg-surface text-on-surface selection:bg-tertiary-container selection:text-on-tertiary-container">
+
+  <!-- ================================================ -->
+  <!-- START SCREEN                                      -->
+  <!-- ================================================ -->
+  <div id="screen-start" class="screen active items-center justify-center w-screen h-screen fade-in">
+    <main class="w-[560px] flex flex-col items-center text-center">
+      <header class="mb-12">
+        <h1 class="font-serif-display leading-none flex items-baseline justify-center tracking-widest">
+          <span class="text-[88px] text-tertiary-container leading-none">C</span><span class="text-[64px] text-on-surface leading-none -ml-1">HRONOS</span>
+        </h1>
+        <div class="mt-4 w-full flex justify-center">
+          <svg width="420" height="2" viewBox="0 0 420 2" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M1 1C50.5 0.5 100 1.5 150 1C200 0.5 250 1.5 300 1C350 0.5 400 1.5 419 1" stroke="#2a2218" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="1 2"/>
+          </svg>
+        </div>
+      </header>
+      <nav class="flex flex-col gap-8 items-center">
+        <a id="btn-begin" class="font-serif-display text-[22px] text-on-surface ink-underline transition-colors cursor-pointer active:text-primary-fixed">Begin</a>
+        <a id="btn-continue" class="hidden font-serif-display text-[18px] text-on-secondary-container ink-underline transition-colors cursor-pointer active:text-primary-fixed">Continue</a>
+      </nav>
+    </main>
+  </div>
+
+  <!-- ================================================ -->
+  <!-- LOADING SCREEN                                    -->
+  <!-- ================================================ -->
+  <div id="screen-loading" class="screen flex-col items-center w-screen h-screen">
+    <header class="w-full h-[36px] flex items-center px-8 shrink-0 bg-surface" style="border-bottom: 1px solid rgba(200,184,154,0.1)">
+      <div class="text-sm font-bold text-on-surface font-system uppercase tracking-[0.2em]">CHRONOS</div>
+    </header>
+
+    <main class="w-[560px] flex flex-col space-y-10 pt-28 pb-24 flex-1 manuscript-scroll overflow-y-auto">
+      <!-- Era identity — shown instantly from hardcoded data -->
+      <section class="space-y-3">
+        <div class="font-system text-[11px] tracking-[0.15em] text-tertiary-container" id="loading-era-label"></div>
+        <p class="font-body italic text-[18px] leading-relaxed text-on-surface" id="loading-era-desc"></p>
+      </section>
+
+      <!-- Historical events the character would know -->
+      <section class="space-y-4 pt-2">
+        <div class="font-system text-[10px] tracking-[0.15em] text-on-secondary-container uppercase">What came before</div>
+        <div id="loading-events" class="space-y-4"></div>
+      </section>
+
+      <!-- Voices of the era — real historical quotes -->
+      <section class="space-y-5 pt-2">
+        <div class="font-system text-[10px] tracking-[0.15em] text-on-secondary-container uppercase">Voices of the age</div>
+        <div id="loading-voices" class="space-y-6"></div>
+      </section>
+
+      <!-- Character — hidden, fades in when API returns -->
+      <section id="loading-char-section" class="hidden space-y-3 pt-4 transition-opacity duration-700" style="border-top: 1px solid rgba(42,34,24,0.3);">
+        <div class="font-system text-[11px] tracking-[0.15em] text-on-secondary-container" id="loading-char-label"></div>
+        <p class="font-body text-[18px] leading-relaxed text-on-surface" id="loading-char-desc"></p>
+      </section>
+
+      <!-- Circular progress -->
+      <div class="flex justify-center pt-8">
+        <svg id="loading-ring" width="48" height="48" viewBox="0 0 48 48">
+          <circle cx="24" cy="24" r="20" fill="none" stroke="#2a2218" stroke-width="1.5"/>
+          <circle id="loading-ring-fill" cx="24" cy="24" r="20" fill="none" stroke="#8a7040" stroke-width="1.5"
+            stroke-dasharray="125.66" stroke-dashoffset="125.66" stroke-linecap="round"
+            transform="rotate(-90 24 24)" style="transition: stroke-dashoffset 0.4s ease;"/>
+        </svg>
+      </div>
+    </main>
+
+    <div class="w-full h-[4px] bg-surface-container shrink-0"></div>
+  </div>
+
+  <!-- ================================================ -->
+  <!-- GAME SCREEN  (Active + Observation)               -->
+  <!-- ================================================ -->
+  <div id="screen-game" class="screen flex-col w-screen h-screen">
+
+    <!-- Top Bar — z-300 so it stays above the map overlay -->
+    <header id="top-bar" class="fixed top-0 w-full h-[36px] bg-surface flex items-center px-4 z-[300]" style="border-bottom: 1px solid rgba(200,184,154,0.1)">
+      <div class="flex-1 flex items-center min-w-0">
+        <span id="top-bar-info" class="font-system text-[11px] tracking-tight text-[#5a4e3a] uppercase truncate"></span>
+      </div>
+      <div id="death-indicator" class="hidden font-system text-[11px] text-dead-tint tracking-widest items-center gap-2 mx-4 shrink-0">
+        <span class="material-symbols-outlined text-[14px]">skull</span>
+        <span id="death-indicator-name"></span>
+      </div>
+      <!-- Single toggle button: hamburger ↔ close -->
+      <button id="btn-hamburger" class="shrink-0 ml-4 p-1 cursor-pointer">
+        <div id="hamburger-icon" class="flex flex-col gap-[3px]">
+          <div class="w-4 h-[1px] bg-[#5a4e3a]"></div>
+          <div class="w-4 h-[1px] bg-[#5a4e3a]"></div>
+          <div class="w-4 h-[1px] bg-[#5a4e3a]"></div>
+        </div>
+        <span id="hamburger-close-icon" class="hidden material-symbols-outlined text-[16px] text-[#5a4e3a]">close</span>
+      </button>
+    </header>
+
+    <!-- Manuscript Column -->
+    <main id="manuscript" class="manuscript-scroll overflow-y-auto mt-[36px] mb-[64px]" style="height: calc(100vh - 100px);">
+      <div class="max-w-[560px] mx-auto py-12 px-4" id="manuscript-inner">
+
+        <!-- Death Marker (observation mode) -->
+        <div id="death-marker" class="hidden flex justify-center mb-12">
+          <div class="p-8 text-center max-w-sm" style="border: 1px solid rgba(90,46,46,0.2); background: #151310;">
+            <p class="font-system text-[10px] text-dead-tint tracking-widest uppercase mb-4">Final Record</p>
+            <h1 id="death-marker-title" class="font-body text-3xl text-on-surface mb-2"></h1>
+            <p id="death-marker-quote" class="font-body italic text-on-secondary-container"></p>
+          </div>
+        </div>
+
+        <!-- Turn blocks rendered here -->
+        <div id="turns-container" class="space-y-0"></div>
+
+        <!-- Observation Input (in-manuscript, for dead mode) -->
+        <div id="obs-input-section" class="hidden mt-16 mb-24">
+          <div class="relative">
+            <input id="obs-input" type="text" placeholder="TRAVEL ONLY..." class="w-full bg-surface-container-lowest py-3 px-4 font-system text-[12px] text-dead-tint tracking-widest placeholder:text-dead-tint placeholder:opacity-50 focus:outline-none" style="border: 1px solid rgba(90,46,46,0.2); border-radius: 2px;">
+          </div>
+          <div class="flex justify-between mt-2 px-1">
+            <span class="font-system text-[9px] text-on-secondary-container uppercase">Ghost State: Travel Only</span>
+            <span class="font-system text-[9px] text-on-secondary-container uppercase">Observing...</span>
+          </div>
+        </div>
+
+      </div>
+    </main>
+
+    <!-- Bottom Bar: Input (active mode only, hidden during observation + map) -->
+    <footer id="bottom-bar" class="fixed bottom-0 w-full h-[64px] bg-surface z-[100] flex justify-center items-center px-4" style="border-top: 1px solid rgba(200,184,154,0.1)">
+      <div class="max-w-[560px] w-full">
+        <div class="relative group">
+          <input id="player-input" type="text" autocomplete="off" placeholder="..." class="w-full bg-transparent py-2 px-4 font-system text-[12px] text-on-surface placeholder-[#4a3e2e] focus:ring-0 focus:outline-none transition-colors player-input-field" style="border: 1px solid rgba(42,34,24,0.5); border-radius: 2px;">
+          <div class="absolute right-3 top-1/2 -translate-y-1/2 opacity-20 group-focus-within:opacity-100 transition-opacity">
+            <span class="material-symbols-outlined text-[16px] text-tertiary-container">edit_note</span>
+          </div>
+        </div>
+      </div>
+    </footer>
+
+    <!-- Hamburger Overlay — z-340, above map -->
+    <div id="hamburger-overlay" class="hidden fixed inset-0 bg-black/45 z-[340]"></div>
+
+    <!-- Hamburger Panel — z-350, above everything -->
+    <div id="hamburger-panel" class="fixed right-0 top-0 w-[280px] h-full bg-[#13100c] z-[350] flex flex-col pt-[36px]" style="border-left: 1px solid #2a2218;">
+      <div class="px-10 mt-14 space-y-10">
+        <div id="btn-map-hamburger" class="group cursor-pointer">
+          <span id="map-btn-text" class="font-body text-[20px] text-on-surface ink-underline">MAP</span>
+        </div>
+        <div class="space-y-6">
+          <div id="btn-new-run" class="group cursor-pointer">
+            <span class="font-body text-[20px] text-on-surface ink-underline">NEW RUN</span>
+          </div>
+          <div id="new-run-confirm" class="hidden pl-2 space-y-3">
+            <p class="font-system text-[11px] text-on-secondary-container uppercase tracking-tighter">Abandon this life?</p>
+            <div class="flex items-center gap-4 font-body text-[18px] text-tertiary-container">
+              <span id="btn-new-run-yes" class="cursor-pointer ink-underline hover:text-primary-fixed transition-colors">Yes</span>
+              <span class="text-surface-container select-none">&middot;</span>
+              <span id="btn-new-run-no" class="cursor-pointer ink-underline hover:text-primary-fixed transition-colors">No</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="mt-auto p-10">
+        <p class="font-system text-[10px] text-[#2a2218] uppercase tracking-widest leading-relaxed">
+          Chronos Simulation<br>v0.4.12-Alpha
+        </p>
+      </div>
     </div>
 
-    <div id="narrative" class="hidden">
-        <div id="intro" class="intro"></div>
-        <div id="turns"></div>
-    </div>
+  </div>
 
-    <div id="input-bar" class="hidden">
-        <input type="text" id="player-input" placeholder="" autocomplete="off" disabled>
-        <button id="act-btn" disabled>&rarr;</button>
+  <!-- ================================================ -->
+  <!-- ERASURE SCREEN                                    -->
+  <!-- ================================================ -->
+  <div id="screen-erasure" class="screen items-center justify-center w-screen h-screen">
+    <div class="fixed inset-0 z-0 bg-black/85"></div>
+    <main class="relative z-20 w-[560px] flex flex-col items-center text-center space-y-8">
+      <p id="erasure-text" class="font-body text-[18px] leading-relaxed text-[#a89878] italic tracking-tight"></p>
+      <div class="pt-4">
+        <a id="btn-begin-again" class="font-system text-[11px] text-[#5a4e3a] uppercase tracking-[0.2em] ink-underline transition-colors duration-300 hover:text-tertiary-container cursor-pointer">begin again?</a>
+      </div>
+    </main>
+    <div class="fixed bottom-12 left-1/2 -translate-x-1/2 z-20 pointer-events-none opacity-20">
+      <span id="erasure-cycle" class="font-system text-[9px] text-on-secondary-container uppercase tracking-widest"></span>
     </div>
+  </div>
 
-    <div id="map-container" class="hidden">
-        <div id="map"></div>
-    </div>
+  <!-- ================================================ -->
+  <!-- MAP OVERLAY — below top bar, above manuscript     -->
+  <!-- ================================================ -->
+  <div id="map-container" class="hidden fixed top-[36px] left-0 right-0 bottom-0 z-[200] bg-surface">
+    <div id="map" class="w-full h-full"></div>
+  </div>
 
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="map.js"></script>
-    <script src="app.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="map.js"></script>
+  <script src="app.js"></script>
 </body>
 </html>

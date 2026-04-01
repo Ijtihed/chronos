@@ -11,9 +11,10 @@ This means the player can:
 - Hoard grain and manipulate the economy
 - Start a revolt
 - Do nothing and let events overtake them
+- Speed up the passage of time and watch the world unfold
 - Anything else they can articulate
 
-The game does not constrain the vocabulary or scope of player decisions. It interprets freely and responds with consequences.
+The game does not constrain the vocabulary or scope of player decisions. It interprets freely and responds with consequences — or with silence, if nobody cares.
 
 ## Decision scale
 
@@ -23,19 +24,45 @@ The simulation operates at the level of weeks, months, and years. Each turn repr
 
 ## How a turn works
 
-The game is turn-based. Each turn, the player types one decision in natural language. The game interprets it, updates the world, and shows the result.
+Every turn, the world moves forward. NPCs act autonomously — they pursue their own goals, react to events around them, travel between locations, interact with each other. This happens continuously as background activity. The player witnesses what unfolds at their location.
 
-**Inaction is a valid decision.** If the player types something like "wait" or "do nothing," the character acts autonomously based on their archetype, backstory, and current situation. The world does not pause. Time passes regardless.
+The player types one decision in natural language. The simulation interprets it. The consequences ripple outward — but the player's action is one thread among many. The narrative is dominated by what is happening in the world, not by the player's action in isolation.
+
+**Sometimes nobody cares.** If the player does something minor in a place where nothing is at stake, the world may not react at all. A grain deal in a peaceful town produces no drama. The same deal during a siege changes lives.
+
+**Inaction is a valid decision.** If the player types something like "wait" or "do nothing" or speeds up time, the character acts autonomously based on their archetype, backstory, and current situation. The world does not pause. Time passes regardless. Events unfold.
 
 **Anachronistic language is silently interpreted.** If a player uses modern phrasing — "broker a deal," "go viral," "DM the general" — the game translates this into era-appropriate action without correcting or breaking immersion. The intent is preserved; the language is adapted.
 
-After the player acts, the world responds. But not every character reacts. **The game decides whose perspective matters** for any given action. A grain merchant's trade deal matters to the garrison commander and the deacon distributing food — it does not matter to a fisherman in a distant port. Only the characters whose lives are genuinely touched by the action respond. The player never sees a firehose of reactions from everyone nearby.
+## NPC autonomy
+
+NPCs are not reactive to the player. They are autonomous agents living their own simulated lives. Every turn:
+
+- NPCs at the player's location act in the background — the player witnesses their activity as ambient narrative
+- NPCs elsewhere make their own decisions based on their archetype, goals, and the current state of the world
+- NPCs travel between locations on their own, following trade routes, military orders, religious pilgrimages, or flight from danger
+- NPCs interact with each other — alliances form, conflicts emerge, trust builds or breaks — independently of the player
+
+NPC behavior is grounded in historical context. A centurion follows military logic. A merchant follows trade logic. A refugee follows survival logic. Their decisions are what would most plausibly happen given who they are, where they are, and what's happening around them.
+
+The player may influence NPCs through their actions, but NPCs are not waiting for the player to do something. They have their own lives.
+
+## NPC perception
+
+When the player focuses on an NPC (hovering on the map or encountering them in the narrative), they see their character's **subjective impression** of that person. This is not a stat sheet. It is what the player character thinks and feels about them, colored by:
+
+- Previous interactions
+- The character's own archetype and biases
+- What others have said about this NPC
+- The character's social class and worldview
+
+A soldier sees the deacon differently than a merchant does. The same NPC produces different impressions depending on who is looking.
 
 ## Word definitions
 
 When the player highlights any word in the narrative, a small overlay shows the dictionary definition. This is not a game mechanic — it is a reading aid. The narrative uses era-specific language, titles, place names, political terms, and cultural concepts that a modern player may not recognize. The overlay makes the world legible without breaking immersion or cluttering the UI.
 
-The definition comes from a dictionary API (or local lookup), not from the LLM. It should be instant, not a generation call. It appears on highlight and disappears when the selection clears. No click required — just select the word.
+The definition comes from a dictionary API (not LLM), instant response. It appears on highlight and disappears when the selection clears.
 
 ## The information system
 
@@ -55,7 +82,7 @@ This is not a frustration mechanic — it is the core of the game. Seeking out p
 
 Travel is itself a decision and costs turns. Moving between locations means time passes, which means the world keeps moving without you. There is an inherent tradeoff between staying and acting locally versus traveling to gather information or reach new characters.
 
-The player decides where to go in natural language. The game resolves travel time and what changes in the world while the player is in transit.
+The player decides where to go in natural language. The game resolves travel time and what changes in the world while the player is in transit. NPCs who have traveled may no longer be where you left them.
 
 ## Factions
 
@@ -70,3 +97,7 @@ The player enters an observation mode. They can still travel between locations b
 The run ends when the last character who remembers the player forgets them — or dies. Memory fades over time. Characters who interacted with the player more recently, or who were more deeply affected, hold on longer. Eventually, even they move on. When that last memory is gone, the player is truly erased from history. That is the end of the run.
 
 This mechanic is thematically central. The game is about people history forgot. The ending makes you feel what that means.
+
+## Future: perspective switching
+
+The simulation is a single coherent world. The player character is one lens into it. In the future, the same simulation could be experienced through different characters' perspectives — the same events, different understanding. This is not a current feature, but the architecture should support it. The simulation is the truth. The perspective is the filter.

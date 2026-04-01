@@ -6,7 +6,8 @@
 
 - Does multiplayer ever make sense? (Multiple players assigned different characters in the same world, experiencing the same events from different sides)
 - Is there any meta-progression across runs? (Does anything carry over, or is each run truly isolated?)
-- **Terrain view (Phase 2.5 or 3):** A tilted 3D relief/war-table view of the era's region, as an alternative to the globe view. Cut from Phase 2 (globe only). Decide when to add it — could be a Phase 2 follow-up or bundled with Phase 3 illustrations.
+- **Terrain view (Phase 2.5 or 3):** A tilted 3D relief/war-table view of the era's region. Cut from Phase 2. Decide when to add.
+- **Perspective switching:** The ability to switch which character you're observing the simulation through — same world, different lens. Architecturally supported by the simulation-first design. Not currently scoped to any phase.
 
 ## Roadmap-blocking — resolve before the phase listed
 
@@ -48,3 +49,8 @@ Bullets for tracking resolution in prose (move to “Closed” subsection below 
 - [x] **Map region knowledge** — Click/hover a region shows what the character knows (facts) and has heard (rumors), filtered by archetype, social class, distance, and NPC conversations. Generated on demand per region. Not an encyclopedia — it's the character's worldview. (2026-04-01)
 - [x] **Map event visualization** — Events (sieges, plagues, armies) appear on the map only if the character has plausible awareness. No god-view. Sources: HCE Events DB (canonical) + world engine (gameplay). The map is always a partial view. (2026-04-01)
 - [x] **Word definitions overlay** — Highlighting any word in the narrative shows a dictionary definition as a small overlay. Dictionary API, not LLM. Instant, no click required, disappears on deselect. Reading aid for era-specific language, not a game mechanic. (2026-04-01)
+- [x] **NPC autonomy model** — NPCs are autonomous subagents, not reactive. They act every turn, travel between locations, interact with each other, pursue their own goals grounded in historical context. The world happens whether or not the player does anything. (2026-04-01)
+- [x] **Player as perspective, not protagonist** — The narrative is always from the player character's subjective perspective. The simulation doesn't revolve around the player. Sometimes nobody cares what you did. The player is a lens into the simulation, not its center. (2026-04-01)
+- [x] **NPC perception on hover** — Focusing on an NPC shows the player character's subjective impression of them, colored by interactions, archetype, and biases. Not a stat sheet. (2026-04-01)
+- [x] **Ambient world activity** — Every turn, NPCs act as background. The player witnesses activity at their location. The narrative is dominated by what is happening in the world, not by the player's action alone. (2026-04-01)
+- [x] **Time acceleration** — The player can speed up time passage, letting the simulation run forward. Reinforces that this is a simulation observed, not a story directed. (2026-04-01)

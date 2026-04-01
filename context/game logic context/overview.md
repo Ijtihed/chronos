@@ -2,9 +2,11 @@
 
 ## What this game is
 
-CHRONOS is a turn-based AI-powered historical simulation game. The player is dropped into a randomly assigned historical period and given a randomly assigned character — almost always a minor figure, an opponent, a witness, or someone on the losing side of a famous moment in history. The game is about the *other* perspective. The conquered, not the conqueror. The merchant during the siege, not the general commanding it.
+CHRONOS is a historical simulation that you observe through the perspective of one person. It is not a game about controlling a character — it is a simulation of a living historical world that you experience from the inside.
 
-The player makes macro-level decisions — big life choices — and watches those decisions ripple through a living world. But nothing is handed to them. There is no dashboard, no score, no narrator. The only way to understand what your decisions have done is to go find the people they affected and hear it from them directly.
+The NPCs are not supporting cast. They are the simulation. They are autonomous agents with their own goals, relationships, fears, and ambitions. They make decisions grounded in historical context. They travel between locations, argue with each other, trade, flee, betray, and die — whether or not the player does anything. The world happens. You are in it.
+
+The player embodies one perspective within this simulation. What you see is filtered through who that person is — their social class, their knowledge, their biases. Your actions are real and have consequences, but the world does not revolve around you. Sometimes nobody cares what you did. Sometimes your grain deal changes the course of a siege. It depends on where you are, who you are, and what's happening around you.
 
 Every run is unique. The world map is shared, but the borders, factions, characters, and political context are seeded fresh each time from a random historical period.
 
@@ -15,3 +17,11 @@ Character assignment reflects the realistic demographic distribution of the era.
 Playing as a ruler is not a separate mode. The same mechanics apply regardless of social station. The difference is purely one of action space — a ruler can do more because they have more real-world power, not because the game grants them special mechanics. A merchant cannot declare war. A king can. But the mechanic is identical: you type what you want, the world interprets it, and you travel to understand what it did to people.
 
 The player character is randomly assigned at run start with a short generated backstory that establishes immediate personal tension. The player never chooses who they are.
+
+## Perspective, not protagonist
+
+The narrative is always from the player character's perspective. What you see, hear, and understand is filtered through who they are. A scholar notices different things than a soldier. A merchant hears different rumors than a priest.
+
+This is not a third-person narrator describing events. It is one person's subjective experience of a world that is much larger than them. In the future, the same simulation could be viewed through different characters' perspectives — the same events, different understanding.
+
+The player can speed up the passage of time, letting the simulation run forward. This reinforces what the game is: you are not directing a story. You are observing a world, and sometimes you act within it.
