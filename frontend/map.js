@@ -62,9 +62,7 @@ export function initGlobe() {
 
   const sphereGeo = new THREE.SphereGeometry(GLOBE_RADIUS, 64, 64);
   const sphereMat = new THREE.MeshBasicMaterial({
-    color: 0x111110,
-    transparent: true,
-    opacity: 0.95,
+    color: 0x0c0c0a,
   });
   globeGroup.add(new THREE.Mesh(sphereGeo, sphereMat));
 
@@ -88,14 +86,19 @@ export async function loadCoastlines() {
   try {
     const resp = await fetch("/geo/coastlines.geojson");
     const geo = await resp.json();
-    const lineGeo = new GeoJsonGeometry(geo, GLOBE_RADIUS);
-    const lineMat = new THREE.LineBasicMaterial({
-      color: 0x2a2820,
-      linewidth: 1,
-    });
-    const coastlines = new THREE.LineSegments(lineGeo, lineMat);
-    coastlines.name = "coastlines";
-    globeGroup.add(coastlines);
+
+    for (const feature of geo.features) {
+      if (!feature.geometry) continue;
+      try {
+        const lineGeo = new GeoJsonGeometry(feature.geometry, GLOBE_RADIUS);
+        const lineMat = new THREE.LineBasicMaterial({
+          color: 0x605840,
+        });
+        const line = new THREE.LineSegments(lineGeo, lineMat);
+        globeGroup.add(line);
+      } catch { /* skip malformed */ }
+    }
+    console.log("Coastlines loaded:", geo.features.length, "features");
   } catch (e) {
     console.warn("Failed to load coastlines:", e);
   }
@@ -117,18 +120,18 @@ export async function loadBorders(eraKey) {
     for (const feature of geo.features) {
       if (!feature.geometry) continue;
       try {
-        const featureGeo = new GeoJsonGeometry(feature.geometry, GLOBE_RADIUS * 1.001);
+        const featureGeo = new GeoJsonGeometry(feature.geometry, GLOBE_RADIUS * 1.002);
         const mat = new THREE.LineBasicMaterial({
-          color: 0x3a3428,
-          linewidth: 1,
+          color: 0x806840,
           transparent: true,
-          opacity: 0.6,
+          opacity: 0.5,
         });
         borderGroup.add(new THREE.LineSegments(featureGeo, mat));
       } catch {
         // skip malformed features
       }
     }
+    console.log("Borders loaded:", geo.features.length, "features");
 
     globeGroup.add(borderGroup);
   } catch (e) {
@@ -184,9 +187,9 @@ export function updateMarkers(state) {
 
 function createPlayerMarker(lat, lon, runStatus) {
   const pos = latLonToVec3(lat, lon, GLOBE_RADIUS * MARKER_ALTITUDE);
-  const geo = new THREE.SphereGeometry(1.2, 16, 16);
+  const geo = new THREE.SphereGeometry(1.8, 16, 16);
 
-  let color = 0xc8b88a;
+  let color = 0xddc890;
   let opacity = 1.0;
   if (runStatus === "dead_observing") {
     color = 0x706050;
@@ -203,9 +206,9 @@ function createPlayerMarker(lat, lon, runStatus) {
   const mesh = new THREE.Mesh(geo, mat);
   mesh.position.copy(pos);
 
-  const glowGeo = new THREE.SphereGeometry(2.0, 16, 16);
+  const glowGeo = new THREE.SphereGeometry(3.5, 16, 16);
   const glowMat = new THREE.MeshBasicMaterial({
-    color: 0xc8b88a,
+    color: 0xddc890,
     transparent: true,
     opacity: opacity * 0.15,
   });
