@@ -92,7 +92,7 @@ function toggleMap() {
 async function syncMapState() {
   if (!runId) return;
   try {
-    const resp = await fetch(`/api/run/${runId}`);
+    const resp = await fetch(`/api/run/${runId}?_t=${Date.now()}`);
     if (resp.ok) {
       state = await resp.json();
     }

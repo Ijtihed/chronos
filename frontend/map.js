@@ -150,12 +150,14 @@ export function updateMarkers(state) {
 
   if (!state) return;
 
-  const playerLoc = state.locations.find(
-    (l) => l.id === state.player.location
-  );
-  if (playerLoc && playerLoc.lat && playerLoc.lon) {
-    playerMarker = createPlayerMarker(playerLoc.lat, playerLoc.lon, state.run_status);
-    globeGroup.add(playerMarker);
+  if (state.run_status !== "ended") {
+    const playerLoc = state.locations.find(
+      (l) => l.id === state.player.location
+    );
+    if (playerLoc && playerLoc.lat && playerLoc.lon) {
+      playerMarker = createPlayerMarker(playerLoc.lat, playerLoc.lon, state.run_status);
+      globeGroup.add(playerMarker);
+    }
   }
 
   const visitedSet = new Set(state.visited_locations || []);
@@ -163,6 +165,9 @@ export function updateMarkers(state) {
   for (const npc of state.npcs) {
     const loc = state.locations.find((l) => l.id === npc.location);
     if (!loc || !loc.lat || !loc.lon) continue;
+
+    if (state.run_status === "ended") continue;
+    if (state.run_status === "dead_observing" && npc.memory_of_player <= 0) continue;
 
     const visited = visitedSet.has(npc.location);
     const marker = createNpcMarker(
@@ -223,9 +228,7 @@ function createNpcMarker(lat, lon, npc, visited, runStatus) {
 
   let size, color, opacity;
 
-  if (runStatus === "ended") {
-    opacity = 0.0;
-  } else if (visited) {
+  if (visited) {
     size = 0.7;
     color = 0xa09070;
     opacity = 0.9;
@@ -235,10 +238,8 @@ function createNpcMarker(lat, lon, npc, visited, runStatus) {
     opacity = 0.5;
   }
 
-  if (runStatus === "dead_observing" && npc.memory_of_player <= 0) {
-    opacity = 0.0;
-  } else if (runStatus === "dead_observing") {
-    opacity *= npc.memory_of_player;
+  if (runStatus === "dead_observing") {
+    opacity *= Math.max(0, npc.memory_of_player);
   }
 
   const geo = visited
