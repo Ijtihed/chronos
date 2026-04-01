@@ -257,12 +257,18 @@ function setupInput() {
 
   if (input) {
     input.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") submitTurn(input.value.trim());
+      if (e.key === "Enter" && !turnInProgress && !input.disabled) {
+        e.preventDefault();
+        submitTurn(input.value.trim());
+      }
     });
   }
   if (obsInput) {
     obsInput.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") submitTurn(obsInput.value.trim());
+      if (e.key === "Enter" && !turnInProgress && !obsInput.disabled) {
+        e.preventDefault();
+        submitTurn(obsInput.value.trim());
+      }
     });
   }
 }
@@ -312,6 +318,7 @@ async function submitTurn(text) {
     if (data.erasure) {
       block.remove();
       clearRunFromStorage();
+      turnInProgress = false;
       showErasure(data.erasure);
       return;
     }
