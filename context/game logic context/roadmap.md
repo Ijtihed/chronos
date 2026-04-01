@@ -349,47 +349,11 @@ Use this shape:
 
 ### Phase 1
 
-- **Completed:** 2026-04-01
-- **Success criteria:** All six met.
-  - *Full run lifecycle:* Run completes from character generation through death to erasure without soft-locks. Verified via API and manual playtesting.
-  - *Era distinction:* 5 eras (Roman Late Empire, Viking Age, Crusader States, Black Death, Fall of Constantinople) produce distinct runs with era-specific NPCs, locations, and political context. LLM-generated characters via Ollama.
-  - *NPC distinction:* NPCs have distinct archetypes, social classes, and voices. Selective reaction filtering (game decides who cares per action, 1-3 NPCs, not everyone).
-  - *Total player freedom:* Player can type anything at any scale. No fixed action vocabulary. Unified turn endpoint handles actions, travel, and inaction. No Skip button -- inaction is typed.
-  - *Selective NPC reactions:* Action parser outputs relevant: true/false per NPC. Only genuinely affected NPCs respond.
-  - *Death + erasure:* Hybrid aging + consequence death. Memory decay proportional to interaction depth. Erasure passage generated when last memory fades.
-- **Planned vs actual:**
-  - *UI rebuilt for total agency:* Original plan had Skip button and travel links. Rebuilt to narrative-only: blank text input, no menus, no travel links, no action type badges.
-  - *Unified turn endpoint:* Original had separate /skip and /travel endpoints. Merged into single /turn that detects travel intent and inaction from the action parser.
-  - *Selective reactions added:* Not in original Phase 1 spec. Added during design session -- action parser now outputs per-NPC relevance judgment.
-  - *RAG/HKE v1:* Chroma vector DB with Gutenberg + Wikipedia corpus. Ingestion CLI built. Context retrieval injected into NPC POV prompts.
-  - *Persistence:* SQLite session storage. Runs survive server restart. Frontend resumes from localStorage on page reload.
-  - *118 automated tests* (99 offline + 19 map) passing at Phase 1 close.
-- **Carryover:**
-  - NPC response length still occasionally exceeds 2-4 sentence constraint.
-  - No map yet (Phase 2).
-  - HCE (Historical Context Engine) designed but not yet implemented.
+*(no entry yet)*
 
 ### Phase 2
 
-- **Completed:** 2026-04-01
-- **Success criteria:** Partial -- globe and markers work, border drift and post-1886 not tested (static borders for now).
-  - *Map loads for 3+ eras:* [x] All 5 eras have border GeoJSON from aourednik/historical-basemaps. Globe renders coastlines + era borders.
-  - *Player + NPC positions:* [x] lat/lon on all 15 locations. Player marker (glowing) and NPC markers (visited/unvisited distinction) projected onto sphere.
-  - *Border changes:* [ ] Borders are static per era in Phase 2. Dynamic border drift deferred.
-  - *Travel feels spatial:* [x] Travel costs turns based on distance. Camera pans to new location on toggle.
-- **Planned vs actual:**
-  - *Globe only:* Original roadmap planned Leaflet.js 2D map. Replaced with Three.js 3D globe. Terrain view cut from Phase 2 (deferred to future phase).
-  - *Border data:* Sourced from aourednik/historical-basemaps (world_400, world_900, world_1200, world_1300, world_1400). Gap documentation in frontend/geo/sources.md.
-  - *Visited/unvisited markers:* Design requirement -- visited locations get brighter, larger markers. Unvisited are anonymous dots. State from API, not hardcoded.
-  - *Import map fix:* Three.js CDN modules required HTML import map for bare specifier resolution.
-  - *Deferred globe init:* Globe initializes on first map toggle (not at run creation) to avoid zero-size container rendering issue.
-  - *Page reload persistence:* Frontend stores run_id in localStorage, resumes from saved state on refresh.
-  - *Hamburger menu:* Added for map toggle, new run, run status display.
-- **Carryover:**
-  - Manual WebGL test cases in tests/manual/2d_map_integration.md not yet fully verified.
-  - Terrain view deferred (see open-questions.md).
-  - Dynamic border changes from player actions not implemented (borders static per era).
-  - CShapes 2.0 integration for post-1886 not needed for current 5 eras.
+*(no entry yet)*
 
 ### Phase 3
 

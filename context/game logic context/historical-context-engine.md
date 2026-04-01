@@ -21,7 +21,6 @@ This generated context is injected into the world state at run start and continu
 ## The Events DB
 
 ### Structure
-
 Each record is a flat entry:
 
 ```json
@@ -37,7 +36,6 @@ Each record is a flat entry:
 ```
 
 ### Fields
-
 - `year` — the year the event occurs or begins
 - `region` — broad geographic region (not a specific city, but a named area: "Anatolia", "Northern France", "Song Dynasty heartland")
 - `event` — one sentence, factual, canonical description
@@ -47,16 +45,13 @@ Each record is a flat entry:
 - `canonical` — always `true` in the base DB; `false` for game-generated events that diverge from history
 
 ### Sources
-
 The Events DB is populated from two sources at build time:
-
 - **Wikipedia API** — era and region summary articles, major event lists, parsed and structured by an LLM build script
 - **Dedicated historical datasets** — conflict databases (e.g. UCDP), famine and epidemic records, political transition data where available in open formats
 
 The build script is a one-time agent that: fetches source material for each era, extracts discrete events, structures them into the flat schema, deduplicates, and writes to a SQLite table alongside the existing world state DB.
 
 ### Coverage
-
 One Events DB covers all eras. Events are filtered at runtime by year range and region relevance to the active run. The DB does not need to be exhaustive — it needs to be dense enough that any era has at least 20–40 relevant events within a 50-year window of the run's start year.
 
 ---
@@ -64,11 +59,9 @@ One Events DB covers all eras. Events are filtered at runtime by year range and 
 ## The Ground-Level Context Generator
 
 ### When it runs
-
 At run initialization, after the player character and starting region are assigned, before the first turn is rendered.
 
 ### What it produces
-
 A `GroundContext` object attached to the world state:
 
 ```json
@@ -87,7 +80,6 @@ A `GroundContext` object attached to the world state:
 ```
 
 ### How it is generated
-
 1. Query Events DB for all events within 50 years of the run's start year, filtered to the run's region
 2. Retrieve relevant RAG chunks from the existing HKE corpus (same vector DB, different query framing)
 3. Pass to local LLM (llama3.1:8b) with a structured prompt:
@@ -98,7 +90,6 @@ A `GroundContext` object attached to the world state:
 4. Store the result in world state as `ground_context`
 
 ### How it is used during the run
-
 - **NPC prompts** inject the era_feel and material_conditions as background context on every turn — cheap, always present
 - **Character backstory generation** uses the full GroundContext to make the backstory specific and grounded
 - **NPC POV generation** uses `what_your_character_knows` and `local_rumors` to calibrate information asymmetry — an NPC who is geographically distant from an event knows less about it
@@ -110,7 +101,6 @@ A `GroundContext` object attached to the world state:
 The Events DB contains canonical history. As soon as the player acts, the world diverges. The game tracks this divergence explicitly.
 
 When a player action creates a significant world event (a battle won, a ruler killed, a city abandoned), that event is written to the world state event log with `canonical: false`. These game-generated events:
-
 - Are treated as equally real to canonical events for the purposes of NPC reactions and world state
 - Can **override or contradict** canonical events — if the player prevents the fall of Constantinople, subsequent canonical events that depended on that fall are flagged as `superseded`
 - Accumulate over the run and are passed alongside canonical events to the Ground Context Generator when NPCs need context
@@ -120,6 +110,8 @@ This means the further a run progresses, the more the world diverges from the ca
 ---
 
 ## Relationship to the HKE
+
+The HCE and HKE are distinct but complementary:
 
 | | HCE | HKE |
 |---|---|---|
@@ -137,7 +129,6 @@ This means the further a run progresses, the more the world diverges from the ca
 A dedicated build script (`scripts/build_events_db.py`) handles Events DB population. It is not run during gameplay — only when adding a new era or refreshing data.
 
 The agent:
-
 1. Takes an era name and year range as input
 2. Fetches Wikipedia summary articles for the era and region
 3. Queries any available structured datasets (conflict DB, etc.) for the period

@@ -68,146 +68,38 @@ class TestCoastlineData:
         assert data.get("type") in ("FeatureCollection", "GeometryCollection")
 
 
-class TestBorderFiles:
-    def test_all_five_border_files_exist(self):
+class TestBorderData:
+    def test_all_5_border_files_exist(self):
         from pathlib import Path
         geo_dir = Path(__file__).resolve().parent.parent / "frontend" / "geo"
-        era_keys = [
-            "roman_late_empire", "viking_age", "crusader_states",
-            "black_death", "fall_of_constantinople",
-        ]
-        for key in era_keys:
-            path = geo_dir / f"borders_{key}.geojson"
-            assert path.exists(), f"borders_{key}.geojson missing"
+        for era_key in ["roman_late_empire", "viking_age", "crusader_states",
+                        "black_death", "fall_of_constantinople"]:
+            f = geo_dir / f"borders_{era_key}.geojson"
+            assert f.exists(), f"Missing: {f.name}"
 
     def test_all_border_files_are_valid_geojson(self):
         from pathlib import Path
         geo_dir = Path(__file__).resolve().parent.parent / "frontend" / "geo"
-        for path in geo_dir.glob("borders_*.geojson"):
-            data = json.loads(path.read_text())
-            assert data.get("type") == "FeatureCollection", f"{path.name} not a FeatureCollection"
-            assert len(data.get("features", [])) > 0, f"{path.name} has no features"
+        for era_key in ["roman_late_empire", "viking_age", "crusader_states",
+                        "black_death", "fall_of_constantinople"]:
+            data = json.loads((geo_dir / f"borders_{era_key}.geojson").read_text())
+            assert data["type"] == "FeatureCollection", f"{era_key} not FeatureCollection"
+            assert len(data["features"]) > 0, f"{era_key} has 0 features"
 
-    def test_border_files_have_multipolygon_geometry(self):
+    def test_border_files_have_name_property(self):
         from pathlib import Path
         geo_dir = Path(__file__).resolve().parent.parent / "frontend" / "geo"
-        for path in geo_dir.glob("borders_*.geojson"):
-            data = json.loads(path.read_text())
-            for feat in data["features"][:5]:
-                gtype = feat.get("geometry", {}).get("type")
-                assert gtype in ("Polygon", "MultiPolygon"), (
-                    f"{path.name} has unexpected geometry: {gtype}"
-                )
+        data = json.loads((geo_dir / "borders_roman_late_empire.geojson").read_text())
+        has_name = any(
+            f.get("properties", {}).get("NAME")
+            for f in data["features"]
+        )
+        assert has_name, "No features have a NAME property"
 
     def test_sources_md_exists(self):
         from pathlib import Path
         sources = Path(__file__).resolve().parent.parent / "frontend" / "geo" / "sources.md"
         assert sources.exists(), "sources.md missing"
-
-
-class TestVisitedLocations:
-    def test_initial_state_has_starting_location_visited(self):
-        state = create_initial_state()
-        assert "ariminum" in state.visited_locations
-
-    def test_visited_locations_in_serialization(self):
-        state = create_initial_state()
-        dumped = state.model_dump()
-        assert "visited_locations" in dumped
-        assert "ariminum" in dumped["visited_locations"]
-
-
-class TestStateSyncForMap:
-    """Tests that the state API returns correct data for map rendering.
-    These verify the backend side of marker state sync."""
-
-    @pytest.mark.asyncio
-    @respx.mock
-    async def test_visited_locations_updates_after_travel(self, client):
-        _mock_ollama_down()
-        run_id = (await client.post("/api/run")).json()["run_id"]
-
-        state_before = (await client.get(f"/api/run/{run_id}")).json()
-        assert "ariminum" in state_before["visited_locations"]
-        assert "ravenna" not in state_before["visited_locations"]
-
-        import json
-        travel_action = json.dumps({
-            "action_type": "travel", "target": "Ravenna",
-            "intent": "Go to Ravenna", "era_description": "Travels.",
-            "is_travel": True, "destination": "ravenna",
-            "is_inaction": False, "npc_impacts": [],
-        })
-        fake_skip = json.dumps({"action": "Rests.", "effect": "Nothing."})
-        fake_pov = "I watch."
-
-        respx.get(OLLAMA_TAGS_URL).mock(
-            return_value=httpx.Response(200, json={"models": []})
-        )
-        respx.post("http://localhost:11434/api/chat").mock(
-            side_effect=[
-                httpx.Response(200, json={"message": {"role": "assistant", "content": travel_action}}),
-                httpx.Response(200, json={"message": {"role": "assistant", "content": fake_skip}}),
-                httpx.Response(200, json={"message": {"role": "assistant", "content": fake_skip}}),
-                httpx.Response(200, json={"message": {"role": "assistant", "content": fake_pov}}),
-            ]
-        )
-
-        await client.post(
-            f"/api/run/{run_id}/turn",
-            json={"player_input": "travel to Ravenna"},
-        )
-
-        state_after = (await client.get(f"/api/run/{run_id}")).json()
-        assert "ravenna" in state_after["visited_locations"]
-        assert state_after["player"]["location"] == "ravenna"
-
-    @pytest.mark.asyncio
-    @respx.mock
-    async def test_fresh_state_on_every_fetch(self, client):
-        """Two consecutive fetches return the same state — no stale cache."""
-        _mock_ollama_down()
-        run_id = (await client.post("/api/run")).json()["run_id"]
-
-        s1 = (await client.get(f"/api/run/{run_id}")).json()
-        s2 = (await client.get(f"/api/run/{run_id}")).json()
-        assert s1["turn"] == s2["turn"]
-        assert s1["visited_locations"] == s2["visited_locations"]
-
-    @pytest.mark.asyncio
-    @respx.mock
-    async def test_observation_mode_npcs_have_memory_field(self, client):
-        """In observation mode, NPC memory_of_player is in the state response."""
-        _mock_ollama_down()
-        run_id = (await client.post("/api/run")).json()["run_id"]
-
-        from backend import persistence
-        from backend.death_engine import apply_death
-        state = await persistence.load_session(run_id)
-        state = apply_death(state, "Died.")
-        for npc in state.npcs:
-            npc.memory_of_player = 0.5
-        await persistence.save_session(state)
-
-        resp = (await client.get(f"/api/run/{run_id}")).json()
-        assert resp["run_status"] == "dead_observing"
-        for npc in resp["npcs"]:
-            assert "memory_of_player" in npc
-
-    @pytest.mark.asyncio
-    @respx.mock
-    async def test_erasure_state_in_api(self, client):
-        """Ended run returns run_status=ended so map knows to clear markers."""
-        _mock_ollama_down()
-        run_id = (await client.post("/api/run")).json()["run_id"]
-
-        from backend import persistence
-        state = await persistence.load_session(run_id)
-        state.run_status = "ended"
-        await persistence.save_session(state)
-
-        resp = (await client.get(f"/api/run/{run_id}")).json()
-        assert resp["run_status"] == "ended"
 
 
 class TestGeoEndpoint:
@@ -219,12 +111,13 @@ class TestGeoEndpoint:
         assert resp.status_code == 404
 
     @pytest.mark.asyncio
-    async def test_serves_existing_era_borders(self, client):
+    @respx.mock
+    async def test_valid_era_returns_geojson(self, client):
+        _mock_ollama_down()
         resp = await client.get("/api/geo/roman_late_empire")
         assert resp.status_code == 200
         data = resp.json()
         assert data["type"] == "FeatureCollection"
-        assert len(data["features"]) > 0
 
     @pytest.mark.asyncio
     @respx.mock

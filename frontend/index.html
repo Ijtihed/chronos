@@ -16,66 +16,6 @@
             height: 100vh;
         }
 
-        /* ---- Menu ---- */
-
-        #menu-btn {
-            position: fixed;
-            top: 14px;
-            right: 16px;
-            z-index: 20;
-            background: none;
-            border: none;
-            color: #484030;
-            font-size: 1.4em;
-            cursor: pointer;
-            padding: 4px 8px;
-            line-height: 1;
-        }
-        #menu-btn:hover { color: #a09070; }
-
-        #menu-panel {
-            position: fixed;
-            top: 0;
-            right: 0;
-            width: 240px;
-            height: 100%;
-            background: #121210;
-            border-left: 1px solid #1e1c18;
-            z-index: 19;
-            padding: 60px 20px 20px;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
-
-        .menu-item {
-            background: none;
-            border: 1px solid #1e1c18;
-            color: #a09070;
-            padding: 10px 14px;
-            font-family: Georgia, serif;
-            font-size: 0.85em;
-            cursor: pointer;
-            border-radius: 2px;
-            text-align: left;
-        }
-        .menu-item:hover { border-color: #3a3428; color: #c8b88a; }
-
-        .menu-divider {
-            border: none;
-            border-top: 1px solid #1a1816;
-            margin: 8px 0;
-        }
-
-        .menu-label {
-            font-size: 0.7em;
-            color: #3a3428;
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
-        }
-
-        /* ---- Narrative ---- */
-
         #narrative {
             flex: 1;
             overflow-y: auto;
@@ -148,8 +88,6 @@
         }
         .erasure-block p { color: #585040; line-height: 2.2; font-style: italic; }
 
-        /* ---- Input ---- */
-
         #input-bar {
             padding: 14px 24px;
             border-top: 1px solid #1a1816;
@@ -188,10 +126,9 @@
         #act-btn:hover { border-color: #3a3428; color: #a09070; }
         #act-btn:disabled { opacity: 0.2; cursor: not-allowed; }
 
-        /* ---- Start screen ---- */
-
         .loading-text { color: #3a3428; font-style: italic; }
         .error-text { color: #805040; }
+
         strong { color: #d0c090; font-weight: 600; }
 
         #start-screen {
@@ -223,43 +160,10 @@
         }
         #start-screen .begin-btn:hover { border-color: #484030; }
 
-        /* ---- Map ---- */
-
         .hidden { display: none; }
-
-        #map-container {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: 10;
-            background: #0a0a0a;
-        }
-
-        .map-hint {
-            position: fixed;
-            bottom: 16px;
-            right: 16px;
-            z-index: 11;
-            font-size: 0.7em;
-            color: #2a2420;
-            letter-spacing: 0.05em;
-        }
     </style>
 </head>
 <body>
-    <button id="menu-btn" class="hidden">&#9776;</button>
-
-    <div id="menu-panel" class="hidden">
-        <div class="menu-label">Game</div>
-        <button class="menu-item" id="menu-map">Map (M)</button>
-        <button class="menu-item" id="menu-new">New Run</button>
-        <hr class="menu-divider">
-        <div class="menu-label">Info</div>
-        <button class="menu-item" id="menu-status">Run Status</button>
-    </div>
-
     <div id="start-screen">
         <h2>Chronos</h2>
         <button class="begin-btn" id="start-btn">Begin</button>
@@ -271,25 +175,11 @@
         <div id="turns"></div>
     </div>
 
-    <div id="map-container" class="hidden"></div>
-    <div id="map-hint" class="map-hint hidden">M to return</div>
-
     <div id="input-bar" class="hidden">
         <input type="text" id="player-input" placeholder="" autocomplete="off" disabled>
         <button id="act-btn" disabled>&rarr;</button>
     </div>
 
-    <script type="importmap">
-    {
-      "imports": {
-        "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
-        "three/examples/jsm/controls/OrbitControls.js": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/controls/OrbitControls.js",
-        "earcut": "https://cdn.jsdelivr.net/npm/earcut@3.0.1/src/earcut.js",
-        "d3-geo": "https://cdn.jsdelivr.net/npm/d3-geo@3.1.1/+esm",
-        "three-geojson-geometry": "https://cdn.jsdelivr.net/npm/three-geojson-geometry@1.3.2/dist/three-geojson-geometry.mjs"
-      }
-    }
-    </script>
-    <script type="module" src="app.js"></script>
+    <script src="app.js"></script>
 </body>
 </html>

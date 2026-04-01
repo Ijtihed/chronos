@@ -78,7 +78,6 @@ class WorldState(BaseModel):
     npcs: List[NPC]
     locations: List[Location]
     events: List[Event] = Field(default_factory=list)
-    visited_locations: List[str] = Field(default_factory=list)
     turn: int = 0
 
 
@@ -247,7 +246,6 @@ def create_initial_state() -> WorldState:
             ),
         ],
         events=[],
-        visited_locations=["ariminum"],
         turn=0,
     )
 
