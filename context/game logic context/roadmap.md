@@ -65,7 +65,7 @@ The **full path** from browser → backend → action representation → world m
 - **Ambient world activity:** Every turn shows what NPCs are doing around the player, not just reactions to the player's action. The narrative is dominated by world activity.
 - Run initialization: random era selected from a starter set of 5, player character generated with archetype + backstory
 - 8–15 NPCs seeded across multiple locations with archetypes, social classes, and relationships
-- Full turn loop: player types a decision → world responds → structured state + narrative layer both update
+- Full turn loop: world advances (NPCs act) then player optionally acts → world responds → structured state + narrative layer both update
 - Inaction: if the player types "wait" or "do nothing," their character acts autonomously based on archetype
 - Travel mechanic: player can move between locations, costing turns, with world advancing in transit. NPCs at the destination react to arrival.
 - POV system gated by geography: only NPCs at the player's current location respond
@@ -88,19 +88,19 @@ The **full path** from browser → backend → action representation → world m
 
 ### Definition of success
 
-A **full run** is reproducible: new run, play until **last memory dies** without cheats. The player has **total freedom** -- any typed decision is interpreted and produces consequences, at macro scale. **Travel** gates POV: you cannot read distant NPC reactions without moving. **Selective reactions**: after a player action, only **relevant** NPCs respond (not all nearby). **RAG** answers world consequence queries for at least **5** ingested eras; **3+** eras are **playably** different in practice. Emotional bar: end state reads as **fade / erasure**, not a game over.
+A **full run** is reproducible: new run, play until **last memory dies** without cheats. The **world is alive** -- every turn, NPCs act autonomously (visible as ambient narrative), travel between locations, and interact with each other. The **player is one thread** -- their action produces consequences but the narrative is dominated by world activity. **Sometimes nobody cares**. Travel gates information. RAG grounds responses for **5+** eras. Emotional bar: end state reads as **fade / erasure**, not a game over.
 
 ### How to verify
 
-1. **Run lifecycle** -- Start 3 runs (different era seeds). Each: reach **player death**, then **observation** (travel OK, no influence), then **run end** when no character remembers PC. Log turn count; ensure no soft-lock.
-2. **Eras** -- Play at least **3** distinct eras end-to-end; confirm corpus/RAG loads era-specific context.
-3. **Player freedom** -- Enter **5** wildly different actions (flee the city, start a revolt, hoard wealth, forge an alliance, do nothing). All should parse and produce coherent consequences.
-4. **Selective NPC reactions** -- After an action, count responding NPCs. Should be **1-3**, not the full list.
-5. **NPC distinction** -- Same event, **3** NPCs with different archetypes: collect POVs **after** travel; qualitatively score bias/voice differentiation.
-6. **Travel-gated POV** -- Without traveling to NPC B, **no** POV from B about a remote event; after travel, POV unlocks.
-7. **Anachronism** -- Input modern phrasing; outcome narrative should **not** break fourth wall.
-8. **RAG v1** -- For fixed query set per era, retrieval returns **non-empty** relevant chunks from Chroma.
-9. **Death and memory** -- After death, verify memory fields decay over turns; last loss triggers **run end** and UI matches **erasure** framing.
+1. **World is alive** -- Start a run. Do nothing for 3 turns. Confirm NPCs are visibly acting each turn (ambient narrative shows NPC activity, not silence).
+2. **NPC movement** -- Play 5+ turns. Confirm at least one NPC has moved to a different location than where they started (check via map or state).
+3. **Player is one thread** -- Take an action. Confirm the turn response includes both the player's consequence AND ambient NPC activity (not just reaction to the player).
+4. **Nobody cares** -- Take a minor action (observe, wait). Confirm the response shows world activity but little or no reaction to the player specifically.
+5. **NPC perception** -- Hover over an NPC. Confirm a subjective impression appears, colored by the character's archetype.
+6. **Run lifecycle** -- Complete a run to erasure. Confirm no soft-locks.
+7. **Eras** -- Play 3 different eras. Confirm they feel distinct.
+8. **Travel** -- Travel to a new location. Confirm the world advanced during transit and NPCs at the destination are doing their own things.
+9. **Death and memory** -- After death, confirm memory decay and erasure framing.
 
 ### What is explicitly NOT in this phase
 

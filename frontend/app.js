@@ -1,653 +1,363 @@
+/**
+ * CHRONOS — Simulation-first game loop.
+ *
+ * Turn flow: world simulates (NPCs act) → player optionally acts →
+ * narrative shows ambient activity first, player action as one thread.
+ *
+ * Works with the manuscript UI (index.html screen-based navigation).
+ */
+
 const $ = (sel) => document.querySelector(sel);
+const $$ = (sel) => document.querySelectorAll(sel);
 
-// ── Screens ──────────────────────────────────────────────────
-const screens = {
-  start:   $("#screen-start"),
-  loading: $("#screen-loading"),
-  game:    $("#screen-game"),
-  erasure: $("#screen-erasure"),
-};
+let state = null;
+let runId = null;
+let eraKey = null;
 
-// ── Loading ──────────────────────────────────────────────────
-const loadingEraLabel    = $("#loading-era-label");
-const loadingEraDesc     = $("#loading-era-desc");
-const loadingEvents      = $("#loading-events");
-const loadingVoices      = $("#loading-voices");
-const loadingCharSection = $("#loading-char-section");
-const loadingCharLabel   = $("#loading-char-label");
-const loadingCharDesc    = $("#loading-char-desc");
-const loadingRingFill    = $("#loading-ring-fill");
-const RING_CIRCUMFERENCE = 125.66;
-
-// ── Game chrome ──────────────────────────────────────────────
-const topBarInfo         = $("#top-bar-info");
-const deathIndicator     = $("#death-indicator");
-const deathIndicatorName = $("#death-indicator-name");
-const manuscript         = $("#manuscript");
-const turnsContainer     = $("#turns-container");
-const deathMarker        = $("#death-marker");
-const deathMarkerTitle   = $("#death-marker-title");
-const deathMarkerQuote   = $("#death-marker-quote");
-const obsInputSection    = $("#obs-input-section");
-const obsInput           = $("#obs-input");
-const bottomBar          = $("#bottom-bar");
-const playerInput        = $("#player-input");
-
-// ── Hamburger ────────────────────────────────────────────────
-const hamburgerPanel     = $("#hamburger-panel");
-const hamburgerOverlay   = $("#hamburger-overlay");
-const hamburgerIcon      = $("#hamburger-icon");
-const hamburgerCloseIcon = $("#hamburger-close-icon");
-const newRunConfirm      = $("#new-run-confirm");
-const mapBtnText         = $("#map-btn-text");
-
-// ── Erasure ──────────────────────────────────────────────────
-const erasureText  = $("#erasure-text");
-const erasureCycle = $("#erasure-cycle");
-
-// ── Map ──────────────────────────────────────────────────────
-const mapContainer = $("#map-container");
-
-// ── State ────────────────────────────────────────────────────
-let state   = null;
-let runId   = null;
-let eraKey  = null;
-let busy    = false;
-let mapOpen = false;
-
-// ═════════════════════════════════════════════════════════════
-//  ERA LOADING CONTENT — real historical events & voices
-// ═════════════════════════════════════════════════════════════
-
-const ERA_KEYS = [
-  "roman_late_empire",
-  "viking_age",
-  "crusader_states",
-  "black_death",
-  "fall_of_constantinople",
-];
-
-const ERA_LOADING = {
-  roman_late_empire: {
-    label: "THE WESTERN ROMAN EMPIRE \u00B7 410 AD",
-    desc: "The legions retreat. The barbarians advance. The eternal city holds its breath.",
-    events: [
-      { date: "378 AD", text: "The Battle of Adrianople. Emperor Valens dies on the field. The Goths cannot be stopped." },
-      { date: "402 AD", text: "The imperial court abandons Milan for the marshes of Ravenna." },
-      { date: "408 AD", text: "Stilicho, the last great general, is executed by his own emperor\u2019s order." },
-    ],
-    voices: [
-      { speaker: "ST. JEROME, LETTER 127", text: "The city which had taken the whole world was itself taken. My voice sticks in my throat, and sobs choke my utterance." },
-      { speaker: "ST. AUGUSTINE OF HIPPO", text: "All earthly cities are vulnerable. Only the City of God endures." },
-    ],
-  },
-  viking_age: {
-    label: "THE NORSE WORLD \u00B7 870 AD",
-    desc: "The longships carry more than warriors. They carry the future of the North.",
-    events: [
-      { date: "793 AD", text: "Lindisfarne burns. The monks scattered. The age of the Northmen begins." },
-      { date: "865 AD", text: "The Great Heathen Army lands in East Anglia. England will never be the same." },
-      { date: "860 AD", text: "Norse ships appear before the walls of Constantinople. Even the Romans tremble." },
-    ],
-    voices: [
-      { speaker: "H\u00C1VAM\u00C1L, STANZA 77", text: "Cattle die, kinsmen die, you yourself will die. One thing I know that never dies: the reputation of the dead." },
-      { speaker: "ADAM OF BREMEN", text: "They worship Thor, who rules the air, the thunder, the winds, and the rain." },
-    ],
-  },
-  crusader_states: {
-    label: "THE CRUSADER STATES \u00B7 1190 AD",
-    desc: "Jerusalem has fallen. The coast holds. Faith and steel are all that remain.",
-    events: [
-      { date: "1187 AD", text: "The Horns of Hattin. Saladin shatters the army of Jerusalem. The True Cross is lost." },
-      { date: "1189 AD", text: "The kings of Europe take the cross. Frederick drowns in a river. Philip schemes. Richard sails." },
-      { date: "1190 AD", text: "The siege of Acre begins. Two years of blood for a single city." },
-    ],
-    voices: [
-      { speaker: "USAMA IBN MUNQIDH", text: "The Franks are void of all zeal and caution. But there is none more stubborn in war." },
-      { speaker: "WILLIAM OF TYRE", text: "Our land is lost to us, unless God Himself sends help from above." },
-    ],
-  },
-  black_death: {
-    label: "THE BLACK DEATH \u00B7 1348 AD",
-    desc: "The pestilence makes no distinction between lord and serf. The world empties.",
-    events: [
-      { date: "1347", text: "Genoese ships from Caffa bring death to Messina. The sailors are already dying when they dock." },
-      { date: "1348", text: "Florence loses half its people in months. The dead are stacked in churches, then in the streets." },
-      { date: "1348", text: "The flagellants march from town to town, whipping themselves bloody, begging God for mercy." },
-    ],
-    voices: [
-      { speaker: "GIOVANNI BOCCACCIO", text: "How many brave men, how many fair ladies, breakfasted with their kinfolk and that same night supped with their ancestors in the other world!" },
-      { speaker: "PETRARCH", text: "O happy posterity, who will not experience such abysmal woe, and will look upon our testimony as a fable." },
-    ],
-  },
-  fall_of_constantinople: {
-    label: "THE FALL OF CONSTANTINOPLE \u00B7 1453 AD",
-    desc: "A thousand years of empire. Seven thousand defenders. One final dawn.",
-    events: [
-      { date: "1422 AD", text: "Murad II besieges Constantinople. The walls hold. This time." },
-      { date: "1444 AD", text: "The Crusade of Varna fails. Hungary is broken. No relief will come from the West." },
-      { date: "1452 AD", text: "Mehmed builds the fortress of Rumelihisar\u0131 on the Bosporus. The noose tightens." },
-    ],
-    voices: [
-      { speaker: "GEORGE SPHRANTZES", text: "The Emperor said: \u2018The city is fallen and I am still alive.\u2019 Then he cast aside the imperial insignia and charged into the enemy." },
-      { speaker: "DOUKAS, HISTORIAN", text: "The last Romans fought with a courage that shamed the centuries of decline. But courage alone cannot stop a cannon." },
-    ],
-  },
-};
-
-// ═════════════════════════════════════════════════════════════
-//  SCREEN MANAGEMENT
-// ═════════════════════════════════════════════════════════════
-
-function showScreen(name) {
-  Object.values(screens).forEach((s) => {
-    s.classList.remove("active");
-    s.classList.add("screen");
-  });
-  const target = screens[name];
-  if (target) {
-    target.classList.add("active", "fade-in");
-    target.addEventListener("animationend", () => target.classList.remove("fade-in"), { once: true });
-  }
+// Screen management
+function showScreen(id) {
+  $$(".screen").forEach((s) => s.classList.remove("active"));
+  const s = $(`#${id}`);
+  if (s) s.classList.add("active");
 }
 
-// ═════════════════════════════════════════════════════════════
-//  START → LOADING → GAME
-// ═════════════════════════════════════════════════════════════
+// -------------------------------------------------------------------
+// Start screen
+// -------------------------------------------------------------------
 
-// ── Continue button ──────────────────────────────────────────
-const btnContinue = $("#btn-continue");
-
-(async function init() {
-  const savedId = localStorage.getItem("chronos_run_id");
-  if (savedId) {
-    try {
-      const res = await fetch(`/api/run/${savedId}`);
-      if (res.ok) {
-        btnContinue.classList.remove("hidden");
-      }
-    } catch (_) { /* ignore */ }
-  }
-})();
-
-$("#btn-begin").addEventListener("click", (e) => {
-  e.preventDefault();
-  beginNewRun();
+$("#btn-begin").addEventListener("click", () => startNewRun());
+$("#btn-begin-again") && $("#btn-begin-again").addEventListener("click", () => {
+  showScreen("screen-start");
 });
 
-btnContinue.addEventListener("click", async (e) => {
-  e.preventDefault();
-  await resumeRun();
-});
-
-$("#btn-begin-again").addEventListener("click", (e) => {
-  e.preventDefault();
-  resetGameState();
-  beginNewRun();
-});
-
-// ── Progress ring helper ─────────────────────────────────────
-let ringInterval = null;
-
-function startProgressRing() {
-  let progress = 0;
-  setRingProgress(0);
-  ringInterval = setInterval(() => {
-    progress += 0.012 + Math.random() * 0.008;
-    if (progress > 0.85) progress = 0.85;
-    setRingProgress(progress);
-  }, 200);
-}
-
-function completeProgressRing() {
-  if (ringInterval) { clearInterval(ringInterval); ringInterval = null; }
-  setRingProgress(1);
-}
-
-function setRingProgress(pct) {
-  const offset = RING_CIRCUMFERENCE * (1 - pct);
-  loadingRingFill.style.strokeDashoffset = offset;
-}
-
-// ── New run ──────────────────────────────────────────────────
-
-async function beginNewRun() {
-  eraKey = ERA_KEYS[Math.floor(Math.random() * ERA_KEYS.length)];
-  populateEraLoading(eraKey);
-  showScreen("loading");
-  loadingCharSection.classList.add("hidden");
-  startProgressRing();
+async function startNewRun() {
+  showScreen("screen-loading");
+  $("#loading-era-label").textContent = "";
+  $("#loading-era-desc").textContent = "";
+  const charSection = $("#loading-char-section");
+  if (charSection) charSection.classList.add("hidden");
 
   try {
-    const res  = await fetch("/api/run", {
-      method:  "POST",
-      headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify({ era: eraKey }),
-    });
+    const res = await fetch("/api/run", { method: "POST" });
     const data = await res.json();
-    runId  = data.run_id;
+    runId = data.run_id;
     eraKey = data.era;
-    state  = data.world_state;
+    state = data.world_state;
 
-    localStorage.setItem("chronos_run_id", runId);
+    const year = state.current_year || state.era.year_start;
+    $("#loading-era-label").textContent = `${state.era.name} — ${year} AD`;
+    $("#loading-era-desc").textContent = state.era.description;
 
-    completeProgressRing();
-    showCharacterOnLoading();
+    if (charSection) {
+      charSection.classList.remove("hidden");
+      const charLabel = $("#loading-char-label");
+      const charDesc = $("#loading-char-desc");
+      if (charLabel) charLabel.textContent = `${state.player.name}, ${state.player.role}`;
+      if (charDesc) charDesc.textContent = state.player.description;
+    }
 
-    await delay(3500);
-    transitionToGame();
+    const ringFill = $("#loading-ring-fill");
+    if (ringFill) ringFill.style.strokeDashoffset = "0";
+
+    setTimeout(() => enterGame(), 2000);
   } catch (e) {
-    completeProgressRing();
-    loadingEraDesc.textContent = "Error: " + e.message;
+    $("#loading-era-desc").textContent = `Error: ${e.message}`;
   }
 }
 
-// ── Resume saved run ─────────────────────────────────────────
+function enterGame() {
+  showScreen("screen-game");
+  const turnsContainer = $("#turns-container");
+  if (turnsContainer) turnsContainer.innerHTML = "";
 
-async function resumeRun() {
-  const savedId = localStorage.getItem("chronos_run_id");
-  if (!savedId) return;
+  updateTopBar();
+  setupInput();
 
-  try {
-    const res = await fetch(`/api/run/${savedId}`);
-    if (!res.ok) throw new Error("Run not found");
-    const ws = await res.json();
+  const loc = state.locations.find((l) => l.id === state.player.location);
+  const year = state.current_year || state.era.year_start;
 
-    runId  = ws.run_id;
-    state  = ws;
-    eraKey = guessEraKey(ws.era.name);
+  let introHtml = `<div class="mb-12">`;
+  introHtml += `<div class="font-system text-[10px] tracking-[0.15em] text-tertiary-container uppercase mb-4">${esc(state.era.name)} — ${year} AD</div>`;
+  introHtml += `<p class="font-body text-[18px] leading-relaxed text-on-surface mb-4">${esc(state.era.description)}</p>`;
+  introHtml += `<p class="font-body text-[18px] leading-relaxed text-on-surface mb-4">You are <strong class="text-primary-fixed">${esc(state.player.name)}</strong>, ${esc(state.player.role.toLowerCase())}. ${esc(state.player.description)}</p>`;
+  if (loc) {
+    introHtml += `<p class="font-body text-[18px] leading-relaxed text-on-surface">${esc(loc.description)}</p>`;
+  }
+  introHtml += `</div>`;
+  turnsContainer.innerHTML = introHtml;
+}
 
-    showScreen("game");
-    updateGameChrome();
-    renderInitialTurn();
-    playerInput.focus();
-  } catch (e) {
-    localStorage.removeItem("chronos_run_id");
-    btnContinue.classList.add("hidden");
-    beginNewRun();
+function updateTopBar() {
+  const info = $("#top-bar-info");
+  if (!info || !state) return;
+  const loc = state.locations.find((l) => l.id === state.player.location);
+  const locName = loc ? loc.name : "";
+  const year = state.current_year || state.era.year_start;
+  info.textContent = `${year} AD · ${locName}`;
+
+  const deathInd = $("#death-indicator");
+  const deathName = $("#death-indicator-name");
+  if (state.run_status === "dead_observing" && deathInd) {
+    deathInd.classList.remove("hidden");
+    deathInd.classList.add("flex");
+    if (deathName) deathName.textContent = state.player.name;
   }
 }
 
-function guessEraKey(eraName) {
-  for (const k of ERA_KEYS) {
-    if (ERA_LOADING[k] && ERA_LOADING[k].label.includes(eraName.split(" ")[0].toUpperCase())) return k;
+// -------------------------------------------------------------------
+// Input handling
+// -------------------------------------------------------------------
+
+function setupInput() {
+  const input = $("#player-input");
+  const obsInput = $("#obs-input");
+
+  if (input) {
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") submitTurn(input.value.trim());
+    });
   }
-  return ERA_KEYS[0];
-}
-
-// ── Loading screen helpers ───────────────────────────────────
-
-function populateEraLoading(key) {
-  const era = ERA_LOADING[key];
-  if (!era) return;
-
-  loadingEraLabel.textContent = era.label;
-  loadingEraDesc.textContent  = era.desc;
-
-  let evHtml = "";
-  for (const ev of era.events) {
-    evHtml += `<div class="flex gap-4 items-baseline">`;
-    evHtml += `<span class="font-system text-[10px] text-tertiary-container tracking-wider shrink-0 w-[70px]">${esc(ev.date)}</span>`;
-    evHtml += `<p class="font-body text-[16px] leading-[1.7] text-on-surface">${esc(ev.text)}</p>`;
-    evHtml += `</div>`;
+  if (obsInput) {
+    obsInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") submitTurn(obsInput.value.trim());
+    });
   }
-  loadingEvents.innerHTML = evHtml;
-
-  let voHtml = "";
-  for (const v of era.voices) {
-    voHtml += `<div class="space-y-2">`;
-    voHtml += `<p class="font-body italic text-[16px] leading-[1.7] text-on-secondary-container">\u201C${esc(v.text)}\u201D</p>`;
-    voHtml += `<span class="font-system text-[10px] text-tertiary-container tracking-wider">\u2014 ${esc(v.speaker)}</span>`;
-    voHtml += `</div>`;
-  }
-  loadingVoices.innerHTML = voHtml;
 }
-
-function showCharacterOnLoading() {
-  const player = state.player;
-  loadingCharLabel.textContent = `${player.name.toUpperCase()} \u00B7 ${player.role.toUpperCase()}`;
-  loadingCharDesc.textContent  = player.description;
-  loadingCharSection.classList.remove("hidden");
-  loadingCharSection.style.opacity = "0";
-  requestAnimationFrame(() => {
-    loadingCharSection.style.opacity = "1";
-  });
-}
-
-function transitionToGame() {
-  showScreen("game");
-  updateGameChrome();
-  renderInitialTurn();
-  playerInput.focus();
-}
-
-// ═════════════════════════════════════════════════════════════
-//  GAME STATE HELPERS
-// ═════════════════════════════════════════════════════════════
-
-function resetGameState() {
-  state  = null;
-  runId  = null;
-  eraKey = null;
-  busy   = false;
-  mapOpen = false;
-  turnsContainer.innerHTML = "";
-
-  deathMarker.classList.add("hidden");
-  obsInputSection.classList.add("hidden");
-  deathIndicator.classList.add("hidden");
-  deathIndicator.style.display = "";
-  bottomBar.classList.remove("hidden");
-  newRunConfirm.classList.add("hidden");
-  closeHamburger();
-  hideMap();
-}
-
-function updateGameChrome() {
-  if (!state) return;
-
-  const year    = state.current_year || state.era.year_start;
-  const locName = locationName(state.player.location);
-
-  topBarInfo.textContent = `${year} AD \u00B7 ${locName.toUpperCase()} \u00B7 ${state.player.name.toUpperCase()}`;
-
-  if (state.run_status === "dead_observing") enterObservationMode();
-}
-
-function locationName(locId) {
-  if (!state || !state.locations) return locId || "";
-  const loc = state.locations.find((l) => l.id === locId);
-  return loc ? loc.name : locId;
-}
-
-function enterObservationMode() {
-  deathIndicator.classList.remove("hidden");
-  deathIndicator.style.display = "flex";
-  deathIndicatorName.textContent = `\u2020 ${state.player.name.toUpperCase()}`;
-
-  bottomBar.classList.add("hidden");
-  obsInputSection.classList.remove("hidden");
-}
-
-// ═════════════════════════════════════════════════════════════
-//  TURN RENDERING
-// ═════════════════════════════════════════════════════════════
-
-function renderInitialTurn() {
-  const era    = state.era;
-  const player = state.player;
-  const loc    = state.locations.find((l) => l.id === player.location);
-  const year   = state.current_year || era.year_start;
-
-  addTurnBlock({
-    year:         `${year} AD`,
-    narration:    era.description,
-    playerIntro:  `You are ${player.name}, ${player.role.toLowerCase()}. ${player.description}`,
-    locationDesc: loc ? loc.description : "",
-    npcResponses: [],
-  });
-}
-
-function addTurnBlock(data) {
-  const block = document.createElement("div");
-  block.className = "turn-block space-y-6 pb-12 transition-opacity duration-700";
-
-  let h = "";
-
-  if (data.year) {
-    h += `<div class="font-system text-[11px] text-on-secondary-container tracking-widest text-center">${esc(data.year)}${data.season ? " \u00B7 " + esc(data.season) : ""}</div>`;
-  }
-
-  if (data.playerAction) {
-    h += `<div class="font-body italic text-[16px] text-on-secondary-container text-center">${esc(data.playerAction)}</div>`;
-  }
-
-  if (data.playerIntro) {
-    h += `<div class="font-body text-[18px] leading-[1.9] text-on-surface text-center">${esc(data.playerIntro)}</div>`;
-  }
-
-  if (data.narration) {
-    h += `<div class="font-body text-[18px] leading-[1.9] text-on-surface text-center">${esc(data.narration)}</div>`;
-  }
-
-  if (data.locationDesc) {
-    h += `<div class="font-body text-[18px] leading-[1.9] text-on-surface text-center">${esc(data.locationDesc)}</div>`;
-  }
-
-  if (data.travel) {
-    h += `<div class="font-body italic text-[16px] text-on-secondary-container text-center">The journey from ${esc(data.travel.from)} to ${esc(data.travel.to)} takes ${data.travel.turns_spent} turn${data.travel.turns_spent === 1 ? "" : "s"}. The world moves on while you travel.</div>`;
-  }
-
-  for (const npc of data.npcResponses || []) {
-    h += `<div class="pt-4" style="border-top: 1px solid rgba(42,34,24,0.3);">`;
-    h += `<span class="font-system text-[13px] text-on-secondary-container block mb-2 tracking-widest text-center">${esc((npc.npc_name || npc.name || "").toUpperCase())}</span>`;
-    h += `<p class="font-body text-[17px] leading-[1.7] text-on-surface pl-6" style="border-left: 1px solid #2a2218;">${esc(npc.pov || npc.text || "")}</p>`;
-    h += `</div>`;
-  }
-
-  h += `<div class="w-full h-[1px] bg-surface-container mt-6"></div>`;
-
-  block.innerHTML = h;
-  turnsContainer.appendChild(block);
-  updateTurnOpacities();
-  block.scrollIntoView({ behavior: "smooth" });
-}
-
-function updateTurnOpacities() {
-  const blocks = turnsContainer.querySelectorAll(".turn-block");
-  const total  = blocks.length;
-
-  blocks.forEach((block, i) => {
-    const dist = total - 1 - i;
-    if (dist === 0)      block.style.opacity = "1";
-    else if (dist === 1) block.style.opacity = "0.72";
-    else if (dist === 2) block.style.opacity = "0.48";
-    else if (dist === 3) block.style.opacity = "0.18";
-    else                 block.style.opacity = "0.10";
-  });
-}
-
-// ═════════════════════════════════════════════════════════════
-//  TURN SUBMISSION
-// ═════════════════════════════════════════════════════════════
 
 async function submitTurn(text) {
-  text = text.trim();
-  if (!text || !runId || busy) return;
-  busy = true;
+  if (!text || !runId) return;
 
-  const loader = document.createElement("div");
-  loader.className = "turn-block space-y-6 pb-12";
-  loader.innerHTML = `
-    <div class="font-body italic text-[16px] text-on-secondary-container text-center">${esc(text)}</div>
-    <div class="flex justify-center dots-pulse">
-      <span class="font-body text-2xl text-on-secondary-container mx-2">\u00B7</span>
-      <span class="font-body text-2xl text-on-secondary-container mx-2">\u00B7</span>
-      <span class="font-body text-2xl text-on-secondary-container mx-2">\u00B7</span>
-    </div>`;
-  turnsContainer.appendChild(loader);
-  loader.scrollIntoView({ behavior: "smooth" });
+  const input = $("#player-input");
+  const obsInput = $("#obs-input");
+  if (input) { input.value = ""; input.disabled = true; }
+  if (obsInput) { obsInput.value = ""; obsInput.disabled = true; }
+
+  const turnsContainer = $("#turns-container");
+  const block = document.createElement("div");
+  block.className = "mb-8";
+  block.innerHTML = `<p class="font-body italic text-[16px] text-on-secondary-container">${esc(text)}</p><p class="font-system text-[10px] text-[#2a2218] mt-2">...</p>`;
+  turnsContainer.appendChild(block);
+  block.scrollIntoView({ behavior: "smooth" });
 
   try {
     const res = await fetch(`/api/run/${runId}/turn`, {
-      method:  "POST",
+      method: "POST",
       headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify({ player_input: text }),
+      body: JSON.stringify({ player_input: text }),
     });
-
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || `HTTP ${res.status}`);
-    }
-
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || `HTTP ${res.status}`);
     const data = await res.json();
     state = data.world_state;
-    turnsContainer.removeChild(loader);
 
     if (data.erasure) {
+      block.remove();
       showErasure(data.erasure);
-      busy = false;
       return;
     }
 
-    addTurnBlock({
-      year:         `${state.current_year} AD`,
-      playerAction: text,
-      narration:    data.parsed_action ? data.parsed_action.era_description : "",
-      npcResponses: data.npc_responses || [],
-      travel:       data.travel || null,
-    });
-
-    updateGameChrome();
+    renderTurn(block, text, data);
+    updateTopBar();
 
     if (data.death) {
       showDeathMarker(data.death.cause);
       enterObservationMode();
     }
 
-    if (typeof ChronosMap !== "undefined" && ChronosMap.isVisible()) {
+    if (typeof ChronosMap !== "undefined" && !$('#map-container').classList.contains('hidden')) {
       ChronosMap.updateMarkers(state);
     }
   } catch (e) {
-    loader.innerHTML = `
-      <div class="font-body italic text-[16px] text-on-secondary-container text-center">${esc(text)}</div>
-      <div class="font-system text-[12px] text-[#805040] text-center">${esc(e.message)}</div>`;
-    updateTurnOpacities();
+    block.innerHTML = `<p class="font-body italic text-[16px] text-on-secondary-container">${esc(text)}</p><p class="font-system text-[10px] text-dead-tint mt-2">${esc(e.message)}</p>`;
+  } finally {
+    if (input) input.disabled = false;
+    if (obsInput) obsInput.disabled = false;
+    if (state && state.run_status === "active" && input) input.focus();
+    if (state && state.run_status === "dead_observing" && obsInput) obsInput.focus();
+  }
+}
+
+function renderTurn(el, playerText, data) {
+  const { parsed_action: pa, npc_responses, world_state: ws } = data;
+  const ambient = data.ambient_activity || [];
+
+  let h = `<div class="font-system text-[10px] tracking-[0.12em] text-[#2a2218] uppercase mb-4">${ws.current_year} AD</div>`;
+
+  // Ambient world activity FIRST — what NPCs are doing around you
+  if (ambient.length) {
+    for (const a of ambient) {
+      h += `<p class="font-body text-[17px] leading-relaxed text-on-secondary-container mb-3">`;
+      if (a.interacts_with) {
+        h += `<span class="text-primary-container">${esc(a.npc_name)}</span> and <span class="text-primary-container">${esc(a.interacts_with)}</span> — `;
+      } else {
+        h += `<span class="text-primary-container">${esc(a.npc_name)}</span> — `;
+      }
+      h += `${esc(a.activity)}</p>`;
+    }
   }
 
-  busy = false;
+  // Player's action — one thread among the world
+  h += `<p class="font-body italic text-[16px] text-on-secondary-container mb-3 mt-4">${esc(playerText)}</p>`;
+
+  if (pa.era_description) {
+    h += `<p class="font-body text-[18px] leading-relaxed text-on-surface mb-3">${esc(pa.era_description)}</p>`;
+  }
+
+  if (data.travel) {
+    h += `<p class="font-body text-[17px] leading-relaxed text-on-secondary-container mb-3">${esc(
+      `The journey from ${data.travel.from} to ${data.travel.to} takes ${data.travel.turns_spent} turns.`
+    )}</p>`;
+  }
+
+  // NPC reactions to the player (if any)
+  for (const r of npc_responses || []) {
+    h += `<div class="my-4 pl-4" style="border-left: 2px solid #2a2218;">`;
+    h += `<div class="font-system text-[9px] tracking-[0.1em] text-on-secondary-container uppercase mb-1">${esc(r.npc_name)}</div>`;
+    h += `<p class="font-body text-[17px] leading-relaxed text-on-surface">${esc(r.pov)}</p>`;
+    h += `</div>`;
+  }
+
+  // Separator
+  h += `<div class="mt-6 mb-2"><svg width="100%" height="1"><line x1="0" y1="0" x2="100%" y2="0" stroke="#1e1b18" stroke-width="1" stroke-dasharray="2 3"/></svg></div>`;
+
+  el.innerHTML = h;
+  el.scrollIntoView({ behavior: "smooth" });
 }
 
 function showDeathMarker(cause) {
-  deathMarker.classList.remove("hidden");
-  deathMarkerTitle.textContent = `The Death of ${state.player.name}`;
-  deathMarkerQuote.textContent = `\u201C${cause}\u201D`;
-  deathMarker.scrollIntoView({ behavior: "smooth" });
+  const marker = $("#death-marker");
+  const title = $("#death-marker-title");
+  const quote = $("#death-marker-quote");
+  if (marker) {
+    marker.classList.remove("hidden");
+    if (title) title.textContent = state.player.name;
+    if (quote) quote.textContent = cause;
+  }
+}
+
+function enterObservationMode() {
+  const bottomBar = $("#bottom-bar");
+  const obsSection = $("#obs-input-section");
+  if (bottomBar) bottomBar.classList.add("hidden");
+  if (obsSection) obsSection.classList.remove("hidden");
 }
 
 function showErasure(text) {
-  erasureText.textContent  = text;
-  erasureCycle.textContent = `End of Cycle ${state.turn}`;
-  localStorage.removeItem("chronos_run_id");
-  showScreen("erasure");
+  const erasureText = $("#erasure-text");
+  const erasureCycle = $("#erasure-cycle");
+  if (erasureText) erasureText.textContent = text;
+  if (erasureCycle) erasureCycle.textContent = `Run ${runId}`;
+  showScreen("screen-erasure");
 }
 
-// ═════════════════════════════════════════════════════════════
-//  INPUT HANDLING
-// ═════════════════════════════════════════════════════════════
+// -------------------------------------------------------------------
+// Hamburger menu
+// -------------------------------------------------------------------
 
-playerInput.addEventListener("keydown", (e) => {
-  if (e.key === "Enter" && playerInput.value.trim()) {
-    const v = playerInput.value;
-    playerInput.value = "";
-    submitTurn(v);
-  }
-});
+const hamburgerBtn = $("#btn-hamburger");
+const hamburgerPanel = $("#hamburger-panel");
+const hamburgerOverlay = $("#hamburger-overlay");
+const hamburgerIcon = $("#hamburger-icon");
+const hamburgerCloseIcon = $("#hamburger-close-icon");
 
-obsInput.addEventListener("keydown", (e) => {
-  if (e.key === "Enter" && obsInput.value.trim()) {
-    const v = obsInput.value;
-    obsInput.value = "";
-    submitTurn(v);
-  }
-});
-
-// ═════════════════════════════════════════════════════════════
-//  HAMBURGER PANEL
-// ═════════════════════════════════════════════════════════════
-
-function openHamburger() {
-  hamburgerPanel.classList.add("open");
-  hamburgerOverlay.classList.remove("hidden");
-  hamburgerIcon.classList.add("hidden");
-  hamburgerCloseIcon.classList.remove("hidden");
-  syncMapButtonText();
+if (hamburgerBtn) {
+  hamburgerBtn.addEventListener("click", () => {
+    const isOpen = hamburgerPanel.classList.contains("open");
+    if (isOpen) {
+      hamburgerPanel.classList.remove("open");
+      hamburgerOverlay.classList.add("hidden");
+      hamburgerIcon.classList.remove("hidden");
+      hamburgerCloseIcon.classList.add("hidden");
+    } else {
+      hamburgerPanel.classList.add("open");
+      hamburgerOverlay.classList.remove("hidden");
+      hamburgerIcon.classList.add("hidden");
+      hamburgerCloseIcon.classList.remove("hidden");
+    }
+  });
 }
 
-function closeHamburger() {
-  hamburgerPanel.classList.remove("open");
-  hamburgerOverlay.classList.add("hidden");
-  hamburgerIcon.classList.remove("hidden");
-  hamburgerCloseIcon.classList.add("hidden");
-  newRunConfirm.classList.add("hidden");
+if (hamburgerOverlay) {
+  hamburgerOverlay.addEventListener("click", () => {
+    hamburgerPanel.classList.remove("open");
+    hamburgerOverlay.classList.add("hidden");
+    hamburgerIcon.classList.remove("hidden");
+    hamburgerCloseIcon.classList.add("hidden");
+  });
 }
 
-function toggleHamburger() {
-  if (hamburgerPanel.classList.contains("open")) closeHamburger();
-  else openHamburger();
+// Map toggle from hamburger
+const mapBtn = $("#btn-map-hamburger");
+if (mapBtn) {
+  mapBtn.addEventListener("click", () => {
+    const mapContainer = $("#map-container");
+    const manuscript = $("#manuscript");
+    const bottomBar = $("#bottom-bar");
+    const mapText = $("#map-btn-text");
+
+    if (mapContainer.classList.contains("hidden")) {
+      mapContainer.classList.remove("hidden");
+      if (manuscript) manuscript.style.display = "none";
+      if (bottomBar) bottomBar.classList.add("hidden");
+      if (mapText) mapText.textContent = "MANUSCRIPT";
+      if (typeof ChronosMap !== "undefined") ChronosMap.show(state, eraKey);
+    } else {
+      mapContainer.classList.add("hidden");
+      if (manuscript) manuscript.style.display = "";
+      if (state && state.run_status === "active" && bottomBar) bottomBar.classList.remove("hidden");
+      if (mapText) mapText.textContent = "MAP";
+      if (typeof ChronosMap !== "undefined") ChronosMap.hide();
+    }
+
+    hamburgerPanel.classList.remove("open");
+    hamburgerOverlay.classList.add("hidden");
+    hamburgerIcon.classList.remove("hidden");
+    hamburgerCloseIcon.classList.add("hidden");
+  });
 }
 
-$("#btn-hamburger").addEventListener("click", toggleHamburger);
-$("#hamburger-overlay").addEventListener("click", closeHamburger);
-
-$("#btn-new-run").addEventListener("click", () => {
-  newRunConfirm.classList.toggle("hidden");
-});
-
-$("#btn-new-run-yes").addEventListener("click", () => {
-  closeHamburger();
-  localStorage.removeItem("chronos_run_id");
-  resetGameState();
-  beginNewRun();
-});
-
-$("#btn-new-run-no").addEventListener("click", () => {
-  newRunConfirm.classList.add("hidden");
-});
-
-// ═════════════════════════════════════════════════════════════
-//  MAP
-// ═════════════════════════════════════════════════════════════
-
-function showMap() {
-  if (!state || !runId) return;
-  mapOpen = true;
-  mapContainer.classList.remove("hidden");
-  bottomBar.classList.add("hidden");
-  if (typeof ChronosMap !== "undefined") ChronosMap.show(state, eraKey);
+// New run from hamburger
+const newRunBtn = $("#btn-new-run");
+const newRunConfirm = $("#new-run-confirm");
+if (newRunBtn) {
+  newRunBtn.addEventListener("click", () => {
+    if (newRunConfirm) newRunConfirm.classList.toggle("hidden");
+  });
+}
+const newRunYes = $("#btn-new-run-yes");
+if (newRunYes) {
+  newRunYes.addEventListener("click", () => {
+    hamburgerPanel.classList.remove("open");
+    hamburgerOverlay.classList.add("hidden");
+    hamburgerIcon.classList.remove("hidden");
+    hamburgerCloseIcon.classList.add("hidden");
+    if (newRunConfirm) newRunConfirm.classList.add("hidden");
+    startNewRun();
+  });
+}
+const newRunNo = $("#btn-new-run-no");
+if (newRunNo) {
+  newRunNo.addEventListener("click", () => {
+    if (newRunConfirm) newRunConfirm.classList.add("hidden");
+  });
 }
 
-function hideMap() {
-  mapOpen = false;
-  mapContainer.classList.add("hidden");
-  if (typeof ChronosMap !== "undefined") ChronosMap.hide();
-  if (state && state.run_status === "active") {
-    bottomBar.classList.remove("hidden");
-  }
-}
-
-function toggleMap() {
-  if (mapOpen) hideMap();
-  else showMap();
-}
-
-function syncMapButtonText() {
-  mapBtnText.textContent = mapOpen ? "MANUSCRIPT" : "MAP";
-}
-
-$("#btn-map-hamburger").addEventListener("click", () => {
-  closeHamburger();
-  toggleMap();
-});
-
+// M key toggle
 document.addEventListener("keydown", (e) => {
-  if ((e.key === "m" || e.key === "M") && state && runId) {
-    if (document.activeElement === playerInput || document.activeElement === obsInput) return;
-    toggleMap();
+  if (e.key === "m" || e.key === "M") {
+    if (!state || !runId) return;
+    if (document.activeElement === $("#player-input")) return;
+    if (document.activeElement === $("#obs-input")) return;
+    if (mapBtn) mapBtn.click();
   }
 });
 
-// ═════════════════════════════════════════════════════════════
-//  UTILITIES
-// ═════════════════════════════════════════════════════════════
+// -------------------------------------------------------------------
+// Utility
+// -------------------------------------------------------------------
 
 function esc(s) {
   if (!s) return "";
   const d = document.createElement("div");
   d.textContent = s;
   return d.innerHTML;
-}
-
-function delay(ms) {
-  return new Promise((r) => setTimeout(r, ms));
 }

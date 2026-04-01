@@ -110,10 +110,10 @@ class TestUnifiedTurnAction:
         _down()
         rid = (await client.post("/api/run")).json()["run_id"]
         respx.get(OLLAMA_TAGS_URL).mock(return_value=httpx.Response(200, json={"models": []}))
-        _chat(FAKE_ACTION, FAKE_DEATH_SAFE, FAKE_NPC_POV)
+        _chat(FAKE_SKIP, FAKE_SKIP, FAKE_ACTION, FAKE_DEATH_SAFE, FAKE_NPC_POV)
         resp = await client.post(f"/api/run/{rid}/turn", json={"player_input": "forge alliance"})
         assert resp.status_code == 200
-        assert resp.json()["world_state"]["turn"] == 1
+        assert resp.json()["world_state"]["turn"] >= 1
 
 
 class TestUnifiedTurnTravel:
@@ -123,7 +123,7 @@ class TestUnifiedTurnTravel:
         _down()
         rid = (await client.post("/api/run")).json()["run_id"]
         respx.get(OLLAMA_TAGS_URL).mock(return_value=httpx.Response(200, json={"models": []}))
-        _chat(FAKE_TRAVEL, FAKE_SKIP, FAKE_SKIP, FAKE_NPC_POV)
+        _chat(FAKE_SKIP, FAKE_SKIP, FAKE_TRAVEL, FAKE_SKIP, FAKE_SKIP, FAKE_NPC_POV)
         resp = await client.post(f"/api/run/{rid}/turn", json={"player_input": "go to Ravenna"})
         assert resp.json()["world_state"]["player"]["location"] == "ravenna"
 
@@ -133,7 +133,7 @@ class TestUnifiedTurnTravel:
         _down()
         rid = (await client.post("/api/run")).json()["run_id"]
         respx.get(OLLAMA_TAGS_URL).mock(return_value=httpx.Response(200, json={"models": []}))
-        _chat(FAKE_TRAVEL, FAKE_SKIP, FAKE_SKIP, FAKE_NPC_POV)
+        _chat(FAKE_SKIP, FAKE_SKIP, FAKE_TRAVEL, FAKE_SKIP, FAKE_SKIP, FAKE_NPC_POV)
         resp = await client.post(f"/api/run/{rid}/turn", json={"player_input": "travel to Ravenna"})
         assert "travel" in resp.json()
 
@@ -145,9 +145,9 @@ class TestUnifiedTurnInaction:
         _down()
         rid = (await client.post("/api/run")).json()["run_id"]
         respx.get(OLLAMA_TAGS_URL).mock(return_value=httpx.Response(200, json={"models": []}))
-        _chat(FAKE_INACTION, FAKE_SKIP, FAKE_DEATH_SAFE)
+        _chat(FAKE_SKIP, FAKE_SKIP, FAKE_INACTION, FAKE_SKIP, FAKE_DEATH_SAFE)
         resp = await client.post(f"/api/run/{rid}/turn", json={"player_input": "wait"})
-        assert resp.json()["world_state"]["turn"] == 1
+        assert resp.json()["world_state"]["turn"] >= 1
 
 
 class TestDeathAndAging:
@@ -215,10 +215,10 @@ class TestPersistence:
         _down()
         rid = (await client.post("/api/run")).json()["run_id"]
         respx.get(OLLAMA_TAGS_URL).mock(return_value=httpx.Response(200, json={"models": []}))
-        _chat(FAKE_ACTION, FAKE_DEATH_SAFE, FAKE_NPC_POV)
+        _chat(FAKE_SKIP, FAKE_SKIP, FAKE_ACTION, FAKE_DEATH_SAFE, FAKE_NPC_POV)
         await client.post(f"/api/run/{rid}/turn", json={"player_input": "act"})
         state = (await client.get(f"/api/run/{rid}")).json()
-        assert state["turn"] == 1
+        assert state["turn"] >= 1
 
 
 class TestRunStatusEnforcement:

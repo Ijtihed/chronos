@@ -169,6 +169,15 @@
       </header>
       <nav class="flex flex-col gap-8 items-center">
         <a id="btn-begin" class="font-serif-display text-[22px] text-on-surface ink-underline transition-colors cursor-pointer active:text-primary-fixed">Begin</a>
+        <!-- Confirm overwrite when active run exists -->
+        <div id="begin-confirm" class="hidden flex flex-col items-center gap-3">
+          <p class="font-system text-[11px] text-on-secondary-container uppercase tracking-tighter">This will end your current run.</p>
+          <div class="flex items-center gap-4 font-body text-[18px] text-tertiary-container">
+            <span id="btn-begin-yes" class="cursor-pointer ink-underline hover:text-primary-fixed transition-colors">Yes</span>
+            <span class="text-surface-container select-none">&middot;</span>
+            <span id="btn-begin-no" class="cursor-pointer ink-underline hover:text-primary-fixed transition-colors">No</span>
+          </div>
+        </div>
         <a id="btn-continue" class="hidden font-serif-display text-[18px] text-on-secondary-container ink-underline transition-colors cursor-pointer active:text-primary-fixed">Continue</a>
       </nav>
     </main>
@@ -213,7 +222,7 @@
           <circle cx="24" cy="24" r="20" fill="none" stroke="#2a2218" stroke-width="1.5"/>
           <circle id="loading-ring-fill" cx="24" cy="24" r="20" fill="none" stroke="#8a7040" stroke-width="1.5"
             stroke-dasharray="125.66" stroke-dashoffset="125.66" stroke-linecap="round"
-            transform="rotate(-90 24 24)" style="transition: stroke-dashoffset 0.4s ease;"/>
+            transform="rotate(-90 24 24)"/>
         </svg>
       </div>
     </main>

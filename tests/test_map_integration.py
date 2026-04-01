@@ -78,7 +78,7 @@ class TestMarkerStateMidRun:
         respx.get(OLLAMA_TAGS_URL).mock(
             return_value=httpx.Response(200, json={"models": []})
         )
-        _chat(FAKE_ACTION, FAKE_DEATH_SAFE, FAKE_NPC_POV)
+        _chat(FAKE_SKIP, FAKE_SKIP, FAKE_ACTION, FAKE_DEATH_SAFE, FAKE_NPC_POV)
 
         await client.post(f"/api/run/{rid}/turn", json={"player_input": "act"})
         state = (await client.get(f"/api/run/{rid}")).json()
@@ -122,7 +122,7 @@ class TestTravelUpdatesMarkers:
         respx.get(OLLAMA_TAGS_URL).mock(
             return_value=httpx.Response(200, json={"models": []})
         )
-        _chat(FAKE_TRAVEL, FAKE_SKIP, FAKE_SKIP, FAKE_NPC_POV)
+        _chat(FAKE_SKIP, FAKE_SKIP, FAKE_TRAVEL, FAKE_SKIP, FAKE_SKIP, FAKE_NPC_POV)
 
         await client.post(
             f"/api/run/{rid}/turn",
@@ -145,7 +145,7 @@ class TestTravelUpdatesMarkers:
         respx.get(OLLAMA_TAGS_URL).mock(
             return_value=httpx.Response(200, json={"models": []})
         )
-        _chat(FAKE_TRAVEL, FAKE_SKIP, FAKE_SKIP, FAKE_NPC_POV)
+        _chat(FAKE_SKIP, FAKE_SKIP, FAKE_TRAVEL, FAKE_SKIP, FAKE_SKIP, FAKE_NPC_POV)
 
         await client.post(
             f"/api/run/{rid}/turn",
@@ -165,7 +165,7 @@ class TestTravelUpdatesMarkers:
         respx.get(OLLAMA_TAGS_URL).mock(
             return_value=httpx.Response(200, json={"models": []})
         )
-        _chat(FAKE_TRAVEL, FAKE_SKIP, FAKE_SKIP, FAKE_NPC_POV)
+        _chat(FAKE_SKIP, FAKE_SKIP, FAKE_TRAVEL, FAKE_SKIP, FAKE_SKIP, FAKE_NPC_POV)
 
         resp = await client.post(
             f"/api/run/{rid}/turn",

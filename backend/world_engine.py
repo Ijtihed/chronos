@@ -1,7 +1,10 @@
-"""World advancement engine — runs simulation ticks when the player
-travels or skips turns.
+"""World engine — runs the living simulation every turn.
 
-Model tier: LOCAL — lightweight per-tick NPC actions via Ollama.
+The world advances whether or not the player acts. NPCs act autonomously,
+travel between locations, and interact with each other. The player's
+action is one thread among many.
+
+Model tier: LOCAL — lightweight per-NPC autonomous actions via Ollama.
 """
 
 from __future__ import annotations
@@ -11,7 +14,7 @@ import json
 import random
 from pathlib import Path
 from string import Template
-from typing import List
+from typing import Dict, List, Optional, Tuple
 
 from backend.llm import chat, load_prompt
 from backend.world_state import (
@@ -20,7 +23,9 @@ from backend.world_state import (
     NPC,
     WorldState,
     build_story_summary,
+    get_location,
     get_player_location,
+    npcs_near_player,
 )
 
 _AUTONOMOUS_TEMPLATE_PATH = (
@@ -28,87 +33,124 @@ _AUTONOMOUS_TEMPLATE_PATH = (
 )
 
 
-async def advance_world(state: WorldState, ticks: int = 1) -> WorldState:
-    """Advance the world by N ticks. Each tick: a subset of NPCs act
-    autonomously, tension may shift, calendar advances.
+async def simulate_turn(state: WorldState) -> Tuple[WorldState, List[dict]]:
+    """Run one simulation tick. Returns (new_state, ambient_events).
 
-    Mutates in place for efficiency (caller should have a copy).
+    ambient_events is a list of dicts describing what NPCs did this turn,
+    to be included in the narrative. Only includes activity at the player's
+    location (the rest happens silently).
     """
-    for _ in range(ticks):
-        state.turn += 1
-        state.current_year = int(
-            state.era.year_start + state.turn * state.era.years_per_turn
+    new = state.model_copy(deep=True)
+    new.turn += 1
+    new.current_year = int(
+        new.era.year_start + new.turn * new.era.years_per_turn
+    )
+
+    if new.player.location not in new.visited_locations:
+        new.visited_locations.append(new.player.location)
+
+    nearby = [n for n in new.npcs if n.location == new.player.location]
+    elsewhere = [n for n in new.npcs if n.location != new.player.location]
+
+    visible_activity = []
+
+    if nearby:
+        active_nearby = random.sample(nearby, min(len(nearby), random.randint(2, 4)))
+        results = await asyncio.gather(
+            *[_npc_autonomous_action(npc, new, nearby) for npc in active_nearby],
+            return_exceptions=True,
         )
+        for npc, result in zip(active_nearby, results):
+            if isinstance(result, dict):
+                action_desc = result.get("action", f"{npc.name} goes about their day.")
+                visible_activity.append({
+                    "npc_id": npc.id,
+                    "npc_name": npc.name,
+                    "npc_role": npc.role,
+                    "activity": action_desc,
+                    "interacts_with": result.get("interacts_with"),
+                })
+                new.events.append(Event(
+                    turn=new.turn,
+                    action_type="ambient",
+                    description=action_desc,
+                    target=result.get("interacts_with"),
+                    location=npc.location,
+                ))
+                if result.get("mood_shift") and result["mood_shift"] != npc.disposition:
+                    npc.disposition = result["mood_shift"]
+                if result.get("wants_to_travel") and result.get("travel_destination"):
+                    _schedule_npc_travel(npc, result["travel_destination"], new)
 
-        active_npcs = _select_active_npcs(state)
-        if active_npcs:
-            results = await asyncio.gather(
-                *[_autonomous_npc_action(npc, state) for npc in active_npcs],
-                return_exceptions=True,
-            )
-            for npc, result in zip(active_npcs, results):
-                if isinstance(result, dict):
-                    desc = result.get("action", f"{npc.name} goes about their day.")
-                    state.events.append(
-                        Event(
-                            turn=state.turn,
-                            action_type="autonomous",
-                            description=desc,
-                            target=npc.name,
-                            location=npc.location,
-                        )
-                    )
+    if elsewhere:
+        active_elsewhere = random.sample(elsewhere, min(len(elsewhere), max(1, len(elsewhere) // 3)))
+        bg_results = await asyncio.gather(
+            *[_npc_autonomous_action(npc, new, []) for npc in active_elsewhere],
+            return_exceptions=True,
+        )
+        for npc, result in zip(active_elsewhere, bg_results):
+            if isinstance(result, dict):
+                new.events.append(Event(
+                    turn=new.turn,
+                    action_type="ambient_distant",
+                    description=result.get("action", f"{npc.name} acts."),
+                    target=result.get("interacts_with"),
+                    location=npc.location,
+                ))
+                if result.get("mood_shift") and result["mood_shift"] != npc.disposition:
+                    npc.disposition = result["mood_shift"]
+                if result.get("wants_to_travel") and result.get("travel_destination"):
+                    _schedule_npc_travel(npc, result["travel_destination"], new)
 
-        _tick_tension(state)
+    _tick_tension(new)
 
+    return new, visible_activity
+
+
+async def advance_world(state: WorldState, ticks: int = 1) -> WorldState:
+    """Advance the world by N ticks without generating visible activity.
+    Used during travel when the player is in transit."""
+    for _ in range(ticks):
+        state, _ = await simulate_turn(state)
     return state
 
 
 async def player_skip_turn(state: WorldState) -> dict:
-    """The player skips — their character acts autonomously.
-
-    Returns a dict describing what the player character did,
-    shaped like a parsed action for compatibility with apply_action.
-    """
+    """The player chose inaction — their character acts autonomously."""
     raw_template = load_prompt(_AUTONOMOUS_TEMPLATE_PATH)
     player_loc = get_player_location(state)
+    nearby = npcs_near_player(state)
+    other_names = ", ".join(n.name for n in nearby) or "no one"
 
     prompt = Template(raw_template).safe_substitute(
         character_name=state.player.name,
         character_role=state.player.role,
         character_description=state.player.description,
         character_disposition=state.player.disposition,
+        other_npcs_here=other_names,
         location_name=player_loc.name,
         year=state.current_year or state.era.year_start,
         era_description=state.era.description,
         story_so_far=build_story_summary(state),
+        player_name=state.player.name,
     )
 
     try:
         raw = await chat(prompt, json_mode=True)
         data = json.loads(raw)
     except Exception:
-        data = {
-            "action": f"{state.player.name} rests and waits.",
-            "effect": "Nothing changes.",
-        }
+        data = {"action": f"{state.player.name} rests and waits.", "interacts_with": None}
 
     return {
         "action_type": "autonomous",
-        "target": None,
+        "target": data.get("interacts_with"),
         "intent": "inaction — character acts on their own",
         "era_description": data.get("action", f"{state.player.name} waits."),
         "npc_impacts": [],
     }
 
 
-def _select_active_npcs(state: WorldState) -> List[NPC]:
-    """Pick a random subset of NPCs to act this tick. Keep it lightweight."""
-    count = max(1, len(state.npcs) // 3)
-    return random.sample(state.npcs, min(count, len(state.npcs)))
-
-
-async def _autonomous_npc_action(npc: NPC, state: WorldState) -> dict:
+async def _npc_autonomous_action(npc: NPC, state: WorldState, nearby_npcs: List[NPC]) -> dict:
     raw_template = load_prompt(_AUTONOMOUS_TEMPLATE_PATH)
 
     try:
@@ -116,26 +158,39 @@ async def _autonomous_npc_action(npc: NPC, state: WorldState) -> dict:
     except StopIteration:
         npc_loc = state.locations[0]
 
+    other_names = ", ".join(
+        n.name for n in nearby_npcs if n.id != npc.id
+    ) or "no one"
+
     prompt = Template(raw_template).safe_substitute(
         character_name=npc.name,
         character_role=npc.role,
         character_description=npc.description,
         character_disposition=npc.disposition,
+        other_npcs_here=other_names,
         location_name=npc_loc.name,
         year=state.current_year or state.era.year_start,
         era_description=state.era.description,
         story_so_far=build_story_summary(state),
+        player_name=state.player.name,
     )
 
     try:
         raw = await chat(prompt, json_mode=True)
         return json.loads(raw)
     except Exception:
-        return {"action": f"{npc.name} goes about their day.", "effect": ""}
+        return {"action": f"{npc.name} goes about their day.", "interacts_with": None}
+
+
+def _schedule_npc_travel(npc: NPC, destination: str, state: WorldState) -> None:
+    """Move an NPC to a new location if the destination is valid."""
+    dest_id = destination.lower().strip()
+    valid_ids = {loc.id for loc in state.locations}
+    if dest_id in valid_ids and dest_id != npc.location:
+        npc.location = dest_id
 
 
 def _tick_tension(state: WorldState) -> None:
-    """Tension creeps up at random locations during world advancement."""
     if state.turn % 3 != 0:
         return
     loc = random.choice(state.locations)
