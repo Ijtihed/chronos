@@ -36,12 +36,15 @@ async function startNewRun() {
 }
 
 function renderIntro() {
-  let h = `<p>${esc(state.era.description)}</p>`;
+  const loc = state.locations.find((l) => l.id === state.player.location);
+  const year = state.current_year || state.era.year_start;
+
+  let h = `<div class="year-mark">${esc(state.era.name)} \u2014 ${year} AD</div>`;
+  h += `<p>${esc(state.era.description)}</p>`;
   h += `<p>You are <strong>${esc(state.player.name)}</strong>, ${esc(
     state.player.role.toLowerCase()
   )}. ${esc(state.player.description)}</p>`;
 
-  const loc = state.locations.find((l) => l.id === state.player.location);
   if (loc) {
     h += `<p>${esc(loc.description)}</p>`;
   }
