@@ -6,11 +6,12 @@
 
 ## Current project status
 
-**Phase 0 — Proof of Life: COMPLETE** (2026-03-31). See [roadmap.md](roadmap.md) Phase 0 completion log for details.
+**Phase 0 — Proof of Life: COMPLETE** (2026-03-31).
+**Phase 1 — Playable Text Loop: BUILT** — full run lifecycle, 5 eras, travel, death, memory decay, erasure, RAG, persistence. Pending playtesting.
+**Phase 2 — The Map: COMPLETE** (2026-04-01). 2D Leaflet map with historical borders, visited/unvisited NPC markers, toggle with narrative.
+**Next: Phase 2.5 — Map Intelligence + HCE.** Events DB, region knowledge on click, event markers filtered by character awareness.
 
-**Phase 1 — Playable Text Loop: IN PROGRESS.** Full run lifecycle built: 5 eras, character generation, travel, death, memory decay, erasure, RAG/HKE v1, SQLite persistence. Pending: playtesting against success criteria.
-
-**Design principles locked in:** Total player agency (no hand-holding), macro decision scale (alliances/revolts/flight, not bar conversations), selective NPC reactions (game decides who cares), present-tense stream UI.
+**Design principles:** Total player agency, macro decisions, selective NPC reactions, present-tense stream UI. Character assignment reflects era demographics with bias toward historically significant figures. Map region knowledge filtered by character worldview (known facts + rumors). Map events filtered by character awareness (no god-view).
 
 ## Read in this order
 

@@ -115,14 +115,14 @@ A **full run** is reproducible: new run, play until **last memory dies** without
 
 ### What exists at the end of this phase
 
-- 3D globe (Three.js) integrated into the web UI, toggles with the narrative view
-- Globe view: Three.js sphere with Natural Earth coastlines, era-specific historical borders from aourednik/historical-basemaps projected onto the surface
-- Player marker on the globe at their current location
-- NPC markers with visited/unvisited distinction — visited NPCs have a distinct marker state, unvisited are anonymous dots. This is the information-is-geography mechanic made visible.
-- Camera follows the player's region, smooth rotation on travel
-- Historical border data sourced from aourednik/historical-basemaps (open, free GeoJSON), simplified to 110m resolution
+- 2D Leaflet.js map integrated into the web UI, toggles with the narrative view via M key
+- Natural Earth 110m coastlines + era-specific historical borders from aourednik/historical-basemaps
+- Player marker (gold) at current location, NPC markers with visited/unvisited distinction
+- Visited NPCs: named markers with role on hover. Unvisited NPCs: anonymous dots. This is the information-is-geography mechanic made visible.
+- visited_locations tracking in world state -- grows as the player travels
+- 5 border GeoJSON files (400, 900, 1200, 1300, 1400 AD) sourced, simplified, documented in frontend/geo/sources.md
 - Locations in all 5 era configs have lat/lon coordinates
-- No terrain view in this phase (globe only)
+- GET /api/geo/{era_key} endpoint serves border GeoJSON per era
 
 ### Success criteria
 
@@ -147,12 +147,55 @@ The **map is authoritative** for place: player marker, NPC markers, and **histor
 
 ### What is explicitly NOT in this phase
 
-- Terrain / relief view (deferred — globe only for Phase 2)
-- Clickable map interactions (travel by clicking)
-- Diffusion illustrations
-- Fine-tuned model
+- Terrain / relief view (deferred to future phase)
+- Clickable map interactions (travel is typed in the narrative)
+- Region knowledge on hover/click (deferred to Phase 2.5)
+- Event markers on map (deferred to Phase 2.5)
+- Diffusion illustrations (Phase 3)
 - Dynamic border changes from player actions (borders are static per era)
-- Illustrated/stylized map tiles
+
+---
+
+## PHASE 2.5 -- Map Intelligence + Historical Context Engine
+
+**Goal:** The map becomes a knowledge surface. Clicking a region shows what the character knows and has heard. Significant events appear on the map, filtered by character awareness. The Historical Context Engine (Events DB + Ground Context Generator) ships as the data backbone.
+
+### What exists at the end of this phase
+
+- **HCE Events DB** -- a SQLite table of canonical historical events indexed by year and region, populated by a build-time script from Wikipedia + structured datasets. One DB covers all eras. At least 20-40 events per era within a 50-year window of each run's start year.
+- **Ground Context Generator** -- at run initialization, generates a GroundContext object (era_feel, what_your_character_knows, local_rumors, material_conditions) from the Events DB + RAG corpus. Injected into world state and NPC prompts.
+- **Region knowledge endpoint** -- GET /api/run/{id}/region/{polity_name} returns character-filtered knowledge (known facts + rumors) for any region the player clicks on the map. Generated on demand via local LLM, cached per region per turn.
+- **Event markers on map** -- significant events (sieges, plagues, armies) appear as visual markers on the Leaflet map, filtered by character awareness. Sources: HCE Events DB (canonical) + world engine (gameplay events).
+- **Knowledge awareness model** -- determines what a character knows about a region based on: distance, archetype/social class, trade routes, NPC-sourced info, and era common knowledge.
+- **Historical divergence tracking** -- game-generated events marked canonical: false in the Events DB. When player actions contradict canonical history, subsequent canonical events flagged as superseded.
+- **Build-time agent** -- scripts/build_events_db.py populates the Events DB per era from Wikipedia + structured sources via local LLM.
+
+### Success criteria
+
+- [ ] Events DB has 20+ events per era within 50-year window of run start
+- [ ] Region knowledge on click feels character-appropriate -- a farmer knows less than a scholar
+- [ ] Event markers appear only for events the character is plausibly aware of
+- [ ] Ground context at run start makes NPC voices more grounded and era-specific than Phase 1
+- [ ] Historical divergence: player actions that contradict canonical events produce coherent (not contradictory) NPC responses
+
+### Definition of success
+
+The map is no longer just geography -- it is **the character's understanding of the world**. Clicking a region produces **knowledge the character would have** and **rumors they have heard**, not an encyclopedia entry. Event markers appear **only when the character has plausible awareness**. The HCE Events DB provides the **historical spine** that NPC voices and consequences draw from. Ground context at run start makes the opening feel **lived-in**, not generic.
+
+### How to verify
+
+1. **Events DB coverage** -- For each of 5 eras: count events in 50-year window. Must be >= 20. Spot-check 5 events per era for factual accuracy.
+2. **Region knowledge asymmetry** -- Same region, two runs with different archetypes (scholar vs farmer). Scholar's knowledge should be richer and more specific. Farmer's should be vague or rumor-heavy.
+3. **Event marker filtering** -- Start a run. Confirm no distant events visible. Travel to a new location. Confirm events near that location now appear. Confirm no events appear that the character has no plausible awareness of.
+4. **Ground context quality** -- Compare NPC first-turn responses with and without GroundContext. With context, responses should reference era-specific material conditions and rumors.
+5. **Divergence** -- Trigger a player action that contradicts a canonical event (e.g. defend Constantinople). Subsequent NPC responses should reflect the changed world, not the canonical outcome.
+
+### What is explicitly NOT in this phase
+
+- Diffusion illustrations (Phase 3)
+- Fine-tuned consequence model (Phase 4)
+- NPC-to-NPC relationships (Phase 5)
+- Terrain / relief map view
 
 ---
 
@@ -274,6 +317,9 @@ All **20** era buckets are **playable** with ingested corpus + smoke-tested arch
 - Run initialization (character backstory, NPC seeding)
 - Memory decay descriptions
 - Historical consequence generation (RAG retrieval + local reasoning)
+- HCE ground context generation at run init
+- HCE region knowledge generation on map hover/click
+- Events DB population (build-time script, not runtime)
 - Embeddings for vector DB (`nomic-embed-text`, free, local)
 
 **Frontier model (haiku/mini tier only — cheapest available):**
@@ -353,7 +399,19 @@ Use this shape:
 
 ### Phase 2
 
-*(no entry yet)*
+- **Completed:** 2026-04-01
+- **Success criteria:** Core criteria met. Map loads for all 5 eras with correct borders. Player and NPC positions represented. Visited/unvisited marker distinction works from world state. Toggle works.
+  - *Border drift* not tested (borders are static per era in Phase 2).
+  - *Post-1886* not tested (no post-1886 eras in current set).
+- **Planned vs actual:**
+  - *3D globe* planned. Shipped as **2D Leaflet** per design session pivot. Globe/terrain deferred.
+  - *aourednik/historical-basemaps* confirmed as primary source. 5 files pulled, simplified, documented in sources.md.
+  - *visited_locations* tracking added to world state model (not originally planned -- required for marker design requirement).
+  - 27 map-specific tests + 126 total offline tests.
+- **Carryover:**
+  - Region knowledge on hover and event markers deferred to Phase 2.5 (HCE dependency).
+  - Terrain view deferred to future phase (see open questions).
+  - Border accuracy gaps documented in frontend/geo/sources.md (48-year gap for Black Death, 53-year for Constantinople).
 
 ### Phase 3
 
