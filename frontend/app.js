@@ -178,21 +178,12 @@ async function startNewRun() {
     state = runData.world_state;
     saveRunToStorage();
 
-    // Character info fades in when ready
-    if (charSection) {
-      charSection.classList.remove("hidden");
-      const charLabel = $("#loading-char-label");
-      const charDesc = $("#loading-char-desc");
-      if (charLabel) charLabel.textContent = `${state.player.name}, ${state.player.role}`;
-      if (charDesc) charDesc.textContent = state.player.description;
-    }
-
     completeProgressBar();
 
     setTimeout(() => {
       showScreen("screen-transition");
       setTimeout(() => enterGame(), 3000);
-    }, 800);
+    }, 600);
   } catch (e) {
     completeProgressBar();
     $("#loading-era-desc").textContent = `Error: ${e.message}`;
@@ -276,13 +267,26 @@ function setupInput() {
   }
 }
 
+let turnInProgress = false;
+
 async function submitTurn(text) {
-  if (!text || !runId) return;
+  if (!text || !runId || turnInProgress) return;
+  turnInProgress = true;
 
   const input = $("#player-input");
   const obsInput = $("#obs-input");
-  if (input) { input.value = ""; input.disabled = true; }
-  if (obsInput) { obsInput.value = ""; obsInput.disabled = true; }
+
+  // Lock input immediately — show "the world is happening"
+  if (input) {
+    input.value = "";
+    input.disabled = true;
+    input.placeholder = "The world is happening...";
+  }
+  if (obsInput) {
+    obsInput.value = "";
+    obsInput.disabled = true;
+    obsInput.placeholder = "The world is happening...";
+  }
 
   const turnsContainer = $("#turns-container");
   const block = document.createElement("div");
@@ -290,6 +294,9 @@ async function submitTurn(text) {
   block.innerHTML = `<p class="font-body italic text-[16px] text-on-secondary-container">${esc(text)}</p><p class="font-system text-[10px] text-[#2a2218] mt-2">...</p>`;
   turnsContainer.appendChild(block);
   block.scrollIntoView({ behavior: "smooth" });
+
+  // Save immediately — the player's input is committed, no take-backs on reload
+  saveRunToStorage();
 
   try {
     const res = await fetch(`/api/run/${runId}/turn`, {
@@ -323,8 +330,15 @@ async function submitTurn(text) {
   } catch (e) {
     block.innerHTML = `<p class="font-body italic text-[16px] text-on-secondary-container">${esc(text)}</p><p class="font-system text-[10px] text-dead-tint mt-2">${esc(e.message)}</p>`;
   } finally {
-    if (input) input.disabled = false;
-    if (obsInput) obsInput.disabled = false;
+    turnInProgress = false;
+    if (input) {
+      input.disabled = false;
+      input.placeholder = "";
+    }
+    if (obsInput) {
+      obsInput.disabled = false;
+      obsInput.placeholder = "TRAVEL ONLY...";
+    }
     if (state && state.run_status === "active" && input) input.focus();
     if (state && state.run_status === "dead_observing" && obsInput) obsInput.focus();
   }
@@ -600,6 +614,26 @@ function completeProgressBar() {
       tooltip.style.display = "none";
     }
   }
+})();
+
+// -------------------------------------------------------------------
+// Scroll-to-bottom button
+// -------------------------------------------------------------------
+
+(function () {
+  var ms = document.getElementById("manuscript");
+  var btn = document.getElementById("btn-scroll-bottom");
+  if (!ms || !btn) return;
+
+  ms.addEventListener("scroll", function () {
+    var gap = ms.scrollHeight - ms.scrollTop - ms.clientHeight;
+    if (gap > 200) btn.classList.remove("hidden");
+    else btn.classList.add("hidden");
+  });
+
+  btn.addEventListener("click", function () {
+    ms.scrollTo({ top: ms.scrollHeight, behavior: "smooth" });
+  });
 })();
 
 // -------------------------------------------------------------------

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CHRONOS — The Living Manuscript</title>
+  <title>CHRONOS</title>
 
   <link href="https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&family=Special+Elite&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
@@ -316,6 +316,11 @@
         <span id="hamburger-close-icon" class="hidden material-symbols-outlined text-[16px] text-[#5a4e3a]">close</span>
       </button>
     </header>
+
+    <!-- Scroll-to-bottom button (hidden until you scroll up) -->
+    <button id="btn-scroll-bottom" class="hidden fixed top-[44px] right-4 z-[250] w-7 h-7 flex items-center justify-center bg-[#1a1816] text-on-secondary-container hover:text-on-surface cursor-pointer" style="border: 1px solid #2a2218; border-radius: 2px;">
+      <span class="material-symbols-outlined text-[14px]">keyboard_double_arrow_down</span>
+    </button>
 
     <!-- Manuscript Column -->
     <main id="manuscript" class="manuscript-scroll overflow-y-auto mt-[36px] mb-[64px]" style="height: calc(100vh - 100px);">

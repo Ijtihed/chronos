@@ -1,7 +1,7 @@
-# Design System Document: The Living Manuscript
+# Design System Document: Chronos
 
 ## 1. Overview & Creative North Star
-This design system is built upon the Creative North Star of **"The Living Manuscript."** We are not building an interface; we are composing a historical record. Unlike traditional games that rely on heavy HUDs and flashing indicators, this system embraces the austerity of a literary folio. It is intentional, quiet, and authoritative.
+This design system is built upon the Creative North Star of **"Chronos."** We are not building an interface; we are composing a historical record. Unlike traditional games that rely on heavy HUDs and flashing indicators, this system embraces the austerity of a literary folio. It is intentional, quiet, and authoritative.
 
 The aesthetic rejects modern digital crutches—gradients, blurs, and rounded corners—in favor of a high-contrast, flat, and centered experience. By restricting the layout to a fixed **560px centered column**, we force the player’s focus onto the narrative, treating the screen as a singular page of history rather than a piece of software.
 
