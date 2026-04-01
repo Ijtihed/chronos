@@ -15,6 +15,8 @@ const ChronosMap = (function () {
   let isVisible = false;
   let initialized = false;
   let currentEraKey = null;
+  let currentRunId = null;
+  let perceptionCache = {};
 
   function init() {
     if (initialized) return;
@@ -183,6 +185,11 @@ const ChronosMap = (function () {
           offset: [0, -8],
           opacity: 0.8,
         });
+        (function (npcRef, marker) {
+          marker.on("click", function () {
+            _showPerception(npcRef, marker);
+          });
+        })(npc, m);
       }
 
       npcMarkers.push(m);
@@ -196,13 +203,46 @@ const ChronosMap = (function () {
     }
   }
 
-  function show(worldState, eraKey) {
+  async function _showPerception(npc, marker) {
+    if (!currentRunId) return;
+    var cacheKey = npc.id + "_" + (Date.now() / 60000 | 0);
+    if (perceptionCache[cacheKey]) {
+      marker.unbindPopup();
+      marker.bindPopup(
+        '<div style="font-family:IM Fell English,serif;font-size:14px;color:#c8b89a;max-width:280px;line-height:1.6;padding:4px;">' +
+        perceptionCache[cacheKey] + '</div>',
+        { className: "perception-popup", closeButton: false, maxWidth: 300 }
+      ).openPopup();
+      return;
+    }
+    marker.unbindPopup();
+    marker.bindPopup(
+      '<div style="font-family:Special Elite,monospace;font-size:10px;color:#5a4e3a;padding:4px;">thinking...</div>',
+      { className: "perception-popup", closeButton: false }
+    ).openPopup();
+    try {
+      var res = await fetch("/api/run/" + currentRunId + "/npc/" + npc.id + "/perception");
+      if (!res.ok) return;
+      var data = await res.json();
+      perceptionCache[cacheKey] = data.perception;
+      marker.unbindPopup();
+      marker.bindPopup(
+        '<div style="font-family:IM Fell English,serif;font-size:14px;color:#c8b89a;max-width:280px;line-height:1.6;padding:4px;">' +
+        data.perception + '</div>',
+        { className: "perception-popup", closeButton: false, maxWidth: 300 }
+      ).openPopup();
+    } catch (e) {}
+  }
+
+  function show(worldState, eraKey, runId) {
     var container = document.getElementById("map-container");
     if (!container) return;
 
     init();
     container.classList.remove("hidden");
     isVisible = true;
+    if (runId) currentRunId = runId;
+    perceptionCache = {};
     map.invalidateSize();
 
     loadCoastlines();

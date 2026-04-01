@@ -76,9 +76,9 @@ class TestLocationHelpers:
 
 
 class TestApplyAction:
-    def test_increments_turn(self, initial_state, sample_parsed_action):
+    def test_preserves_turn(self, initial_state, sample_parsed_action):
         new = apply_action(initial_state, sample_parsed_action)
-        assert new.turn == 1
+        assert new.turn == initial_state.turn  # simulate_turn handles increment
 
     def test_advances_year(self, initial_state, sample_parsed_action):
         new = apply_action(initial_state, sample_parsed_action)
@@ -87,7 +87,6 @@ class TestApplyAction:
     def test_appends_event(self, initial_state, sample_parsed_action):
         new = apply_action(initial_state, sample_parsed_action)
         assert len(new.events) == 1
-        assert new.events[0].turn == 1
         assert new.events[0].action_type == "speak"
 
     def test_event_records_location(self, initial_state, sample_parsed_action):
@@ -99,19 +98,16 @@ class TestApplyAction:
         assert initial_state.turn == 0
         assert initial_state.events == []
 
-    def test_tension_escalates_every_three_turns(self, initial_state):
-        state = initial_state
-        action = {"action_type": "observe", "target": None, "intent": "wait",
-                  "era_description": "Corvinus waits."}
-        for _ in range(3):
-            state = apply_action(state, action)
-        assert state.turn == 3
+    def test_tension_escalation_logic(self, initial_state):
+        from backend.world_state import _escalate_tension, get_player_location
+        state = initial_state.model_copy(deep=True)
+        state.turn = 3  # simulate_turn would have set this
+        _escalate_tension(state)
         loc = get_player_location(state)
         assert loc.political_tension == "critical"
 
     def test_handles_missing_action_fields_gracefully(self, initial_state):
         new = apply_action(initial_state, {})
-        assert new.turn == 1
         assert new.events[0].action_type == "other"
 
     def test_multiple_actions_accumulate_events(self, initial_state):
@@ -123,7 +119,6 @@ class TestApplyAction:
                 "intent": f"action {i}",
                 "era_description": f"Turn {i + 1} event.",
             })
-        assert state.turn == 5
         assert len(state.events) == 5
 
 
@@ -292,7 +287,7 @@ class TestStorySummary:
     def test_includes_events_after_action(self, initial_state, sample_parsed_action):
         state = apply_action(initial_state, sample_parsed_action)
         summary = build_story_summary(state)
-        assert "Turn 1" in summary
+        assert "Turn 0" in summary
         assert "Corvinus" in summary
 
     def test_includes_tension(self, initial_state, sample_parsed_action):

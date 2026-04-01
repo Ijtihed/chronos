@@ -429,7 +429,7 @@ if (mapBtn) {
       if (manuscript) manuscript.style.display = "none";
       if (bottomBar) bottomBar.classList.add("hidden");
       if (mapText) mapText.textContent = "MANUSCRIPT";
-      if (typeof ChronosMap !== "undefined") ChronosMap.show(state, eraKey);
+      if (typeof ChronosMap !== "undefined") ChronosMap.show(state, eraKey, runId);
     } else {
       mapContainer.classList.add("hidden");
       if (manuscript) manuscript.style.display = "";
@@ -512,6 +512,70 @@ function completeProgressBar() {
     setTimeout(() => { fill.style.transition = ""; }, 500);
   }
 }
+
+// -------------------------------------------------------------------
+// Word definition overlay
+// -------------------------------------------------------------------
+
+(function initWordDefinitions() {
+  const tooltip = document.getElementById("word-tooltip");
+  if (!tooltip) return;
+
+  let debounce = null;
+
+  document.addEventListener("selectionchange", () => {
+    clearTimeout(debounce);
+    debounce = setTimeout(handleSelection, 300);
+  });
+
+  document.addEventListener("mousedown", () => {
+    tooltip.style.display = "none";
+  });
+
+  async function handleSelection() {
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed) { tooltip.style.display = "none"; return; }
+
+    const text = sel.toString().trim();
+    if (!text || text.includes(" ") || text.length < 2 || text.length > 30) {
+      tooltip.style.display = "none";
+      return;
+    }
+
+    const container = sel.anchorNode && sel.anchorNode.parentElement;
+    if (!container) return;
+    const manuscript = document.getElementById("manuscript-inner") || document.getElementById("manuscript");
+    if (!manuscript || !manuscript.contains(container)) return;
+
+    try {
+      const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(text.toLowerCase())}`);
+      if (!res.ok) { tooltip.style.display = "none"; return; }
+      const data = await res.json();
+      if (!data || !data[0]) return;
+
+      const entry = data[0];
+      const meaning = entry.meanings && entry.meanings[0];
+      const def = meaning && meaning.definitions && meaning.definitions[0];
+      if (!def) return;
+
+      tooltip.innerHTML =
+        `<div class="def-word">${esc(entry.word)}</div>` +
+        (meaning.partOfSpeech ? `<div class="def-pos">${esc(meaning.partOfSpeech)}</div>` : "") +
+        `<div class="def-meaning">${esc(def.definition)}</div>`;
+
+      const range = sel.getRangeAt(0);
+      const rect = range.getBoundingClientRect();
+      tooltip.style.left = Math.min(rect.left, window.innerWidth - 320) + "px";
+      tooltip.style.top = (rect.top - tooltip.offsetHeight - 8) + "px";
+      if (parseInt(tooltip.style.top) < 40) {
+        tooltip.style.top = (rect.bottom + 8) + "px";
+      }
+      tooltip.style.display = "block";
+    } catch {
+      tooltip.style.display = "none";
+    }
+  }
+})();
 
 // -------------------------------------------------------------------
 // Utility

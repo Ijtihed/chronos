@@ -153,8 +153,10 @@ class TestUnifiedTurnInaction:
 class TestDeathAndAging:
     def test_age_increases(self):
         state = create_initial_state()
-        for _ in range(20):
-            state = apply_action(state, {"action_type": "observe", "era_description": "Waits."})
+        # simulate_turn handles turn/year increment, not apply_action
+        for i in range(20):
+            state.turn = i + 1
+            state.current_year = int(state.era.year_start + state.turn * state.era.years_per_turn)
         assert state.current_year - state.player.birth_year > 35
 
     def test_death_transitions(self):

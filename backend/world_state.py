@@ -257,12 +257,12 @@ def create_initial_state() -> WorldState:
 # ---------------------------------------------------------------------------
 
 def apply_action(state: WorldState, action: dict) -> WorldState:
-    """Apply a parsed action to the world state. Returns a new state object."""
+    """Apply a parsed action to the world state. Returns a new state object.
+
+    Note: does NOT increment turn/year — that is handled by simulate_turn()
+    which runs before apply_action in the simulation-first turn loop.
+    """
     new = state.model_copy(deep=True)
-    new.turn += 1
-    new.current_year = int(
-        new.era.year_start + new.turn * new.era.years_per_turn
-    )
 
     if new.player.location not in new.visited_locations:
         new.visited_locations.append(new.player.location)

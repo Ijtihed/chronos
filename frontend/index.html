@@ -125,6 +125,17 @@
       border-radius: 50%;
       opacity: 0.3;
     }
+    .perception-popup .leaflet-popup-content-wrapper {
+      background: #1a1816 !important;
+      border: 1px solid #2a2218 !important;
+      border-radius: 2px !important;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5) !important;
+    }
+    .perception-popup .leaflet-popup-tip {
+      background: #1a1816 !important;
+      border: none !important;
+    }
+
     .polity-tooltip {
       background: #2a2218 !important;
       color: #c8b89a !important;
@@ -144,6 +155,37 @@
     .input-dead::placeholder {
       color: #5a2e2e !important;
       opacity: 0.5;
+    }
+
+    #word-tooltip {
+      position: fixed;
+      z-index: 9999;
+      background: #1a1816;
+      border: 1px solid #2a2218;
+      border-radius: 2px;
+      padding: 8px 12px;
+      max-width: 300px;
+      font-family: 'IM Fell English', serif;
+      font-size: 14px;
+      line-height: 1.5;
+      color: #c8b89a;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+      pointer-events: none;
+      display: none;
+    }
+    #word-tooltip .def-word {
+      font-weight: bold;
+      color: #e2c28b;
+      margin-bottom: 2px;
+    }
+    #word-tooltip .def-pos {
+      font-style: italic;
+      color: #7a6a54;
+      font-size: 12px;
+    }
+    #word-tooltip .def-meaning {
+      color: #a89878;
+      margin-top: 4px;
     }
 
     .hidden { display: none !important; }
@@ -355,6 +397,8 @@
   <div id="map-container" class="hidden fixed top-[36px] left-0 right-0 bottom-0 z-[200] bg-surface">
     <div id="map" class="w-full h-full"></div>
   </div>
+
+  <div id="word-tooltip"></div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="map.js"></script>
