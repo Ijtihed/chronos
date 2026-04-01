@@ -360,6 +360,7 @@ function showDeathMarker(cause) {
     marker.classList.remove("hidden");
     if (title) title.textContent = state.player.name;
     if (quote) quote.textContent = cause;
+    marker.scrollIntoView({ behavior: "smooth" });
   }
 }
 

@@ -16,11 +16,12 @@
 ## Read in this order
 
 1. [overview.md](overview.md) — what the game is; perspective not protagonist; character assignment
-2. [gameplay.md](gameplay.md) — turns, NPC autonomy, NPC perception, information system, travel, factions, death, word definitions, perspective switching
-3. [simulation-and-world.md](simulation-and-world.md) — world model, map (region knowledge + event markers), family, difficulty, run setup
-4. [historical-context-engine.md](historical-context-engine.md) — HCE: Events DB + ground-level context generator (distinct from HKE)
-5. [roadmap.md](roadmap.md) — phased delivery, success criteria, what is / isn't in each phase, completion log
-6. [open-questions.md](open-questions.md) — unresolved; **do not assume** when implementing
+2. [gameplay.md](gameplay.md) — turns, NPC autonomy, NPC perception, voice and tone, information system, travel, factions, death
+3. [npc-voice-system.md](npc-voice-system.md) — how NPCs speak: archetype voice reference, what they never do, required content when contextually accurate
+4. [simulation-and-world.md](simulation-and-world.md) — world model, map (region knowledge + event markers), family, difficulty, run setup
+5. [historical-context-engine.md](historical-context-engine.md) — HCE: Events DB + ground-level context generator (distinct from HKE)
+6. [roadmap.md](roadmap.md) — phased delivery, success criteria, what is / isn't in each phase, completion log
+7. [open-questions.md](open-questions.md) — unresolved; **do not assume** when implementing
 
 ## Where this lives in the repo
 

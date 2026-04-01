@@ -263,17 +263,17 @@
     <main id="manuscript" class="manuscript-scroll overflow-y-auto mt-[36px] mb-[64px]" style="height: calc(100vh - 100px);">
       <div class="max-w-[560px] mx-auto py-12 px-4" id="manuscript-inner">
 
-        <!-- Death Marker (observation mode) -->
-        <div id="death-marker" class="hidden flex justify-center mb-12">
+        <!-- Turn blocks rendered here -->
+        <div id="turns-container" class="space-y-0"></div>
+
+        <!-- Death Marker (observation mode) — appears AFTER the last turn -->
+        <div id="death-marker" class="hidden flex justify-center my-12">
           <div class="p-8 text-center max-w-sm" style="border: 1px solid rgba(90,46,46,0.2); background: #151310;">
             <p class="font-system text-[10px] text-dead-tint tracking-widest uppercase mb-4">Final Record</p>
             <h1 id="death-marker-title" class="font-body text-3xl text-on-surface mb-2"></h1>
             <p id="death-marker-quote" class="font-body italic text-on-secondary-container"></p>
           </div>
         </div>
-
-        <!-- Turn blocks rendered here -->
-        <div id="turns-container" class="space-y-0"></div>
 
         <!-- Observation Input (in-manuscript, for dead mode) -->
         <div id="obs-input-section" class="hidden mt-16 mb-24">
