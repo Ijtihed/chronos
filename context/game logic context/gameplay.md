@@ -31,6 +31,12 @@ The game is turn-based. Each turn, the player types one decision in natural lang
 
 After the player acts, the world responds. But not every character reacts. **The game decides whose perspective matters** for any given action. A grain merchant's trade deal matters to the garrison commander and the deacon distributing food — it does not matter to a fisherman in a distant port. Only the characters whose lives are genuinely touched by the action respond. The player never sees a firehose of reactions from everyone nearby.
 
+## Word definitions
+
+When the player highlights any word in the narrative, a small overlay shows the dictionary definition. This is not a game mechanic — it is a reading aid. The narrative uses era-specific language, titles, place names, political terms, and cultural concepts that a modern player may not recognize. The overlay makes the world legible without breaking immersion or cluttering the UI.
+
+The definition comes from a dictionary API (or local lookup), not from the LLM. It should be instant, not a generation call. It appears on highlight and disappears when the selection clears. No click required — just select the word.
+
 ## The information system
 
 There is no UI that tells the player what is happening in the world. No map annotations, no event log, no diplomatic screen, no suggested actions.

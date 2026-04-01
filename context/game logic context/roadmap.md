@@ -169,6 +169,7 @@ The **map is authoritative** for place: player marker, NPC markers, and **histor
 - **Knowledge awareness model** -- determines what a character knows about a region based on: distance, archetype/social class, trade routes, NPC-sourced info, and era common knowledge.
 - **Historical divergence tracking** -- game-generated events marked canonical: false in the Events DB. When player actions contradict canonical history, subsequent canonical events flagged as superseded.
 - **Build-time agent** -- scripts/build_events_db.py populates the Events DB per era from Wikipedia + structured sources via local LLM.
+- **Word definitions overlay** -- highlighting any word in the narrative shows a dictionary definition as a small popup. Uses a dictionary API (not LLM), instant response. Reading aid for era-specific language, titles, and concepts.
 
 ### Success criteria
 
