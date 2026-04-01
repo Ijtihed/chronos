@@ -1,13 +1,12 @@
-import {
-  initGlobe,
-  loadCoastlines,
-  loadBorders,
-  updateMarkers,
-  focusOnLocation,
-  startRendering,
-  stopRendering,
-  isInitialized,
-} from "./map.js";
+let mapModule = null;
+
+async function loadMapModule() {
+  try {
+    mapModule = await import("./map.js");
+  } catch (e) {
+    console.warn("Map module failed to load:", e);
+  }
+}
 
 const $ = (sel) => document.querySelector(sel);
 const introEl = $("#intro");
@@ -58,10 +57,15 @@ async function startNewRun() {
 }
 
 async function prepareGlobe() {
-  initGlobe();
-  await loadCoastlines();
-  if (eraKey) await loadBorders(eraKey);
-  globeReady = true;
+  if (!mapModule) return;
+  try {
+    mapModule.initGlobe();
+    await mapModule.loadCoastlines();
+    if (eraKey) await mapModule.loadBorders(eraKey);
+    globeReady = true;
+  } catch (e) {
+    console.warn("Globe init failed:", e);
+  }
 }
 
 // ------------------------------------------------------------------
@@ -69,14 +73,14 @@ async function prepareGlobe() {
 // ------------------------------------------------------------------
 
 function toggleMap() {
-  if (!state || !globeReady) return;
+  if (!state || !globeReady || !mapModule) return;
 
   if (mapShowing) {
     hide(mapContainer);
     hide(mapHint);
     show(narrativeEl);
     show(inputBar);
-    stopRendering();
+    mapModule.stopRendering();
     mapShowing = false;
   } else {
     hide(narrativeEl);
@@ -84,13 +88,13 @@ function toggleMap() {
     show(mapContainer);
     show(mapHint);
     syncMapState();
-    startRendering();
+    mapModule.startRendering();
     mapShowing = true;
   }
 }
 
 async function syncMapState() {
-  if (!runId) return;
+  if (!runId || !mapModule) return;
   try {
     const resp = await fetch(`/api/run/${runId}?_t=${Date.now()}`);
     if (resp.ok) {
@@ -98,13 +102,13 @@ async function syncMapState() {
     }
   } catch { /* use cached state */ }
 
-  updateMarkers(state);
+  mapModule.updateMarkers(state);
 
   const playerLoc = state.locations.find(
     (l) => l.id === state.player.location
   );
   if (playerLoc) {
-    focusOnLocation(playerLoc.lat, playerLoc.lon, false);
+    mapModule.focusOnLocation(playerLoc.lat, playerLoc.lon, false);
   }
 }
 
@@ -181,7 +185,7 @@ async function submitTurn() {
       block.innerHTML = "";
       appendErasureBlock(data.erasure);
       setInputState("ended");
-      if (globeReady) updateMarkers(state);
+      if (globeReady && mapModule) mapModule.updateMarkers(state);
       return;
     }
 
@@ -194,13 +198,13 @@ async function submitTurn() {
       setInputState("active");
     }
 
-    if (globeReady) {
-      updateMarkers(state);
+    if (globeReady && mapModule) {
+      mapModule.updateMarkers(state);
       if (data.travel) {
         const dest = state.locations.find(
           (l) => l.id === state.player.location
         );
-        if (dest) focusOnLocation(dest.lat, dest.lon, true);
+        if (dest) mapModule.focusOnLocation(dest.lat, dest.lon, true);
       }
     }
   } catch (e) {
@@ -294,3 +298,9 @@ document.addEventListener("keydown", (e) => {
     toggleMap();
   }
 });
+
+// ------------------------------------------------------------------
+// Init
+// ------------------------------------------------------------------
+
+loadMapModule();
