@@ -6,6 +6,7 @@
 
 - Does multiplayer ever make sense? (Multiple players assigned different characters in the same world, experiencing the same events from different sides)
 - Is there any meta-progression across runs? (Does anything carry over, or is each run truly isolated?)
+- **Terrain view (Phase 2.5 or 3):** A tilted 3D relief/war-table view of the era's region, as an alternative to the globe view. Cut from Phase 2 (globe only). Decide when to add it — could be a Phase 2 follow-up or bundled with Phase 3 illustrations.
 
 ## Roadmap-blocking — resolve before the phase listed
 

@@ -115,15 +115,14 @@ A **full run** is reproducible: new run, play until **last memory dies** without
 
 ### What exists at the end of this phase
 
-- Leaflet.js map integrated into the web UI
-- Base physical layer: Natural Earth GeoJSON (coastlines, rivers, terrain) — static
-- Historical border layer: `aourednik/historical-basemaps` GeoJSON, selected per era at run start
-- Dynamic border layer: player-influenced and world-event-influenced border changes tracked as diffs on top of base
-- City and location layer: era-appropriate points of interest, NPC locations shown on map
-- Travel is now spatial: the player sees their position and moves on the map
-- NPC locations visible as markers — clicking one shows their name and whether you have visited them
-- The map updates visually each turn to reflect world state changes
-- CShapes 2.0 integrated for eras post-1886
+- 3D globe (Three.js) integrated into the web UI, toggles with the narrative view
+- Globe view: Three.js sphere with Natural Earth coastlines, era-specific historical borders from aourednik/historical-basemaps projected onto the surface
+- Player marker on the globe at their current location
+- NPC markers with visited/unvisited distinction — visited NPCs have a distinct marker state, unvisited are anonymous dots. This is the information-is-geography mechanic made visible.
+- Camera follows the player's region, smooth rotation on travel
+- Historical border data sourced from aourednik/historical-basemaps (open, free GeoJSON), simplified to 110m resolution
+- Locations in all 5 era configs have lat/lon coordinates
+- No terrain view in this phase (globe only)
 
 ### Success criteria
 
@@ -148,9 +147,12 @@ The **map is authoritative** for place: player marker, NPC markers, and **histor
 
 ### What is explicitly NOT in this phase
 
+- Terrain / relief view (deferred — globe only for Phase 2)
+- Clickable map interactions (travel by clicking)
 - Diffusion illustrations
 - Fine-tuned model
-- Illustrated map aesthetic (Leaflet + GeoJSON only, no stylized tiles)
+- Dynamic border changes from player actions (borders are static per era)
+- Illustrated/stylized map tiles
 
 ---
 
