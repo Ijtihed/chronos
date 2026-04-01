@@ -157,13 +157,22 @@ async function startNewRun() {
   }
 }
 
+let globeDataLoaded = false;
+
 async function prepareGlobe() {
   if (!mapModule) return;
+  globeReady = true;
+}
+
+async function ensureGlobeInit() {
+  if (!mapModule || globeDataLoaded) return;
   try {
     mapModule.initGlobe();
+    void mapContainer.offsetWidth;
+    mapModule.resize();
     await mapModule.loadCoastlines();
     if (eraKey) await mapModule.loadBorders(eraKey);
-    globeReady = true;
+    globeDataLoaded = true;
   } catch (e) {
     console.warn("Globe init failed:", e);
   }
@@ -173,7 +182,7 @@ async function prepareGlobe() {
 // Map toggle (M key)
 // ------------------------------------------------------------------
 
-function toggleMap() {
+async function toggleMap() {
   if (!state || !globeReady || !mapModule) return;
 
   if (mapShowing) {
@@ -188,6 +197,8 @@ function toggleMap() {
     hide(inputBar);
     show(mapContainer);
     show(mapHint);
+    void mapContainer.offsetWidth;
+    await ensureGlobeInit();
     mapModule.resize();
     syncMapState();
     mapModule.startRendering();

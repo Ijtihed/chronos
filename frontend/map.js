@@ -77,8 +77,8 @@ export function initGlobe() {
 
 export function resize() {
   if (!container || !renderer) return;
-  const w = container.clientWidth || 1;
-  const h = container.clientHeight || 1;
+  const w = container.clientWidth || window.innerWidth;
+  const h = container.clientHeight || window.innerHeight;
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
   renderer.setSize(w, h);

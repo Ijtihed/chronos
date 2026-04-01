@@ -6,11 +6,13 @@
 
 ## Current project status
 
-**Phase 0 — Proof of Life: COMPLETE** (2026-03-31). See [roadmap.md](roadmap.md) Phase 0 completion log for details.
+**Phase 0 — Proof of Life: COMPLETE** (2026-03-31). See [roadmap.md](roadmap.md) Phase 0 completion log.
 
-**Phase 1 — Playable Text Loop: IN PROGRESS.** Full run lifecycle built: 5 eras, character generation, travel, death, memory decay, erasure, RAG/HKE v1, SQLite persistence. Pending: playtesting against success criteria.
+**Phase 1 — Playable Text Loop: COMPLETE** (2026-04-01). Full run lifecycle: 5 eras, LLM character generation, travel, death (hybrid aging + consequence), memory decay to erasure, RAG/HKE v1, SQLite persistence, unified turn endpoint, narrative-only UI with total player agency. See [roadmap.md](roadmap.md) Phase 1 completion log.
 
-**Design principles locked in:** Total player agency (no hand-holding), macro decision scale (alliances/revolts/flight, not bar conversations), selective NPC reactions (game decides who cares), present-tense stream UI.
+**Phase 2 — The Map: COMPLETE** (2026-04-01). 3D globe (Three.js), historical borders from aourednik/historical-basemaps, player + NPC markers with visited/unvisited distinction, toggle with narrative, cache-busted state sync. Terrain view deferred. See [roadmap.md](roadmap.md) Phase 2 completion log.
+
+**Design principles locked in:** Total player agency (no hand-holding), macro decision scale, selective NPC reactions (game decides who cares), present-tense stream UI, character assignment with ruler bias, family as NPCs, structural difficulty levers, HCE (Events DB + ground-level context).
 
 ## Read in this order
 
@@ -26,11 +28,9 @@
 | Location | Role |
 |----------|------|
 | `context/game logic context/` | Full design narrative (this index + linked files); **living** — update when design decisions are made |
-| `backend/` | Python server (FastAPI) — action parser, NPC engine, world state, LLM client |
-| `frontend/` | Browser UI (vanilla HTML/JS) |
+| `backend/` | Python server (FastAPI) — action parser, NPC engine, world state, LLM client, death engine, world engine, HKE, persistence |
+| `frontend/` | Browser UI (vanilla HTML/JS, Three.js globe via CDN) |
+| `frontend/geo/` | Map data: coastlines, era border GeoJSON files, sources.md provenance record |
 | `prompts/` | LLM prompt templates — design artifacts, reviewed separately from code |
-| `tests/` | Automated test suite (unit, integration with mocked LLM, live with Ollama) |
-| `.cursor/rules/chronos-design.mdc` | Short design constraints + pointer back here |
-| `.cursor/rules/chronos-ai-dev-protocol.mdc` | How the AI collaborator works: confirm tasks, open questions, context upkeep, prompt templates, never-do list |
-| `.cursor/rules/chronos-roadmap.mdc` | Phase gates, success criteria vs task lists, updating `roadmap.md` when phases complete |
-| `.cursor/rules/chronos-model-tier.mdc` | Local-first (Ollama), frontier only for agreed cases; justify every LLM/embed call |
+| `tests/` | Automated test suite + manual test cases (`tests/manual/`) |
+| `.cursor/rules/` | AI collaborator rules: design, protocol, roadmap, model tier |
