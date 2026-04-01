@@ -7,11 +7,11 @@
 ## Current project status
 
 **Phase 0 — Proof of Life: COMPLETE** (2026-03-31).
-**Phase 1 — Playable Text Loop: BUILT** — full run lifecycle, 5 eras, travel, death, memory decay, erasure, RAG, persistence. Pending playtesting.
-**Phase 2 — The Map: COMPLETE** (2026-04-01). 2D Leaflet map with historical borders, visited/unvisited NPC markers, toggle with narrative.
-**Next: Phase 2.5 — Map Intelligence + HCE.** Events DB, region knowledge on click, event markers filtered by character awareness.
+**Phase 1 — Playable Text Loop: BUILT but needs simulation-first rebuild.** Core systems work (eras, travel, death, RAG, persistence) but the turn loop is player-centric. See `context/other/lessons-learned.md`.
+**Phase 2 — The Map: COMPLETE** (2026-04-01). 2D Leaflet map with historical borders, visited/unvisited NPC markers.
+**Next: Simulation-first rebuild of the turn loop + Phase 2.5 (HCE + map intelligence).**
 
-**Design principles:** Total player agency, macro decisions, selective NPC reactions, present-tense stream UI. Character assignment reflects era demographics with bias toward historically significant figures. Map region knowledge filtered by character worldview (known facts + rumors). Map events filtered by character awareness (no god-view).
+**Core design:** CHRONOS is a simulation observed through one person's perspective. NPCs are autonomous subagents — they travel, interact, act independently. The player is a lens, not a protagonist. The narrative is dominated by world activity, not player actions. Sometimes nobody cares what the player did.
 
 ## Read in this order
 
@@ -31,6 +31,7 @@
 | `frontend/` | Browser UI (vanilla HTML/JS) |
 | `prompts/` | LLM prompt templates — design artifacts, reviewed separately from code |
 | `tests/` | Automated test suite (unit, integration with mocked LLM, live with Ollama) |
+| `context/other/` | Lessons learned, architectural post-mortems, design mistakes to avoid |
 | `.cursor/rules/chronos-design.mdc` | Short design constraints + pointer back here |
 | `.cursor/rules/chronos-ai-dev-protocol.mdc` | How the AI collaborator works: confirm tasks, open questions, context upkeep, prompt templates, never-do list |
 | `.cursor/rules/chronos-roadmap.mdc` | Phase gates, success criteria vs task lists, updating `roadmap.md` when phases complete |

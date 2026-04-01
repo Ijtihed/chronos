@@ -54,13 +54,15 @@ The **full path** from browser → backend → action representation → world m
 
 ## PHASE 1 — Playable Text Loop
 
-**Goal:** A complete single run is possible from start to finish. Player is generated, makes unconstrained macro decisions, finds NPCs, dies, fades from memory, run ends. Everything is text. No map yet.
+**Goal:** A living historical simulation that the player observes through one character's perspective. NPCs are autonomous agents with their own lives. The player's actions are one thread among many. A complete run goes from character assignment to erasure. Everything is text. No map yet.
 
 ### What exists at the end of this phase
 
-- **Total player agency:** No action menus, no suggestions, no hand-holding. The player types any decision at any scale. The game never tells the player what to do.
-- **Macro decision scale:** Decisions operate at weeks/months/years — alliances, betrayals, revolts, economic manipulation, flight. Not bar conversations or item management.
-- **Selective NPC reactions:** Not every NPC reacts to every action. The game decides whose perspective genuinely matters. Most actions produce 1-3 reactions, not a firehose.
+- **Simulation-first architecture:** The world advances every turn. NPCs act autonomously -- traveling, trading, arguing, fleeing -- whether or not the player does anything. The player witnesses what unfolds at their location. Their actions are one thread among many. Sometimes nobody cares.
+- **NPCs are autonomous subagents:** They have goals, they move between locations, they interact with each other. Their behavior is grounded in historical context and their archetype. They are the simulation.
+- **Player as perspective:** The narrative is always from the player character's subjective POV. The player is a lens into the simulation, not its center. NPC perception on hover shows the character's subjective impression.
+- **Total player agency:** No action menus, no suggestions. The player types any decision at any scale. The game never tells the player what to do.
+- **Ambient world activity:** Every turn shows what NPCs are doing around the player, not just reactions to the player's action. The narrative is dominated by world activity.
 - Run initialization: random era selected from a starter set of 5, player character generated with archetype + backstory
 - 8–15 NPCs seeded across multiple locations with archetypes, social classes, and relationships
 - Full turn loop: player types a decision → world responds → structured state + narrative layer both update
@@ -195,8 +197,9 @@ The map is no longer just geography -- it is **the character's understanding of 
 
 - Diffusion illustrations (Phase 3)
 - Fine-tuned consequence model (Phase 4)
-- NPC-to-NPC relationships (Phase 5)
+- Full NPC-to-NPC relationship graph (Phase 5) -- but basic NPC-on-NPC interactions should be visible
 - Terrain / relief map view
+- Perspective switching
 
 ---
 
@@ -396,7 +399,20 @@ Use this shape:
 
 ### Phase 1
 
-*(no entry yet)*
+- **Completed:** 2026-04-01 (infrastructure only -- design reframe pending rebuild)
+- **Success criteria:** Partial. Core systems built (eras, travel, death, memory, RAG, persistence) but the turn loop was player-centric, not simulation-first. See context/other/lessons-learned.md.
+- **Planned vs actual:**
+  - All mechanical systems shipped: 5 eras, character generation, travel, death/aging, memory decay, erasure, RAG/HKE v1, SQLite persistence, unified turn endpoint.
+  - The turn loop was built as player-acts-then-world-reacts. The design requires world-simulates-then-player-observes. This is a structural mismatch, not a bug.
+  - NPCs were static (no autonomous movement, no NPC-on-NPC interaction, no ambient activity). Design requires NPCs as autonomous subagents.
+  - Relevance filtering was too aggressive (usually 1 NPC per turn).
+- **Carryover / rebuild needed:**
+  - Turn loop must start with world advancement, not player action
+  - NPCs must act every turn at the player's location (ambient activity)
+  - NPCs must travel between locations autonomously
+  - NPC-on-NPC interactions must be visible
+  - Narrative framing must foreground the world, not the player
+  - NPC perception on hover must be built
 
 ### Phase 2
 

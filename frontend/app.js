@@ -16,6 +16,8 @@ const loadingVoices      = $("#loading-voices");
 const loadingCharSection = $("#loading-char-section");
 const loadingCharLabel   = $("#loading-char-label");
 const loadingCharDesc    = $("#loading-char-desc");
+const loadingRingFill    = $("#loading-ring-fill");
+const RING_CIRCUMFERENCE = 125.66;
 
 // ── Game chrome ──────────────────────────────────────────────
 const topBarInfo         = $("#top-bar-info");
@@ -153,9 +155,29 @@ function showScreen(name) {
 //  START → LOADING → GAME
 // ═════════════════════════════════════════════════════════════
 
+// ── Continue button ──────────────────────────────────────────
+const btnContinue = $("#btn-continue");
+
+(async function init() {
+  const savedId = localStorage.getItem("chronos_run_id");
+  if (savedId) {
+    try {
+      const res = await fetch(`/api/run/${savedId}`);
+      if (res.ok) {
+        btnContinue.classList.remove("hidden");
+      }
+    } catch (_) { /* ignore */ }
+  }
+})();
+
 $("#btn-begin").addEventListener("click", (e) => {
   e.preventDefault();
   beginNewRun();
+});
+
+btnContinue.addEventListener("click", async (e) => {
+  e.preventDefault();
+  await resumeRun();
 });
 
 $("#btn-begin-again").addEventListener("click", (e) => {
@@ -164,12 +186,37 @@ $("#btn-begin-again").addEventListener("click", (e) => {
   beginNewRun();
 });
 
+// ── Progress ring helper ─────────────────────────────────────
+let ringInterval = null;
+
+function startProgressRing() {
+  let progress = 0;
+  setRingProgress(0);
+  ringInterval = setInterval(() => {
+    progress += 0.012 + Math.random() * 0.008;
+    if (progress > 0.85) progress = 0.85;
+    setRingProgress(progress);
+  }, 200);
+}
+
+function completeProgressRing() {
+  if (ringInterval) { clearInterval(ringInterval); ringInterval = null; }
+  setRingProgress(1);
+}
+
+function setRingProgress(pct) {
+  const offset = RING_CIRCUMFERENCE * (1 - pct);
+  loadingRingFill.style.strokeDashoffset = offset;
+}
+
+// ── New run ──────────────────────────────────────────────────
+
 async function beginNewRun() {
   eraKey = ERA_KEYS[Math.floor(Math.random() * ERA_KEYS.length)];
   populateEraLoading(eraKey);
   showScreen("loading");
-
   loadingCharSection.classList.add("hidden");
+  startProgressRing();
 
   try {
     const res  = await fetch("/api/run", {
@@ -182,14 +229,53 @@ async function beginNewRun() {
     eraKey = data.era;
     state  = data.world_state;
 
+    localStorage.setItem("chronos_run_id", runId);
+
+    completeProgressRing();
     showCharacterOnLoading();
 
     await delay(3500);
     transitionToGame();
   } catch (e) {
+    completeProgressRing();
     loadingEraDesc.textContent = "Error: " + e.message;
   }
 }
+
+// ── Resume saved run ─────────────────────────────────────────
+
+async function resumeRun() {
+  const savedId = localStorage.getItem("chronos_run_id");
+  if (!savedId) return;
+
+  try {
+    const res = await fetch(`/api/run/${savedId}`);
+    if (!res.ok) throw new Error("Run not found");
+    const ws = await res.json();
+
+    runId  = ws.run_id;
+    state  = ws;
+    eraKey = guessEraKey(ws.era.name);
+
+    showScreen("game");
+    updateGameChrome();
+    renderInitialTurn();
+    playerInput.focus();
+  } catch (e) {
+    localStorage.removeItem("chronos_run_id");
+    btnContinue.classList.add("hidden");
+    beginNewRun();
+  }
+}
+
+function guessEraKey(eraName) {
+  for (const k of ERA_KEYS) {
+    if (ERA_LOADING[k] && ERA_LOADING[k].label.includes(eraName.split(" ")[0].toUpperCase())) return k;
+  }
+  return ERA_KEYS[0];
+}
+
+// ── Loading screen helpers ───────────────────────────────────
 
 function populateEraLoading(key) {
   const era = ERA_LOADING[key];
@@ -442,6 +528,7 @@ function showDeathMarker(cause) {
 function showErasure(text) {
   erasureText.textContent  = text;
   erasureCycle.textContent = `End of Cycle ${state.turn}`;
+  localStorage.removeItem("chronos_run_id");
   showScreen("erasure");
 }
 
@@ -499,6 +586,7 @@ $("#btn-new-run").addEventListener("click", () => {
 
 $("#btn-new-run-yes").addEventListener("click", () => {
   closeHamburger();
+  localStorage.removeItem("chronos_run_id");
   resetGameState();
   beginNewRun();
 });
