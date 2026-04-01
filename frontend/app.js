@@ -30,9 +30,15 @@ function saveRunToStorage() {
     localStorage.setItem("chronos_run_id", runId);
     localStorage.setItem("chronos_era_key", eraKey);
   }
+  const turnsContainer = document.getElementById("turns-container");
+  if (turnsContainer && runId) {
+    localStorage.setItem("chronos_narrative_" + runId, turnsContainer.innerHTML);
+  }
 }
 
 function clearRunFromStorage() {
+  const oldId = localStorage.getItem("chronos_run_id");
+  if (oldId) localStorage.removeItem("chronos_narrative_" + oldId);
   localStorage.removeItem("chronos_run_id");
   localStorage.removeItem("chronos_era_key");
 }
@@ -196,23 +202,41 @@ async function startNewRun() {
 function enterGame() {
   showScreen("screen-game");
   const turnsContainer = $("#turns-container");
-  if (turnsContainer) turnsContainer.innerHTML = "";
 
   updateTopBar();
   setupInput();
 
-  const loc = state.locations.find((l) => l.id === state.player.location);
-  const year = state.current_year || state.era.year_start;
+  // Try to restore saved narrative (includes intro + all turn blocks)
+  const savedNarrative = runId ? localStorage.getItem("chronos_narrative_" + runId) : null;
+  if (savedNarrative && turnsContainer) {
+    turnsContainer.innerHTML = savedNarrative;
+    // Scroll to bottom
+    const manuscript = $("#manuscript");
+    if (manuscript) manuscript.scrollTop = manuscript.scrollHeight;
+  } else {
+    // Fresh game — render intro
+    if (turnsContainer) turnsContainer.innerHTML = "";
+    const loc = state.locations.find((l) => l.id === state.player.location);
+    const year = state.current_year || state.era.year_start;
 
-  let introHtml = `<div class="mb-12">`;
-  introHtml += `<div class="font-system text-[10px] tracking-[0.15em] text-tertiary-container uppercase mb-4">${esc(state.era.name)} — ${year} AD</div>`;
-  introHtml += `<p class="font-body text-[18px] leading-relaxed text-on-surface mb-4">${esc(state.era.description)}</p>`;
-  introHtml += `<p class="font-body text-[18px] leading-relaxed text-on-surface mb-4">You are <strong class="text-primary-fixed">${esc(state.player.name)}</strong>, ${esc(state.player.role.toLowerCase())}. ${esc(state.player.description)}</p>`;
-  if (loc) {
-    introHtml += `<p class="font-body text-[18px] leading-relaxed text-on-surface">${esc(loc.description)}</p>`;
+    let introHtml = `<div class="mb-12">`;
+    introHtml += `<div class="font-system text-[10px] tracking-[0.15em] text-tertiary-container uppercase mb-4">${esc(state.era.name)} — ${year} AD</div>`;
+    introHtml += `<p class="font-body text-[18px] leading-relaxed text-on-surface mb-4">${esc(state.era.description)}</p>`;
+    introHtml += `<p class="font-body text-[18px] leading-relaxed text-on-surface mb-4">You are <strong class="text-primary-fixed">${esc(state.player.name)}</strong>, ${esc(state.player.role.toLowerCase())}. ${esc(state.player.description)}</p>`;
+    if (loc) {
+      introHtml += `<p class="font-body text-[18px] leading-relaxed text-on-surface">${esc(loc.description)}</p>`;
+    }
+    introHtml += `</div>`;
+    turnsContainer.innerHTML = introHtml;
+    saveRunToStorage();
   }
-  introHtml += `</div>`;
-  turnsContainer.innerHTML = introHtml;
+
+  // Restore death/observation state if needed
+  if (state.run_status === "dead_observing") {
+    const deathEvent = (state.events || []).find(e => e.action_type === "death");
+    if (deathEvent) showDeathMarker(deathEvent.description);
+    enterObservationMode();
+  }
 }
 
 function updateTopBar() {
@@ -286,6 +310,7 @@ async function submitTurn(text) {
 
     renderTurn(block, text, data);
     updateTopBar();
+    saveRunToStorage();
 
     if (data.death) {
       showDeathMarker(data.death.cause);
