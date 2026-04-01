@@ -75,10 +75,10 @@ export function initGlobe() {
   window.addEventListener("resize", resize);
 }
 
-function resize() {
+export function resize() {
   if (!container || !renderer) return;
-  const w = container.clientWidth;
-  const h = container.clientHeight;
+  const w = container.clientWidth || 1;
+  const h = container.clientHeight || 1;
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
   renderer.setSize(w, h);

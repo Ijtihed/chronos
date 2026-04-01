@@ -16,6 +16,66 @@
             height: 100vh;
         }
 
+        /* ---- Menu ---- */
+
+        #menu-btn {
+            position: fixed;
+            top: 14px;
+            right: 16px;
+            z-index: 20;
+            background: none;
+            border: none;
+            color: #484030;
+            font-size: 1.4em;
+            cursor: pointer;
+            padding: 4px 8px;
+            line-height: 1;
+        }
+        #menu-btn:hover { color: #a09070; }
+
+        #menu-panel {
+            position: fixed;
+            top: 0;
+            right: 0;
+            width: 240px;
+            height: 100%;
+            background: #121210;
+            border-left: 1px solid #1e1c18;
+            z-index: 19;
+            padding: 60px 20px 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .menu-item {
+            background: none;
+            border: 1px solid #1e1c18;
+            color: #a09070;
+            padding: 10px 14px;
+            font-family: Georgia, serif;
+            font-size: 0.85em;
+            cursor: pointer;
+            border-radius: 2px;
+            text-align: left;
+        }
+        .menu-item:hover { border-color: #3a3428; color: #c8b88a; }
+
+        .menu-divider {
+            border: none;
+            border-top: 1px solid #1a1816;
+            margin: 8px 0;
+        }
+
+        .menu-label {
+            font-size: 0.7em;
+            color: #3a3428;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        /* ---- Narrative ---- */
+
         #narrative {
             flex: 1;
             overflow-y: auto;
@@ -88,6 +148,8 @@
         }
         .erasure-block p { color: #585040; line-height: 2.2; font-style: italic; }
 
+        /* ---- Input ---- */
+
         #input-bar {
             padding: 14px 24px;
             border-top: 1px solid #1a1816;
@@ -126,9 +188,10 @@
         #act-btn:hover { border-color: #3a3428; color: #a09070; }
         #act-btn:disabled { opacity: 0.2; cursor: not-allowed; }
 
+        /* ---- Start screen ---- */
+
         .loading-text { color: #3a3428; font-style: italic; }
         .error-text { color: #805040; }
-
         strong { color: #d0c090; font-weight: 600; }
 
         #start-screen {
@@ -160,6 +223,8 @@
         }
         #start-screen .begin-btn:hover { border-color: #484030; }
 
+        /* ---- Map ---- */
+
         .hidden { display: none; }
 
         #map-container {
@@ -184,6 +249,17 @@
     </style>
 </head>
 <body>
+    <button id="menu-btn" class="hidden">&#9776;</button>
+
+    <div id="menu-panel" class="hidden">
+        <div class="menu-label">Game</div>
+        <button class="menu-item" id="menu-map">Map (M)</button>
+        <button class="menu-item" id="menu-new">New Run</button>
+        <hr class="menu-divider">
+        <div class="menu-label">Info</div>
+        <button class="menu-item" id="menu-status">Run Status</button>
+    </div>
+
     <div id="start-screen">
         <h2>Chronos</h2>
         <button class="begin-btn" id="start-btn">Begin</button>

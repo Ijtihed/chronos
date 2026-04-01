@@ -23,11 +23,18 @@ const inputBar = $("#input-bar");
 const mapContainer = $("#map-container");
 const mapHint = $("#map-hint");
 
+const menuBtn = $("#menu-btn");
+const menuPanel = $("#menu-panel");
+const menuMap = $("#menu-map");
+const menuNew = $("#menu-new");
+const menuStatus = $("#menu-status");
+
 let state = null;
 let runId = null;
 let eraKey = null;
 let mapShowing = false;
 let globeReady = false;
+let menuOpen = false;
 
 function show(el) { el.classList.remove("hidden"); }
 function hide(el) { el.classList.add("hidden"); }
@@ -67,6 +74,7 @@ async function tryResumeRun() {
     hide(startScreen);
     show(narrativeEl);
     show(inputBar);
+    show(menuBtn);
     renderResumedRun();
     prepareGlobe();
     return true;
@@ -139,6 +147,7 @@ async function startNewRun() {
     hide(startLoading);
     show(narrativeEl);
     show(inputBar);
+    show(menuBtn);
     renderIntro();
     prepareGlobe();
   } catch (e) {
@@ -179,6 +188,7 @@ function toggleMap() {
     hide(inputBar);
     show(mapContainer);
     show(mapHint);
+    mapModule.resize();
     syncMapState();
     mapModule.startRendering();
     mapShowing = true;
@@ -372,6 +382,58 @@ function esc(s) {
 }
 
 // ------------------------------------------------------------------
+// Menu
+// ------------------------------------------------------------------
+
+function toggleMenu() {
+  menuOpen = !menuOpen;
+  if (menuOpen) {
+    show(menuPanel);
+  } else {
+    hide(menuPanel);
+  }
+}
+
+function newRunFromMenu() {
+  hide(menuPanel);
+  menuOpen = false;
+  clearLocalRun();
+  turnsEl.innerHTML = "";
+  introEl.innerHTML = "";
+  hide(narrativeEl);
+  hide(inputBar);
+  hide(menuBtn);
+  show(startScreen);
+  hide(startLoading);
+  state = null;
+  runId = null;
+  eraKey = null;
+  globeReady = false;
+}
+
+function showRunStatus() {
+  if (!state) return;
+  hide(menuPanel);
+  menuOpen = false;
+
+  const loc = state.locations.find((l) => l.id === state.player.location);
+  const age = state.current_year - state.player.birth_year;
+  const visited = (state.visited_locations || []).length;
+  const total = state.locations.length;
+
+  const block = appendBlock(
+    `<div class="year-mark">Status</div>` +
+    `<div class="narration" style="font-size:0.82em;color:#585040">` +
+    `${esc(state.player.name)} \u00b7 ${esc(state.player.role)}<br>` +
+    `Age: ~${age} \u00b7 Turn ${state.turn} \u00b7 ${state.current_year} AD<br>` +
+    `Location: ${loc ? esc(loc.name) : "unknown"}<br>` +
+    `Visited: ${visited}/${total} locations \u00b7 ` +
+    `Status: ${esc(state.run_status)}` +
+    `</div>`
+  );
+}
+
+// ------------------------------------------------------------------
 // Event listeners
 // ------------------------------------------------------------------
 
@@ -385,10 +447,19 @@ actBtn.addEventListener("click", () => {
 
 startBtn.addEventListener("click", startNewRun);
 
+menuBtn.addEventListener("click", toggleMenu);
+menuMap.addEventListener("click", () => { hide(menuPanel); menuOpen = false; toggleMap(); });
+menuNew.addEventListener("click", newRunFromMenu);
+menuStatus.addEventListener("click", showRunStatus);
+
 document.addEventListener("keydown", (e) => {
   if (e.key === "m" || e.key === "M") {
     if (document.activeElement === input) return;
     toggleMap();
+  }
+  if (e.key === "Escape" && menuOpen) {
+    hide(menuPanel);
+    menuOpen = false;
   }
 });
 
