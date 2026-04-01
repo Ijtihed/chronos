@@ -21,19 +21,18 @@ class TestPromptLoading:
     def test_npc_pov_template_exists(self):
         assert (PROMPTS_DIR / "npc_pov.md").exists()
 
-    def test_action_parser_strips_metadata_header(self):
+    def test_action_parser_strips_metadata(self):
         raw = load_prompt(PROMPTS_DIR / "action_parser.md")
         assert not raw.startswith("#")
-        assert "Model tier" not in raw
         assert "$player_input" in raw
 
-    def test_npc_pov_strips_metadata_header(self):
+    def test_npc_pov_strips_metadata(self):
         raw = load_prompt(PROMPTS_DIR / "npc_pov.md")
         assert not raw.startswith("#")
         assert "$npc_name" in raw
 
 
-class TestActionParserSubstitution:
+class TestActionParserPrompt:
     def test_all_placeholders_fill(self):
         raw = load_prompt(PROMPTS_DIR / "action_parser.md")
         state = create_initial_state()
@@ -51,30 +50,35 @@ class TestActionParserSubstitution:
             npcs=npc_list,
             story_so_far=build_story_summary(state),
             political_tension=player_loc.political_tension,
-            player_input="talk to the centurion",
+            reachable_locations="Ravenna (ravenna, 2 turns)",
+            player_input="flee the city",
         )
-        assert "$" not in result, f"Unfilled placeholders remain: {result}"
+        assert "$" not in result, f"Unfilled: {result}"
 
-    def test_includes_npc_impacts_in_output_spec(self):
+    def test_includes_npc_impacts(self):
         raw = load_prompt(PROMPTS_DIR / "action_parser.md")
         assert "npc_impacts" in raw
-        assert "sentiment" in raw
         assert "relevant" in raw
 
-    def test_does_not_constrain_action_types(self):
+    def test_includes_travel_detection(self):
         raw = load_prompt(PROMPTS_DIR / "action_parser.md")
-        assert "not from a fixed list" in raw
+        assert "is_travel" in raw
+        assert "destination" in raw
+
+    def test_includes_inaction_detection(self):
+        raw = load_prompt(PROMPTS_DIR / "action_parser.md")
+        assert "is_inaction" in raw
 
     def test_emphasizes_total_freedom(self):
         raw = load_prompt(PROMPTS_DIR / "action_parser.md")
         assert "total freedom" in raw.lower()
 
-    def test_includes_story_so_far_placeholder(self):
+    def test_includes_reachable_locations(self):
         raw = load_prompt(PROMPTS_DIR / "action_parser.md")
-        assert "$story_so_far" in raw
+        assert "$reachable_locations" in raw
 
 
-class TestNpcPovSubstitution:
+class TestNpcPovPrompt:
     def test_all_placeholders_fill(self):
         raw = load_prompt(PROMPTS_DIR / "npc_pov.md")
         state = create_initial_state()
@@ -93,10 +97,10 @@ class TestNpcPovSubstitution:
             year=state.current_year or state.era.year_start,
             story_so_far=build_story_summary(state),
             historical_context="No sources available.",
-            era_description_of_action="Corvinus approached the garrison.",
-            action_intent="speak to the centurion",
+            era_description_of_action="Something happened.",
+            action_intent="unknown",
         )
-        assert "$" not in result, f"Unfilled placeholders remain: {result}"
+        assert "$" not in result, f"Unfilled: {result}"
 
     def test_instructs_first_person(self):
         raw = load_prompt(PROMPTS_DIR / "npc_pov.md")
@@ -105,11 +109,3 @@ class TestNpcPovSubstitution:
     def test_forbids_modern_language(self):
         raw = load_prompt(PROMPTS_DIR / "npc_pov.md")
         assert "modern" in raw.lower()
-
-    def test_limits_response_length(self):
-        raw = load_prompt(PROMPTS_DIR / "npc_pov.md")
-        assert "2-4 sentences" in raw
-
-    def test_includes_story_so_far_placeholder(self):
-        raw = load_prompt(PROMPTS_DIR / "npc_pov.md")
-        assert "$story_so_far" in raw

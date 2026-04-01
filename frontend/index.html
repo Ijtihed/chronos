@@ -16,83 +16,47 @@
             height: 100vh;
         }
 
-        header {
-            padding: 14px 24px;
-            border-bottom: 1px solid #282420;
-            background: #121210;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        header h1 {
-            font-size: 1em;
-            letter-spacing: 0.2em;
-            text-transform: uppercase;
-            color: #d8ccaa;
-            font-weight: 400;
-        }
-
-        .era-line { font-size: 0.82em; color: #706850; margin-top: 3px; }
-
-        .header-right { display: flex; gap: 10px; align-items: center; }
-
-        .btn {
-            background: #1e1c18;
-            border: 1px solid #282420;
-            color: #a09070;
-            padding: 6px 14px;
-            font-family: Georgia, serif;
-            font-size: 0.82em;
-            cursor: pointer;
-            border-radius: 3px;
-            transition: background 0.2s;
-        }
-        .btn:hover { background: #282420; }
-        .btn:disabled { opacity: 0.3; cursor: not-allowed; }
-        .btn-primary { border-color: #3a3428; color: #c8b88a; }
-
         #narrative {
             flex: 1;
             overflow-y: auto;
-            padding: 28px 24px;
-            line-height: 1.7;
+            padding: 40px 24px 28px;
+            max-width: 680px;
+            margin: 0 auto;
+            width: 100%;
+            line-height: 1.8;
         }
 
-        .intro p { margin-bottom: 12px; }
+        .intro p { margin-bottom: 14px; }
 
         .turn-block {
-            margin-bottom: 24px;
-            padding-top: 18px;
-            border-top: 1px solid #1e1c18;
+            margin-bottom: 28px;
+            padding-top: 20px;
+            border-top: 1px solid #1a1816;
         }
 
-        .turn-label {
-            font-size: 0.72em;
-            letter-spacing: 0.12em;
+        .year-mark {
+            font-size: 0.7em;
+            letter-spacing: 0.1em;
             text-transform: uppercase;
-            color: #504830;
+            color: #3a3428;
             margin-bottom: 8px;
         }
 
-        .player-line { font-style: italic; color: #887858; margin-bottom: 10px; }
-        .action-narration { margin-bottom: 12px; color: #b8a880; }
-
-        .parsed-badge {
-            display: inline-block;
-            font-family: "SF Mono", "Fira Code", monospace;
-            font-size: 0.72em;
-            color: #585040;
-            background: #161614;
-            border: 1px solid #1e1c18;
-            padding: 2px 8px;
-            border-radius: 3px;
+        .player-line {
+            font-style: italic;
+            color: #706850;
             margin-bottom: 12px;
+            font-size: 0.9em;
+        }
+
+        .narration {
+            margin-bottom: 14px;
+            color: #b8a880;
         }
 
         .npc-block {
-            margin-bottom: 12px;
-            padding: 12px 16px;
+            margin-bottom: 14px;
+            padding: 14px 18px;
             border-left: 2px solid #2a2620;
             background: #12110f;
         }
@@ -101,73 +65,69 @@
             font-size: 0.72em;
             letter-spacing: 0.06em;
             text-transform: uppercase;
-            color: #706040;
+            color: #585040;
             margin-bottom: 5px;
         }
 
-        .npc-voice { line-height: 1.7; color: #c0b088; }
-
-        .tension-line { font-size: 0.78em; color: #585040; margin-top: 8px; }
-        .tension-high { color: #a07840; }
-        .tension-critical { color: #b05030; }
+        .npc-voice { line-height: 1.8; color: #c0b088; }
 
         .death-block {
-            margin: 20px 0;
-            padding: 20px;
-            border: 1px solid #3a2820;
-            background: #1a1210;
+            margin: 30px 0;
+            padding: 24px;
+            border-top: 1px solid #2a2018;
+            border-bottom: 1px solid #2a2018;
             text-align: center;
         }
-        .death-block p { color: #a08060; line-height: 1.8; }
+        .death-block p { color: #907860; line-height: 1.9; }
 
         .erasure-block {
-            margin: 40px auto;
-            max-width: 500px;
+            margin: 50px auto;
+            max-width: 480px;
             text-align: center;
             padding: 30px;
         }
-        .erasure-block p { color: #706050; line-height: 2; font-style: italic; }
-
-        .location-bar {
-            padding: 8px 24px;
-            background: #141412;
-            border-bottom: 1px solid #1e1c18;
-            font-size: 0.8em;
-            color: #585040;
-            display: flex;
-            gap: 20px;
-            flex-wrap: wrap;
-        }
-
-        .location-bar .loc-name { color: #a09070; }
-        .location-bar .nearby-label { color: #484030; }
+        .erasure-block p { color: #585040; line-height: 2.2; font-style: italic; }
 
         #input-bar {
-            padding: 12px 24px;
-            border-top: 1px solid #282420;
-            background: #121210;
+            padding: 14px 24px;
+            border-top: 1px solid #1a1816;
             display: flex;
             gap: 8px;
-            flex-wrap: wrap;
+            max-width: 680px;
+            margin: 0 auto;
+            width: 100%;
         }
 
         #player-input {
             flex: 1;
-            min-width: 200px;
-            background: #181816;
-            border: 1px solid #282420;
+            background: #141412;
+            border: 1px solid #1e1c18;
             color: #c8b88a;
-            padding: 10px 14px;
+            padding: 12px 16px;
             font-family: Georgia, serif;
             font-size: 0.95em;
-            border-radius: 3px;
+            border-radius: 2px;
             outline: none;
         }
-        #player-input:focus { border-color: #484030; }
-        #player-input::placeholder { color: #3a3428; }
+        #player-input:focus { border-color: #3a3428; }
+        #player-input::placeholder { color: #282420; }
+        #player-input:disabled { opacity: 0.3; }
 
-        .loading-text { color: #504830; font-style: italic; }
-        .error-text { color: #a05040; }
+        #act-btn {
+            background: none;
+            border: 1px solid #1e1c18;
+            color: #585040;
+            padding: 12px 18px;
+            font-family: Georgia, serif;
+            font-size: 0.95em;
+            cursor: pointer;
+            border-radius: 2px;
+        }
+        #act-btn:hover { border-color: #3a3428; color: #a09070; }
+        #act-btn:disabled { opacity: 0.2; cursor: not-allowed; }
+
+        .loading-text { color: #3a3428; font-style: italic; }
+        .error-text { color: #805040; }
 
         strong { color: #d0c090; font-weight: 600; }
 
@@ -177,55 +137,38 @@
             align-items: center;
             justify-content: center;
             flex: 1;
-            gap: 20px;
+            gap: 24px;
+            padding: 40px;
         }
         #start-screen h2 {
             font-weight: 400;
-            letter-spacing: 0.15em;
-            color: #a09070;
-        }
-        #start-screen p { color: #585040; max-width: 400px; text-align: center; line-height: 1.7; }
-
-        .travel-options {
-            margin-top: 10px;
-            font-size: 0.82em;
-        }
-        .travel-link {
+            font-size: 1.1em;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
             color: #706850;
+        }
+        #start-screen .begin-btn {
+            background: none;
+            border: 1px solid #282420;
+            color: #a09070;
+            padding: 10px 28px;
+            font-family: Georgia, serif;
+            font-size: 0.9em;
             cursor: pointer;
-            text-decoration: underline;
-            text-decoration-color: #3a3428;
+            border-radius: 2px;
+            letter-spacing: 0.1em;
         }
-        .travel-link:hover { color: #a09070; }
-
-        .memory-indicator {
-            font-size: 0.72em;
-            color: #3a3428;
-            margin-top: 6px;
-        }
+        #start-screen .begin-btn:hover { border-color: #484030; }
 
         .hidden { display: none; }
     </style>
 </head>
 <body>
-    <header>
-        <div>
-            <h1>Chronos</h1>
-            <div class="era-line" id="era-info"></div>
-        </div>
-        <div class="header-right">
-            <button class="btn" id="new-run-btn">New Run</button>
-        </div>
-    </header>
-
     <div id="start-screen">
-        <h2>CHRONOS</h2>
-        <p>You will be assigned a random character in a random era. The world moves forward whether you act or not. No one will tell you what to do.</p>
-        <button class="btn btn-primary" id="start-btn">Begin</button>
+        <h2>Chronos</h2>
+        <button class="begin-btn" id="start-btn">Begin</button>
         <div class="loading-text hidden" id="start-loading">Generating your world...</div>
     </div>
-
-    <div id="location-bar" class="location-bar hidden"></div>
 
     <div id="narrative" class="hidden">
         <div id="intro" class="intro"></div>
@@ -234,7 +177,7 @@
 
     <div id="input-bar" class="hidden">
         <input type="text" id="player-input" placeholder="" autocomplete="off" disabled>
-        <button class="btn" id="act-btn" disabled>&rarr;</button>
+        <button id="act-btn" disabled>&rarr;</button>
     </div>
 
     <script src="app.js"></script>

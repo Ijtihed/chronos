@@ -1,7 +1,6 @@
 """Parse player natural language into a structured action via LLM.
 
-Model tier: LOCAL (Ollama) — frontier stub for Phase 0/1.
-When frontier parsing is enabled, swap the chat() call for a frontier client.
+Model tier: LOCAL (Ollama) — frontier stub.
 """
 
 from __future__ import annotations
@@ -14,6 +13,7 @@ from backend.llm import chat, load_prompt
 from backend.world_state import (
     WorldState,
     build_story_summary,
+    get_location,
     get_player_location,
     npcs_near_player,
 )
@@ -29,6 +29,15 @@ async def parse_action(player_input: str, state: WorldState) -> dict:
     npc_list = ", ".join(f"{n.name} ({n.role})" for n in nearby)
     player_loc = get_player_location(state)
 
+    reachable = []
+    for nid, cost in player_loc.neighbors.items():
+        try:
+            dest = get_location(state, nid)
+            reachable.append(f"{dest.name} ({nid}, {cost} turns)")
+        except ValueError:
+            reachable.append(f"{nid} ({cost} turns)")
+    reachable_str = ", ".join(reachable) if reachable else "none"
+
     prompt = template.safe_substitute(
         year=state.current_year or state.era.year_start,
         era_description=state.era.description,
@@ -39,6 +48,7 @@ async def parse_action(player_input: str, state: WorldState) -> dict:
         npcs=npc_list,
         story_so_far=build_story_summary(state),
         political_tension=player_loc.political_tension,
+        reachable_locations=reachable_str,
         player_input=player_input,
     )
 
@@ -63,5 +73,8 @@ def _fallback(player_input: str, state: WorldState, error: str) -> dict:
         "era_description": (
             f"{state.player.name} attempts something in {loc_name}."
         ),
+        "is_travel": False,
+        "destination": None,
+        "is_inaction": False,
         "_parse_error": error,
     }
