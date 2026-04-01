@@ -238,6 +238,8 @@ async def _handle_travel(state: WorldState, parsed: dict) -> dict:
     state = await advance_world(state, ticks=travel_turns)
 
     state.player.location = dest_id
+    if dest_id not in state.visited_locations:
+        state.visited_locations.append(dest_id)
     try:
         dest_name = get_location(state, dest_id).name
     except ValueError:
@@ -308,6 +310,8 @@ async def _handle_observation_input(state: WorldState, text: str) -> dict:
                 return {"erasure": erasure_text, "world_state": state.model_dump()}
 
             state.player.location = dest_id
+            if dest_id not in state.visited_locations:
+                state.visited_locations.append(dest_id)
             await save_session(state)
             return {
                 "parsed_action": parsed,

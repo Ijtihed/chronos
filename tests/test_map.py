@@ -105,6 +105,18 @@ class TestBorderFiles:
         assert sources.exists(), "sources.md missing"
 
 
+class TestVisitedLocations:
+    def test_initial_state_has_starting_location_visited(self):
+        state = create_initial_state()
+        assert "ariminum" in state.visited_locations
+
+    def test_visited_locations_in_serialization(self):
+        state = create_initial_state()
+        dumped = state.model_dump()
+        assert "visited_locations" in dumped
+        assert "ariminum" in dumped["visited_locations"]
+
+
 class TestGeoEndpoint:
     @pytest.mark.asyncio
     @respx.mock

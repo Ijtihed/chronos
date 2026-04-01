@@ -1,3 +1,14 @@
+import {
+  initGlobe,
+  loadCoastlines,
+  loadBorders,
+  updateMarkers,
+  focusOnLocation,
+  startRendering,
+  stopRendering,
+  isInitialized,
+} from "./map.js";
+
 const $ = (sel) => document.querySelector(sel);
 const introEl = $("#intro");
 const turnsEl = $("#turns");
@@ -8,12 +19,21 @@ const startBtn = $("#start-btn");
 const startLoading = $("#start-loading");
 const narrativeEl = $("#narrative");
 const inputBar = $("#input-bar");
+const mapContainer = $("#map-container");
+const mapHint = $("#map-hint");
 
 let state = null;
 let runId = null;
+let eraKey = null;
+let mapShowing = false;
+let globeReady = false;
 
 function show(el) { el.classList.remove("hidden"); }
 function hide(el) { el.classList.add("hidden"); }
+
+// ------------------------------------------------------------------
+// Run start
+// ------------------------------------------------------------------
 
 async function startNewRun() {
   startBtn.disabled = true;
@@ -23,17 +43,74 @@ async function startNewRun() {
     const res = await fetch("/api/run", { method: "POST" });
     const data = await res.json();
     runId = data.run_id;
+    eraKey = data.era;
     state = data.world_state;
     hide(startScreen);
     show(narrativeEl);
     show(inputBar);
     renderIntro();
+    prepareGlobe();
   } catch (e) {
     startLoading.innerHTML = `<span class="error-text">Error: ${esc(e.message)}</span>`;
   } finally {
     startBtn.disabled = false;
   }
 }
+
+async function prepareGlobe() {
+  initGlobe();
+  await loadCoastlines();
+  if (eraKey) await loadBorders(eraKey);
+  globeReady = true;
+}
+
+// ------------------------------------------------------------------
+// Map toggle (M key)
+// ------------------------------------------------------------------
+
+function toggleMap() {
+  if (!state || !globeReady) return;
+
+  if (mapShowing) {
+    hide(mapContainer);
+    hide(mapHint);
+    show(narrativeEl);
+    show(inputBar);
+    stopRendering();
+    mapShowing = false;
+  } else {
+    hide(narrativeEl);
+    hide(inputBar);
+    show(mapContainer);
+    show(mapHint);
+    syncMapState();
+    startRendering();
+    mapShowing = true;
+  }
+}
+
+async function syncMapState() {
+  if (!runId) return;
+  try {
+    const resp = await fetch(`/api/run/${runId}`);
+    if (resp.ok) {
+      state = await resp.json();
+    }
+  } catch { /* use cached state */ }
+
+  updateMarkers(state);
+
+  const playerLoc = state.locations.find(
+    (l) => l.id === state.player.location
+  );
+  if (playerLoc) {
+    focusOnLocation(playerLoc.lat, playerLoc.lon, false);
+  }
+}
+
+// ------------------------------------------------------------------
+// Narrative rendering
+// ------------------------------------------------------------------
 
 function renderIntro() {
   const loc = state.locations.find((l) => l.id === state.player.location);
@@ -71,6 +148,10 @@ function setInputState(mode) {
   }
 }
 
+// ------------------------------------------------------------------
+// Turn submission
+// ------------------------------------------------------------------
+
 async function submitTurn() {
   const text = input.value.trim();
   if (!text) return;
@@ -100,6 +181,7 @@ async function submitTurn() {
       block.innerHTML = "";
       appendErasureBlock(data.erasure);
       setInputState("ended");
+      if (globeReady) updateMarkers(state);
       return;
     }
 
@@ -111,6 +193,16 @@ async function submitTurn() {
     } else {
       setInputState("active");
     }
+
+    if (globeReady) {
+      updateMarkers(state);
+      if (data.travel) {
+        const dest = state.locations.find(
+          (l) => l.id === state.player.location
+        );
+        if (dest) focusOnLocation(dest.lat, dest.lon, true);
+      }
+    }
   } catch (e) {
     block.querySelector(".loading-text").innerHTML = `<span class="error-text">${esc(
       e.message
@@ -118,6 +210,10 @@ async function submitTurn() {
     setInputState("active");
   }
 }
+
+// ------------------------------------------------------------------
+// Render helpers
+// ------------------------------------------------------------------
 
 function renderTurnResult(el, playerText, data) {
   const { parsed_action: pa, npc_responses, world_state: ws } = data;
@@ -178,10 +274,23 @@ function esc(s) {
   return d.innerHTML;
 }
 
+// ------------------------------------------------------------------
+// Event listeners
+// ------------------------------------------------------------------
+
 input.addEventListener("keydown", (e) => {
   if (e.key === "Enter" && !input.disabled) submitTurn();
 });
+
 actBtn.addEventListener("click", () => {
   if (!actBtn.disabled) submitTurn();
 });
+
 startBtn.addEventListener("click", startNewRun);
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "m" || e.key === "M") {
+    if (document.activeElement === input) return;
+    toggleMap();
+  }
+});

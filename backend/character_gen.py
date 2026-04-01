@@ -55,6 +55,7 @@ async def generate_run(era_config: dict) -> WorldState:
         player=player,
         npcs=npcs,
         locations=locations,
+        visited_locations=[start_location.id],
     )
 
 

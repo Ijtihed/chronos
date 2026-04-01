@@ -161,6 +161,26 @@
         #start-screen .begin-btn:hover { border-color: #484030; }
 
         .hidden { display: none; }
+
+        #map-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            background: #0a0a0a;
+        }
+
+        .map-hint {
+            position: fixed;
+            bottom: 16px;
+            right: 16px;
+            z-index: 11;
+            font-size: 0.7em;
+            color: #2a2420;
+            letter-spacing: 0.05em;
+        }
     </style>
 </head>
 <body>
@@ -175,11 +195,14 @@
         <div id="turns"></div>
     </div>
 
+    <div id="map-container" class="hidden"></div>
+    <div id="map-hint" class="map-hint hidden">M to return</div>
+
     <div id="input-bar" class="hidden">
         <input type="text" id="player-input" placeholder="" autocomplete="off" disabled>
         <button id="act-btn" disabled>&rarr;</button>
     </div>
 
-    <script src="app.js"></script>
+    <script type="module" src="app.js"></script>
 </body>
 </html>
