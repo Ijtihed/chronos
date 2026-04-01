@@ -21,6 +21,8 @@ ERA = {
                 "over crowded streets where Latin, Arabic, and Greek mix."
             ),
             "political_tension": "high",
+            "lat": 32.92,
+            "lon": 35.07,
             "neighbors": {"tyre": 2, "jaffa": 3},
         },
         {
@@ -33,6 +35,8 @@ ERA = {
                 "Kingdom's fleet."
             ),
             "political_tension": "moderate",
+            "lat": 33.27,
+            "lon": 35.20,
             "neighbors": {"acre": 2},
         },
         {
@@ -45,6 +49,8 @@ ERA = {
                 "Jerusalem."
             ),
             "political_tension": "critical",
+            "lat": 32.05,
+            "lon": 34.75,
             "neighbors": {"acre": 3},
         },
     ],

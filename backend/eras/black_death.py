@@ -21,6 +21,8 @@ ERA = {
                 "counting houses. Boccaccio watches from the hills."
             ),
             "political_tension": "critical",
+            "lat": 43.77,
+            "lon": 11.25,
             "neighbors": {"siena": 2, "avignon": 5},
         },
         {
@@ -32,6 +34,8 @@ ERA = {
                 "will never recover its former ambition."
             ),
             "political_tension": "critical",
+            "lat": 43.32,
+            "lon": 11.33,
             "neighbors": {"firenze": 2, "avignon": 4},
         },
         {
@@ -43,6 +47,8 @@ ERA = {
                 "communities face scapegoating as the plague spreads."
             ),
             "political_tension": "critical",
+            "lat": 43.95,
+            "lon": 4.81,
             "neighbors": {"firenze": 5, "siena": 4, "marseille": 2},
         },
         {
@@ -54,6 +60,8 @@ ERA = {
                 "living avoid the docks."
             ),
             "political_tension": "high",
+            "lat": 43.30,
+            "lon": 5.37,
             "neighbors": {"avignon": 2},
         },
     ],

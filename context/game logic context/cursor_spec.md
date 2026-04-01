@@ -14,11 +14,12 @@
 
 ## Read in this order
 
-1. [overview.md](overview.md) — what the game is; the player's role
+1. [overview.md](overview.md) — what the game is; the player's role; character assignment distribution
 2. [gameplay.md](gameplay.md) — turns, information system, travel, factions, death
-3. [simulation-and-world.md](simulation-and-world.md) — world model, historical knowledge, map, run setup, run uniqueness
-4. [roadmap.md](roadmap.md) — phased delivery, success criteria, what is / isn't in each phase, completion log
-5. [open-questions.md](open-questions.md) — unresolved; **do not assume** when implementing
+3. [simulation-and-world.md](simulation-and-world.md) — world model, family, difficulty, historical knowledge, map, run setup
+4. [historical-context-engine.md](historical-context-engine.md) — HCE: Events DB + ground-level context generation, distinct from HKE
+5. [roadmap.md](roadmap.md) — phased delivery, success criteria, what is / isn't in each phase, completion log
+6. [open-questions.md](open-questions.md) — unresolved; **do not assume** when implementing
 
 ## Where this lives in the repo
 

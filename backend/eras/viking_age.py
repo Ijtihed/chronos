@@ -20,6 +20,8 @@ ERA = {
                 "Longships crowd the harbor."
             ),
             "political_tension": "moderate",
+            "lat": 59.05,
+            "lon": 10.22,
             "neighbors": {"hedeby": 3, "birka": 4},
         },
         {
@@ -31,6 +33,8 @@ ERA = {
                 "earthen rampart, it teems with Frisians, Saxons, and Slavs."
             ),
             "political_tension": "high",
+            "lat": 54.49,
+            "lon": 9.57,
             "neighbors": {"kaupang": 3, "birka": 3, "jorvik": 5},
         },
         {
@@ -42,6 +46,8 @@ ERA = {
                 "mission has recently arrived, unsettling the local priests."
             ),
             "political_tension": "moderate",
+            "lat": 59.34,
+            "lon": 17.54,
             "neighbors": {"kaupang": 4, "hedeby": 3},
         },
         {
@@ -53,6 +59,8 @@ ERA = {
                 "subjects. The Great Heathen Army's legacy lingers."
             ),
             "political_tension": "high",
+            "lat": 53.96,
+            "lon": -1.08,
             "neighbors": {"hedeby": 5},
         },
     ],

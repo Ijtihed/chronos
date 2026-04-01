@@ -37,6 +37,24 @@ Each run seeds from a randomly selected historical era (post 0 AD). The game gen
 
 The player is given their backstory and their immediate surroundings. Nothing else. They figure out the rest.
 
+## Family
+
+Family members — spouse, children, heirs — are named NPCs with their own archetypes, locations, and memory of the player. They are POV characters like any other and must be physically visited to hear their perspective. They are not given to the player as information; the player has to find them.
+
+Family members hold memory of the player longer than strangers after death, meaning they are typically among the last NPCs to forget the player during the observation/erasure phase. Children do not persist beyond the run they are born in. There is no cross-run family lineage.
+
+## Difficulty
+
+Difficulty in CHRONOS is structural, not mechanical. It is never achieved by degrading AI output quality or making the interface harder to use. The following levers are the agreed design space for difficulty:
+
+- **Memory decay rate** — faster decay means the player's observation window after death is shorter and erasure comes sooner
+- **Information opacity** — on harder settings NPC perspectives are more biased, rumor-filtered, and culturally specific, making the world harder to read
+- **Autonomy weight on inaction** — on harder settings the character takes riskier autonomous actions when the player skips turns
+- **Era volatility** — some historical periods are structurally more dangerous and chaotic than others; era selection is itself a difficulty axis
+- **Character assignment tier** — being assigned someone with less social power means a structurally smaller action space regardless of player intent
+
+The goal of difficulty is to change how much the world cares that the player exists, not to make the systems feel broken.
+
 ## What makes each run unique
 
 - The era is random

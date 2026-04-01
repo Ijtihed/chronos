@@ -30,6 +30,8 @@ class Location(BaseModel):
     name: str
     description: str
     political_tension: str
+    lat: float = 0.0
+    lon: float = 0.0
     neighbors: Dict[str, int] = Field(default_factory=dict)
 
 
@@ -209,6 +211,8 @@ def create_initial_state() -> WorldState:
                     "arrive each month."
                 ),
                 political_tension="high",
+                lat=44.06,
+                lon=12.57,
                 neighbors={"ravenna": 2, "mediolanum": 4},
             ),
             Location(
@@ -222,6 +226,8 @@ def create_initial_state() -> WorldState:
                     "soldiers, and refugees from the north."
                 ),
                 political_tension="critical",
+                lat=44.42,
+                lon=12.20,
                 neighbors={"ariminum": 2},
             ),
             Location(
@@ -234,6 +240,8 @@ def create_initial_state() -> WorldState:
                     "but increasingly exposed to barbarian raids from the north."
                 ),
                 political_tension="high",
+                lat=45.46,
+                lon=9.19,
                 neighbors={"ariminum": 4},
             ),
         ],

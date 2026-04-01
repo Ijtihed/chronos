@@ -75,7 +75,23 @@ async def _startup() -> None:
 
 @app.get("/api/health")
 async def health():
-    return {"status": "ok", "phase": 1, "ollama": await ollama_ok()}
+    return {"status": "ok", "phase": 2, "ollama": await ollama_ok()}
+
+
+# ------------------------------------------------------------------
+# Geo data (borders + coastlines for the map)
+# ------------------------------------------------------------------
+
+@app.get("/api/geo/{era_key}")
+async def get_geo(era_key: str):
+    """Serve historical border GeoJSON for the given era."""
+    from pathlib import Path
+    geo_dir = Path(__file__).resolve().parent.parent / "frontend" / "geo"
+    border_file = geo_dir / f"borders_{era_key}.geojson"
+    if not border_file.exists():
+        raise HTTPException(404, f"No border data for era '{era_key}'")
+    import json
+    return json.loads(border_file.read_text())
 
 
 # ------------------------------------------------------------------

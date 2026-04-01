@@ -21,6 +21,8 @@ ERA = {
                 "millennium, but the Ottoman cannons are something new."
             ),
             "political_tension": "critical",
+            "lat": 41.01,
+            "lon": 28.98,
             "neighbors": {"galata": 1, "adrianople": 4},
         },
         {
@@ -32,6 +34,8 @@ ERA = {
                 "The chain stretching across the harbor is anchored here."
             ),
             "political_tension": "high",
+            "lat": 41.03,
+            "lon": 28.97,
             "neighbors": {"constantinople": 1},
         },
         {
@@ -44,6 +48,8 @@ ERA = {
                 "under Ottoman rule."
             ),
             "political_tension": "moderate",
+            "lat": 41.68,
+            "lon": 26.56,
             "neighbors": {"constantinople": 4},
         },
     ],

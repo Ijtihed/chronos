@@ -20,6 +20,8 @@ ERA = {
                 "strength. Refugees trickle in from the north."
             ),
             "political_tension": "high",
+            "lat": 44.06,
+            "lon": 12.57,
             "neighbors": {"ravenna": 2, "mediolanum": 4},
         },
         {
@@ -30,6 +32,8 @@ ERA = {
                 "hides behind its walls. The court seethes with intrigue."
             ),
             "political_tension": "critical",
+            "lat": 44.42,
+            "lon": 12.20,
             "neighbors": {"ariminum": 2, "mediolanum": 3},
         },
         {
@@ -41,6 +45,8 @@ ERA = {
                 "threaten the northern approaches."
             ),
             "political_tension": "high",
+            "lat": 45.46,
+            "lon": 9.19,
             "neighbors": {"ariminum": 4, "ravenna": 3},
         },
     ],
