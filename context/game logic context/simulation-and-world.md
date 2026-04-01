@@ -83,6 +83,14 @@ Difficulty in CHRONOS is structural, not mechanical. It is never achieved by deg
 
 The goal of difficulty is to change how much the world cares that the player exists, not to make the systems feel broken.
 
+## Era coverage
+
+The game covers all of post-0 AD history, including the modern period. Eras are not limited to the ancient or medieval world. The 1800s, 1900s, and 2000s are valid settings — a run could place you as a factory worker in Victorian Manchester, a soldier in the trenches of WWI, a dissident in Cold War Prague, or a shopkeeper in 1990s Mogadishu.
+
+The simulation mechanics are identical regardless of era. What changes is the world context, the archetypes, the technology available, and the scale of events the player can influence. A 2003 Baghdad run uses the same turn loop as a 410 AD Italia run — the world simulates, NPCs act, the player observes and sometimes intervenes.
+
+Current starter set (Phase 1): Roman Late Empire (~410), Viking Age (~870), Crusader States (~1190), Black Death (~1348), Fall of Constantinople (~1453). Modern eras (1800s, 1900s, 2000s) are planned for expansion. Border data for post-1886 eras uses CShapes 2.0 (see `frontend/geo/sources.md`).
+
 ## What makes each run unique
 
 - The era is random

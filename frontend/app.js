@@ -40,8 +40,7 @@ async function startNewRun() {
   if (eventsEl) eventsEl.innerHTML = "";
   if (voicesEl) voicesEl.innerHTML = "";
   if (charSection) charSection.classList.add("hidden");
-  const ringFill = $("#loading-ring-fill");
-  if (ringFill) ringFill.style.strokeDashoffset = "125.66";
+  startProgressBar();
 
   try {
     // Step 1: Get era info INSTANTLY (no character generation)
@@ -93,10 +92,11 @@ async function startNewRun() {
       if (charDesc) charDesc.textContent = state.player.description;
     }
 
-    if (ringFill) ringFill.style.strokeDashoffset = "0";
+    completeProgressBar();
 
     setTimeout(() => enterGame(), 2000);
   } catch (e) {
+    completeProgressBar();
     $("#loading-era-desc").textContent = `Error: ${e.message}`;
   }
 }
@@ -386,6 +386,37 @@ document.addEventListener("keydown", (e) => {
     if (mapBtn) mapBtn.click();
   }
 });
+
+// -------------------------------------------------------------------
+// Progress bar — asymptotic curve tied to real elapsed time
+// -------------------------------------------------------------------
+
+let barRAF = null;
+let barStart = 0;
+const BAR_TAU = 60;
+
+function startProgressBar() {
+  const fill = $("#loading-bar-fill");
+  if (fill) fill.style.width = "0%";
+  barStart = performance.now();
+  function tick() {
+    const elapsed = (performance.now() - barStart) / 1000;
+    const pct = (1 - Math.exp(-elapsed / BAR_TAU)) * 100;
+    if (fill) fill.style.width = pct + "%";
+    barRAF = requestAnimationFrame(tick);
+  }
+  barRAF = requestAnimationFrame(tick);
+}
+
+function completeProgressBar() {
+  if (barRAF) { cancelAnimationFrame(barRAF); barRAF = null; }
+  const fill = $("#loading-bar-fill");
+  if (fill) {
+    fill.style.transition = "width 0.4s ease";
+    fill.style.width = "100%";
+    setTimeout(() => { fill.style.transition = ""; }, 500);
+  }
+}
 
 // -------------------------------------------------------------------
 // Utility

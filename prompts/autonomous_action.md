@@ -25,6 +25,8 @@ You are a person with your own life, goals, and concerns. What do you do this tu
 
 You are NOT reacting to $player_name. You may not even notice them. You are living your own life.
 
+Write the action in plain, blunt language — like describing what a real person does, not what a character in a novel does. Keep it grounded and specific.
+
 Respond with ONLY a JSON object:
 
-{"action": "one sentence describing what you do — be specific and grounded in the era", "interacts_with": "name of another NPC you interact with this turn, or null if acting alone", "wants_to_travel": false, "travel_destination": null, "mood_shift": "your disposition stays the same or shifts to a new one-word state"}
+{"action": "one sentence describing what you do — plain language, specific, grounded", "interacts_with": "name of another NPC you interact with this turn, or null if acting alone", "wants_to_travel": false, "travel_destination": null, "mood_shift": "your disposition stays the same or shifts to a new one-word state"}

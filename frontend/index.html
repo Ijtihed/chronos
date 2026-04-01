@@ -216,14 +216,11 @@
         <p class="font-body text-[18px] leading-relaxed text-on-surface" id="loading-char-desc"></p>
       </section>
 
-      <!-- Circular progress -->
-      <div class="flex justify-center pt-8">
-        <svg id="loading-ring" width="48" height="48" viewBox="0 0 48 48">
-          <circle cx="24" cy="24" r="20" fill="none" stroke="#2a2218" stroke-width="1.5"/>
-          <circle id="loading-ring-fill" cx="24" cy="24" r="20" fill="none" stroke="#8a7040" stroke-width="1.5"
-            stroke-dasharray="125.66" stroke-dashoffset="125.66" stroke-linecap="round"
-            transform="rotate(-90 24 24)"/>
-        </svg>
+      <!-- Progress bar -->
+      <div class="pt-8 w-full">
+        <div class="w-full h-[2px] bg-surface-container">
+          <div id="loading-bar-fill" class="h-full bg-tertiary-container" style="width: 0%;"></div>
+        </div>
       </div>
     </main>
 

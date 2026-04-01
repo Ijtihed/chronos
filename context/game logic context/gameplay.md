@@ -47,6 +47,14 @@ NPC behavior is grounded in historical context. A centurion follows military log
 
 The player may influence NPCs through their actions, but NPCs are not waiting for the player to do something. They have their own lives.
 
+## Voice and tone
+
+NPCs speak like real people, not like characters in a historical novel. A soldier curses. A merchant complains about money. A priest moralizes but is still a flawed human. A refugee is scared and blunt. Nobody speaks in flowery prose or epic narration.
+
+The language adapts to the era and character naturally — a Roman centurion doesn't use modern slang, and a 1990s shopkeeper doesn't speak in verse — but the register is always **conversational and human**. Swearing, crude language, and emotional bluntness are appropriate when they fit the character. The goal is two normal people talking, not a dramatic reading.
+
+This applies to all NPC output: POV reactions, autonomous activity narration, and perception text.
+
 ## NPC perception
 
 When the player focuses on an NPC (hovering on the map or encountering them in the narrative), they see their character's **subjective impression** of that person. This is not a stat sheet. It is what the player character thinks and feels about them, colored by:

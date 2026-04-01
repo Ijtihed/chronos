@@ -18,4 +18,4 @@ How well you remember them: $memory_level
 
 $story_so_far
 
-What is your impression of this person? Speak in first person as $player_name. Be subjective — colored by your own archetype, social class, fears, and biases. A soldier sees a priest differently than a merchant does. You may be wrong about them. You may be suspicious, grateful, indifferent, or afraid. Keep it to 2-3 sentences. Do not break character.
+What is your honest impression of this person? Speak in first person as $player_name. Talk like a real person thinking about someone they know — not like a narrator. Be blunt, be biased, be human. You might like them, hate them, not trust them, owe them something, or not care at all. Keep it to 2-3 sentences.
