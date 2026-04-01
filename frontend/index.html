@@ -148,14 +148,19 @@
     .npc-tooltip .leaflet-tooltip-arrow { display: none; }
 
     .polity-tooltip {
-      background: #2a2218 !important;
+      background: #1a1816 !important;
       color: #c8b89a !important;
-      border: none !important;
+      border: 1px solid #2a2218 !important;
+      border-radius: 2px !important;
       font-family: 'Special Elite', monospace !important;
       font-size: 10px !important;
       letter-spacing: 0.05em;
-      box-shadow: none !important;
+      padding: 4px 8px !important;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5) !important;
     }
+    .polity-tooltip .leaflet-tooltip-arrow { display: none; }
+
+    .leaflet-control-zoom { display: none !important; }
 
     .player-input-field:focus { border-color: #8a7040 !important; }
 
@@ -407,6 +412,11 @@
   <!-- ================================================ -->
   <div id="map-container" class="hidden fixed top-[36px] left-0 right-0 bottom-0 z-[200] bg-surface">
     <div id="map" class="w-full h-full"></div>
+    <!-- Custom zoom controls -->
+    <div class="absolute bottom-6 right-6 z-[210] flex flex-col gap-2">
+      <button id="map-zoom-in" class="w-8 h-8 flex items-center justify-center bg-[#1a1816] text-on-secondary-container hover:text-on-surface cursor-pointer font-system text-[16px] leading-none" style="border: 1px solid #2a2218; border-radius: 2px;">+</button>
+      <button id="map-zoom-out" class="w-8 h-8 flex items-center justify-center bg-[#1a1816] text-on-secondary-container hover:text-on-surface cursor-pointer font-system text-[16px] leading-none" style="border: 1px solid #2a2218; border-radius: 2px;">&minus;</button>
+    </div>
   </div>
 
   <div id="word-tooltip"></div>

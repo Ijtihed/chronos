@@ -30,8 +30,12 @@ const ChronosMap = (function () {
     });
 
     map.getContainer().style.background = "#0e0e0e";
-    L.control.zoom({ position: "bottomright" }).addTo(map);
     initialized = true;
+
+    var zoomIn = document.getElementById("map-zoom-in");
+    var zoomOut = document.getElementById("map-zoom-out");
+    if (zoomIn) zoomIn.addEventListener("click", function () { map.zoomIn(); });
+    if (zoomOut) zoomOut.addEventListener("click", function () { map.zoomOut(); });
   }
 
   async function loadCoastlines() {
@@ -137,11 +141,18 @@ const ChronosMap = (function () {
       }).addTo(map);
 
       if (runStatus === "active") {
-        playerMarker.bindTooltip(worldState.player.name, {
-          direction: "top",
-          offset: [0, -10],
-          opacity: 0.9,
-        });
+        playerMarker.bindTooltip(
+          '<span style="font-family:IM Fell English,serif;font-size:13px;color:#c8b89a;">' +
+          worldState.player.name + '</span><br>' +
+          '<span style="font-family:Special Elite,monospace;font-size:9px;color:#8a7040;text-transform:uppercase;letter-spacing:0.08em;">' +
+          worldState.player.role + '</span>',
+          {
+            direction: "top",
+            offset: [0, -10],
+            opacity: 1,
+            className: "npc-tooltip",
+          }
+        );
       }
     }
 

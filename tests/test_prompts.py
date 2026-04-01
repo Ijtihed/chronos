@@ -108,6 +108,6 @@ class TestNpcPovPrompt:
 
     def test_directs_authentic_voice(self):
         raw = load_prompt(PROMPTS_DIR / "npc_pov.md")
-        assert "normal person" in raw.lower()
-        assert "profanity" in raw.lower()
-        assert "do not" in raw.lower()
+        assert "illiterate" in raw.lower()
+        assert "swearing" in raw.lower()
+        assert "not the player" in raw.lower()
