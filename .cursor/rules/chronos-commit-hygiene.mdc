@@ -1,0 +1,13 @@
+# CHRONOS — Commit & Context Hygiene (hard rule)
+
+After **any** change — no matter how small — do the following before moving on:
+
+1. **Update context docs** if the change affects design, architecture, or decisions. The relevant files in `context/game logic context/` must reflect what was changed. If a design decision was made, record it in `open-questions.md` as closed. If a feature was added or modified, update the relevant design doc.
+
+2. **Run tests** to confirm nothing broke: `python -m pytest tests/ --ignore=tests/test_live.py -q`
+
+3. **Commit and push** with a clear message describing what changed and why.
+
+4. **Never leave uncommitted work.** Every change lands in git immediately. The user should be able to pull at any point and have a working, documented codebase.
+
+This applies to: code changes, prompt edits, context doc updates, config changes, test additions, and frontend modifications. No exceptions.
