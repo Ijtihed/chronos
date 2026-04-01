@@ -3,8 +3,10 @@ let mapModule = null;
 async function loadMapModule() {
   try {
     mapModule = await import("./map.js");
+    console.log("Map module loaded successfully");
   } catch (e) {
-    console.warn("Map module failed to load:", e);
+    console.warn("Map module failed to load (Three.js CDN may be blocked):", e);
+    mapModule = null;
   }
 }
 
@@ -45,6 +47,7 @@ async function startNewRun() {
     eraKey = data.era;
     state = data.world_state;
     hide(startScreen);
+    hide(startLoading);
     show(narrativeEl);
     show(inputBar);
     renderIntro();

@@ -10,9 +10,9 @@
  * - Click-drag to rotate, scroll to zoom
  */
 
-import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js";
-import { OrbitControls } from "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/controls/OrbitControls.js";
-import { GeoJsonGeometry } from "https://cdn.jsdelivr.net/npm/three-geojson-geometry@1.3.2/dist/three-geojson-geometry.mjs";
+import * as THREE from "three";
+import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { GeoJsonGeometry } from "three-geojson-geometry";
 
 const GLOBE_RADIUS = 100;
 const DEG2RAD = Math.PI / 180;
