@@ -44,29 +44,27 @@ async function startNewRun() {
   if (ringFill) ringFill.style.strokeDashoffset = "125.66";
 
   try {
-    const res = await fetch("/api/run", { method: "POST" });
-    const data = await res.json();
-    runId = data.run_id;
-    eraKey = data.era;
-    state = data.world_state;
+    // Step 1: Get era info INSTANTLY (no character generation)
+    const previewRes = await fetch("/api/run/preview", { method: "POST" });
+    const preview = await previewRes.json();
 
-    const year = state.current_year || state.era.year_start;
-    $("#loading-era-label").textContent = `${state.era.name} — ${year} AD`;
-    $("#loading-era-desc").textContent = state.era.description;
+    eraKey = preview.era_key;
+    $("#loading-era-label").textContent = `${preview.era_name} \u2014 ${preview.year_start} AD`;
+    $("#loading-era-desc").textContent = preview.description;
 
-    // Historical events
-    if (eventsEl && data.loading_events) {
+    // Populate events immediately
+    if (eventsEl && preview.loading_events) {
       let evHtml = "";
-      for (const ev of data.loading_events) {
+      for (const ev of preview.loading_events) {
         evHtml += `<p class="font-body text-[16px] leading-relaxed text-on-secondary-container">${esc(ev)}</p>`;
       }
       eventsEl.innerHTML = evHtml;
     }
 
-    // Voices of the age
-    if (voicesEl && data.loading_voices) {
+    // Populate voices immediately
+    if (voicesEl && preview.loading_voices) {
       let voHtml = "";
-      for (const v of data.loading_voices) {
+      for (const v of preview.loading_voices) {
         voHtml += `<blockquote class="pl-4" style="border-left: 1px solid #2a2218;">`;
         voHtml += `<p class="font-body italic text-[17px] leading-relaxed text-on-surface">${esc(v.quote)}</p>`;
         voHtml += `<cite class="block mt-1 font-system text-[10px] text-on-secondary-container not-italic tracking-tight">${esc(v.source)}</cite>`;
@@ -75,7 +73,18 @@ async function startNewRun() {
       voicesEl.innerHTML = voHtml;
     }
 
-    // Character
+    // Step 2: Generate characters in background (takes 1-2 min)
+    const runRes = await fetch("/api/run", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ era: eraKey }),
+    });
+    const runData = await runRes.json();
+    runId = runData.run_id;
+    eraKey = runData.era;
+    state = runData.world_state;
+
+    // Character info fades in when ready
     if (charSection) {
       charSection.classList.remove("hidden");
       const charLabel = $("#loading-char-label");
@@ -86,7 +95,7 @@ async function startNewRun() {
 
     if (ringFill) ringFill.style.strokeDashoffset = "0";
 
-    setTimeout(() => enterGame(), 3000);
+    setTimeout(() => enterGame(), 2000);
   } catch (e) {
     $("#loading-era-desc").textContent = `Error: ${e.message}`;
   }

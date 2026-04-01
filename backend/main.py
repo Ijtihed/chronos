@@ -99,6 +99,24 @@ async def get_geo(era_key: str):
 # Run management
 # ------------------------------------------------------------------
 
+@app.post("/api/run/preview")
+async def preview_run(req: RunRequest = RunRequest()):
+    """Return era info instantly for the loading screen, before character generation."""
+    if req.era and req.era in ALL_ERAS:
+        era_key, era_config = req.era, ALL_ERAS[req.era]
+    else:
+        era_key, era_config = random_era()
+    return {
+        "era_key": era_key,
+        "era_name": era_config["name"],
+        "year_start": era_config["year_start"],
+        "description": era_config["description"],
+        "region": era_config["region"],
+        "loading_events": era_config.get("loading_events", []),
+        "loading_voices": era_config.get("loading_voices", []),
+    }
+
+
 @app.post("/api/run")
 async def new_run(req: RunRequest = RunRequest()):
     if req.era and req.era in ALL_ERAS:
@@ -117,8 +135,6 @@ async def new_run(req: RunRequest = RunRequest()):
         "run_id": state.run_id,
         "era": era_key,
         "world_state": state.model_dump(),
-        "loading_events": era_config.get("loading_events", []),
-        "loading_voices": era_config.get("loading_voices", []),
     }
 
 
