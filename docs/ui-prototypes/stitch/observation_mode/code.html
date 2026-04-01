@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>CHRONOS — Observation Mode</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=IM+Fell+English&amp;family=Special+Elite&amp;family=Newsreader:opsz,wght@6..72,400;6..72,700&amp;family=Space+Grotesk:wght@300;400;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "tertiary": "#e2c28b",
+            "on-error": "#690005",
+            "outline": "#998f82",
+            "background": "#151310",
+            "on-background": "#e8e1db",
+            "surface": "#151310",
+            "tertiary-fixed-dim": "#e2c28b",
+            "primary-fixed-dim": "#d5c5a6",
+            "on-tertiary-container": "#fffaf9",
+            "on-error-container": "#ffdad6",
+            "tertiary-fixed": "#ffdea6",
+            "on-tertiary-fixed-variant": "#594318",
+            "surface-container": "#221f1c",
+            "on-secondary-fixed": "#241a09",
+            "error-container": "#93000a",
+            "on-primary-fixed-variant": "#51452e",
+            "inverse-surface": "#e8e1db",
+            "surface-dim": "#151310",
+            "on-surface-variant": "#d0c5b6",
+            "surface-bright": "#3c3935",
+            "on-primary": "#392f1a",
+            "primary-container": "#807258",
+            "outline-variant": "#4d463a",
+            "secondary-fixed": "#f5dfc4",
+            "primary": "#d5c5a6",
+            "surface-container-low": "#1e1b18",
+            "on-secondary-container": "#c9b59c",
+            "on-tertiary-fixed": "#271900",
+            "tertiary-container": "#8a7040",
+            "surface-variant": "#373430",
+            "inverse-primary": "#695d44",
+            "on-surface": "#e8e1db",
+            "surface-container-highest": "#373430",
+            "secondary": "#d8c3a9",
+            "on-primary-container": "#fffaf9",
+            "surface-container-high": "#2c2a26",
+            "error": "#ffb4ab",
+            "inverse-on-surface": "#33302c",
+            "secondary-container": "#554733",
+            "on-secondary-fixed-variant": "#524531",
+            "secondary-fixed-dim": "#d8c3a9",
+            "primary-fixed": "#f2e1c1",
+            "on-secondary": "#3b2e1c",
+            "on-tertiary": "#402d03",
+            "on-primary-fixed": "#231a07",
+            "surface-container-lowest": "#100e0b",
+            "surface-tint": "#d5c5a6"
+          },
+          fontFamily: {
+            "headline": ["IM Fell English", "serif"],
+            "body": ["IM Fell English", "serif"],
+            "label": ["Special Elite", "monospace"],
+            "serif": ["IM Fell English", "serif"],
+            "mono": ["Special Elite", "monospace"]
+          },
+          borderRadius: {"DEFAULT": "2px", "lg": "4px", "xl": "6px", "full": "9999px"},
+        },
+      },
+    }
+  </script>
+<style>
+    body {
+      background-color: #0e0c09;
+      color: #c8b89a;
+      overflow: hidden;
+    }
+    .manuscript-column {
+      width: 560px;
+      margin: 0 auto;
+    }
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+    }
+    .ink-underline:hover {
+      text-decoration: underline;
+      text-underline-offset: 4px;
+      text-decoration-thickness: 1px;
+    }
+    .dimmed-text {
+      opacity: 0.4;
+    }
+    .dead-tint {
+      color: #5a2e2e;
+    }
+  </style>
+</head>
+<body class="h-screen w-screen selection:bg-tertiary-container selection:text-on-tertiary-container">
+<!-- TopNavBar (Shared Component) -->
+<nav class="fixed top-0 w-full h-[36px] flex items-center px-4 z-[100] bg-[#0e0c09] border-b border-opacity-10 border-[#c8b89a] style_shell_layout">
+<div class="flex items-center justify-between w-full">
+<div class="text-sm font-bold text-[#c8b89a] font-serif uppercase tracking-widest style_brand_logo">
+        CHRONOS
+      </div>
+<!-- Observation Mode Identity (Requirement) -->
+<div class="font-mono text-[11px] dead-tint tracking-widest flex items-center gap-2">
+<span class="material-symbols-outlined text-[14px]">skull</span>
+        † NIKOLAOS DOUKAS
+      </div>
+<div class="flex gap-4">
+<span class="material-symbols-outlined text-[#7a6a54] hover:text-[#8a7040] cursor-pointer" data-icon="history">history</span>
+<span class="material-symbols-outlined text-[#7a6a54] hover:text-[#8a7040] cursor-pointer" data-icon="settings">settings</span>
+</div>
+</div>
+</nav>
+<!-- SideNavBar (Shared Component - Hidden Desktop Version for Game Feel) -->
+<aside class="hidden lg:flex flex-col fixed left-0 top-[36px] bottom-[64px] w-64 py-8 px-6 bg-[#2a2218] border-r border-opacity-10 border-[#c8b89a] z-40">
+<div class="mb-10">
+<h2 class="text-lg font-serif text-[#c8b89a] mb-1">The Living Manuscript</h2>
+<p class="font-mono text-[10px] text-[#7a6a54] uppercase tracking-tighter">Turn: 1,248 · SPECTATING</p>
+</div>
+<nav class="flex flex-col gap-6">
+<div class="flex items-center gap-3 text-[#8a7040] font-bold underline decoration-2 cursor-pointer ink-underline">
+<span class="material-symbols-outlined" data-icon="timeline">timeline</span>
+<span class="font-mono text-[12px]">Era Overview</span>
+</div>
+<div class="flex items-center gap-3 text-[#7a6a54] hover:text-[#c8b89a] cursor-pointer ink-underline">
+<span class="material-symbols-outlined" data-icon="account_tree">account_tree</span>
+<span class="font-mono text-[12px]">Genealogy</span>
+</div>
+<div class="flex items-center gap-3 text-[#7a6a54] hover:text-[#c8b89a] cursor-pointer ink-underline">
+<span class="material-symbols-outlined" data-icon="equalizer">equalizer</span>
+<span class="font-mono text-[12px]">Resource Log</span>
+</div>
+<div class="flex items-center gap-3 text-[#7a6a54] hover:text-[#c8b89a] cursor-pointer ink-underline">
+<span class="material-symbols-outlined" data-icon="military_tech">military_tech</span>
+<span class="font-mono text-[12px]">Military</span>
+</div>
+<div class="flex items-center gap-3 text-[#7a6a54] hover:text-[#c8b89a] cursor-pointer ink-underline">
+<span class="material-symbols-outlined" data-icon="gavel">gavel</span>
+<span class="font-mono text-[12px]">Diplomacy</span>
+</div>
+</nav>
+<div class="mt-auto pt-8 border-t border-[#c8b89a] border-opacity-5">
+<div class="flex flex-col gap-2">
+<div class="flex justify-between font-mono text-[10px] text-[#7a6a54]">
+<span>OBSERVER COUNT</span>
+<span>14</span>
+</div>
+<div class="w-full bg-[#100e0b] h-1">
+<div class="bg-[#5a2e2e] h-full w-full opacity-30"></div>
+</div>
+</div>
+</div>
+</aside>
+<!-- Main Narrative Canvas -->
+<main class="h-full pt-[36px] pb-[64px] overflow-y-auto bg-[#0e0c09]">
+<div class="manuscript-column py-16">
+<!-- Death Marker -->
+<div class="flex justify-center mb-12">
+<div class="p-8 border border-[#5a2e2e] border-opacity-20 bg-[#151310] text-center max-w-sm">
+<p class="font-mono text-[10px] dead-tint tracking-widest uppercase mb-4">Final Record</p>
+<h1 class="font-serif text-3xl text-[#c8b89a] mb-2">The Fall of the Sebastokrator</h1>
+<p class="font-serif italic text-[#7a6a54]">"The silence of the grave is the only chronicle that does not lie."</p>
+</div>
+</div>
+<!-- Dimmed Narrative History -->
+<section class="space-y-12">
+<article class="dimmed-text transition-opacity duration-700 hover:opacity-100">
+<div class="flex items-center gap-4 mb-4">
+<span class="font-mono text-[10px] text-[#7a6a54]">1,247 AD · SPRING</span>
+<div class="h-[1px] flex-grow bg-[#c8b89a] opacity-10"></div>
+</div>
+<p class="font-serif text-lg leading-relaxed text-[#c8b89a]">
+            The winds of the Bosporus carried the scent of woodsmoke and betrayal. Nikolaos stood upon the battlements of the Golden Gate, watching the smoke rise from the Venetian quarter. The simulation calculated a 4% chance of survival. He chose to stay.
+          </p>
+</article>
+<article class="dimmed-text transition-opacity duration-700 hover:opacity-100">
+<div class="flex items-center gap-4 mb-4">
+<span class="font-mono text-[10px] text-[#7a6a54]">1,247 AD · SUMMER</span>
+<div class="h-[1px] flex-grow bg-[#c8b89a] opacity-10"></div>
+</div>
+<p class="font-serif text-lg leading-relaxed text-[#c8b89a]">
+            The blockade tightened like a garrote. Provisions were reduced to salted fish and hope. In the lower city, the families began to whisper of a new claimant—one who promised bread in exchange for the simulation's keys.
+          </p>
+<div class="mt-4 p-4 bg-[#2a2218] rounded-[2px]">
+<p class="font-mono text-[11px] text-[#8a7040]">EVENT LOG: LOYALTY CRITICAL [-45]</p>
+</div>
+</article>
+<!-- Current Observation Point -->
+<article class="relative">
+<div class="absolute -left-8 top-1">
+<span class="material-symbols-outlined text-[#5a2e2e] animate-pulse" style="font-variation-settings: 'FILL' 1;">visibility</span>
+</div>
+<div class="flex items-center gap-4 mb-4">
+<span class="font-mono text-[10px] dead-tint">1,248 AD · PRESENT</span>
+<div class="h-[1px] flex-grow bg-[#5a2e2e] opacity-20"></div>
+</div>
+<p class="font-serif text-lg leading-relaxed text-[#c8b89a]">
+            The simulation continues without a pilot. The successor, Alexios IV, has already signed the decree of banishment for the remaining loyalists. You drift through the halls of the Blachernae, a ghost of a sovereign observing the machinery of history grinding on.
+          </p>
+<div class="mt-8 grid grid-cols-2 gap-4">
+<div class="bg-[#2a2218] p-4 border border-[#c8b89a] border-opacity-5">
+<span class="font-mono text-[10px] text-[#7a6a54] block mb-2 uppercase">Current Unrest</span>
+<span class="font-serif text-xl text-[#c8b89a]">Widespread Revolt</span>
+</div>
+<div class="bg-[#2a2218] p-4 border border-[#c8b89a] border-opacity-5">
+<span class="font-mono text-[10px] text-[#7a6a54] block mb-2 uppercase">Treasury Status</span>
+<span class="font-serif text-xl text-[#c8b89a]">Plundered</span>
+</div>
+</div>
+</article>
+<!-- Input Section (Requirement) -->
+<div class="mt-16 mb-24">
+<div class="relative">
+<input class="w-full bg-[#100e0b] border border-[#5a2e2e] border-opacity-20 px-4 py-3 font-mono text-[12px] text-[#5a2e2e] tracking-widest placeholder:text-[#5a2e2e] placeholder:opacity-50 focus:outline-none rounded-[2px]" disabled="" placeholder="YOU ARE DEAD · TRAVEL ONLY" type="text"/>
+<div class="absolute right-4 top-1/2 -translate-y-1/2 flex gap-2">
+<span class="material-symbols-outlined text-[18px] opacity-20" data-icon="lock">lock</span>
+</div>
+</div>
+<div class="flex justify-between mt-2 px-1">
+<span class="font-mono text-[9px] text-[#7a6a54] uppercase">Input Disabled: Ghost State Active</span>
+<span class="font-mono text-[9px] text-[#7a6a54] uppercase underline cursor-pointer ink-underline">Respawn in 04:12</span>
+</div>
+</div>
+</section>
+</div>
+</main>
+<!-- BottomNavBar (Shared Component) -->
+<footer class="fixed bottom-0 left-0 w-full z-50 flex justify-center items-center gap-12 h-[64px] px-8 bg-[#0e0c09] border-t border-opacity-10 border-[#c8b89a] style_shell_layout">
+<div class="flex flex-col items-center justify-center text-[#7a6a54] opacity-80 style_inactive_navigation group hover:text-[#c8b89a] cursor-pointer">
+<span class="material-symbols-outlined" data-icon="menu_book">menu_book</span>
+<span class="font-mono text-[11px] mt-1">Chronicle</span>
+</div>
+<div class="flex flex-col items-center justify-center text-[#8a7040] font-bold style_active_navigation cursor-pointer scale-95">
+<span class="material-symbols-outlined" data-icon="public" style="font-variation-settings: 'FILL' 1;">public</span>
+<span class="font-mono text-[11px] mt-1">Map</span>
+</div>
+<div class="flex flex-col items-center justify-center text-[#7a6a54] opacity-80 style_inactive_navigation group hover:text-[#c8b89a] cursor-pointer">
+<span class="material-symbols-outlined" data-icon="analytics">analytics</span>
+<span class="font-mono text-[11px] mt-1">Status</span>
+</div>
+<div class="flex flex-col items-center justify-center text-[#7a6a54] opacity-80 style_inactive_navigation group hover:text-[#c8b89a] cursor-pointer">
+<span class="material-symbols-outlined" data-icon="inventory_2">inventory_2</span>
+<span class="font-mono text-[11px] mt-1">Archive</span>
+</div>
+</footer>
+<!-- Observation Marginalia (System Detail) -->
+<div class="hidden xl:block fixed right-12 top-1/2 -translate-y-1/2 w-48 pointer-events-none">
+<div class="p-4 bg-[#2a2218] border-l-2 border-[#5a2e2e] opacity-40">
+<h3 class="font-mono text-[10px] text-[#c8b89a] mb-2 uppercase">Observation Tool</h3>
+<ul class="space-y-3">
+<li class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[14px]" data-icon="north_east">north_east</span>
+<span class="font-mono text-[9px] text-[#7a6a54]">Track Successor</span>
+</li>
+<li class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[14px]" data-icon="hub">hub</span>
+<span class="font-mono text-[9px] text-[#7a6a54]">View Network</span>
+</li>
+<li class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[14px]" data-icon="auto_stories">auto_stories</span>
+<span class="font-mono text-[9px] text-[#7a6a54]">Historical Context</span>
+</li>
+</ul>
+</div>
+</div>
+</body></html>

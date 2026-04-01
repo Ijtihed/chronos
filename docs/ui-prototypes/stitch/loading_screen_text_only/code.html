@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>CHRONOS — Loading</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&amp;family=Special+Elite&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "tertiary": "#e2c28b",
+            "on-error": "#690005",
+            "outline": "#998f82",
+            "background": "#0e0c09",
+            "on-background": "#e8e1db",
+            "surface": "#0e0c09",
+            "tertiary-fixed-dim": "#e2c28b",
+            "primary-fixed-dim": "#d5c5a6",
+            "on-tertiary-container": "#fffaf9",
+            "on-error-container": "#ffdad6",
+            "tertiary-fixed": "#ffdea6",
+            "on-tertiary-fixed-variant": "#594318",
+            "surface-container": "#2a2218",
+            "on-secondary-fixed": "#241a09",
+            "error-container": "#93000a",
+            "on-primary-fixed-variant": "#51452e",
+            "inverse-surface": "#e8e1db",
+            "surface-dim": "#0e0c09",
+            "on-surface-variant": "#d0c5b6",
+            "surface-bright": "#3c3935",
+            "on-primary": "#392f1a",
+            "primary-container": "#807258",
+            "outline-variant": "#4d463a",
+            "secondary-fixed": "#f5dfc4",
+            "primary": "#d5c5a6",
+            "surface-container-low": "#1e1b18",
+            "on-secondary-container": "#c9b59c",
+            "on-tertiary-fixed": "#271900",
+            "tertiary-container": "#8a7040",
+            "surface-variant": "#373430",
+            "inverse-primary": "#695d44",
+            "on-surface": "#e8e1db",
+            "surface-container-highest": "#373430",
+            "secondary": "#d8c3a9",
+            "on-primary-container": "#fffaf9",
+            "surface-container-high": "#2c2a26",
+            "error": "#ffb4ab",
+            "inverse-on-surface": "#33302c",
+            "secondary-container": "#554733",
+            "on-secondary-fixed-variant": "#524531",
+            "secondary-fixed-dim": "#d8c3a9",
+            "primary-fixed": "#f2e1c1",
+            "on-secondary": "#3b2e1c",
+            "on-tertiary": "#402d03",
+            "on-primary-fixed": "#231a07",
+            "surface-container-lowest": "#100e0b",
+            "surface-tint": "#d5c5a6"
+          },
+          fontFamily: {
+            "headline": ["IM Fell English", "serif"],
+            "body": ["IM Fell English", "serif"],
+            "label": ["Special Elite", "monospace"]
+          },
+          borderRadius: {"DEFAULT": "2px", "lg": "4px", "xl": "6px", "full": "9999px"},
+        },
+      },
+    }
+  </script>
+<style>
+    body {
+      background-color: #0e0c09;
+      color: #c8b89a;
+      overflow: hidden;
+    }
+    .manuscript-column {
+      width: 560px;
+    }
+    .special-elite { font-family: 'Special Elite', monospace; }
+    .im-fell { font-family: 'IM Fell English', serif; }
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+    }
+  </style>
+</head>
+<body class="flex flex-col items-center justify-center min-h-screen">
+<!-- Suppression of Shell: This is a task-focused/transactional loading screen. -->
+<!-- Top Decorative Anchor (Non-Interactive) -->
+<header class="fixed top-0 w-full h-[36px] flex items-center px-8 border-b border-opacity-10 border-[#c8b89a] bg-[#0e0c09] z-50">
+<div class="text-sm font-bold text-[#c8b89a] special-elite uppercase tracking-[0.2em]">
+      CHRONOS
+    </div>
+</header>
+<!-- Main Narrative Canvas -->
+<main class="manuscript-column flex flex-col space-y-12 py-24">
+<!-- Visual Anchor: Atmospheric Image -->
+<!-- Section 1: Era Identity -->
+<section class="space-y-4">
+<div class="special-elite text-[11px] tracking-[0.15em] text-[#8a7040]">
+        FALL OF CONSTANTINOPLE · 1453 AD
+      </div>
+<p class="im-fell italic text-[18px] leading-relaxed text-[#c8b89a]">
+        The Triple Walls have held for a thousand years, but the earth now trembles under the weight of bronze cannons. In the shadow of the Hagia Sophia, the air tastes of salt and impending ash. The Golden Horn is choked with ships, and the last echo of Rome awaits the dawn.
+      </p>
+</section>
+<!-- Section 2: Character Identity -->
+<section class="space-y-4 pt-4">
+<div class="special-elite text-[11px] tracking-[0.15em] text-[#7a6a54]">
+        NIKOLAOS DOUKAS · MONASTERY LIBRARIAN
+      </div>
+<p class="im-fell text-[18px] leading-relaxed text-[#c8b89a]">
+        He does not carry a sword, but a satchel of vellum. While others sharpen steel, Nikolaos hides the wisdom of centuries behind loose floorboards, praying the ink survives the fire.
+      </p>
+</section>
+<!-- Waiting State -->
+<div class="flex justify-center pt-12">
+<span class="im-fell text-2xl text-[#4a3e2e] tracking-[0.5em]">· · ·</span>
+</div>
+</main>
+<!-- Footnote / Marginalia (Design System Rule 5) -->
+<aside class="fixed bottom-12 right-12 w-48 opacity-30 pointer-events-none">
+<div class="special-elite text-[10px] text-[#7a6a54] leading-tight uppercase tracking-wider">
+      Manifesto Entry #1453<br/>
+      Status: Reconstructing...<br/>
+      Latency: 42ms
+    </div>
+</aside>
+<!-- Tonal Layering Illustration (Surface-Container) -->
+<div class="fixed bottom-0 left-0 w-full h-[4px] bg-[#2a2218]"></div>
+</body></html>

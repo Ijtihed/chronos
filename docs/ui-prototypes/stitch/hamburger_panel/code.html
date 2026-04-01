@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>CHRONOS — The Living Manuscript</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=IM+Fell+English&amp;family=Special+Elite&amp;family=Newsreader:opsz,wght@6..72,400;6..72,700&amp;family=Space+Grotesk:wght@400;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #0e0c09;
+      overflow: hidden;
+    }
+    .font-serif-narrative { font-family: 'IM Fell English', serif; }
+    .font-mono-system { font-family: 'Special Elite', cursive; }
+    
+    /* Custom ink underline for hover states as per design system */
+    .ink-underline:hover {
+      text-decoration: underline;
+      text-decoration-thickness: 1px;
+      text-underline-offset: 4px;
+    }
+    
+    .manuscript-column {
+      width: 560px;
+    }
+  </style>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "tertiary": "#8a7040",
+            "on-error": "#690005",
+            "outline": "#998f82",
+            "background": "#0e0c09",
+            "on-background": "#c8b89a",
+            "surface": "#0e0c09",
+            "surface-container": "#2a2218",
+            "surface-container-low": "#1e1b18",
+            "surface-container-lowest": "#100e0b",
+            "on-surface": "#c8b89a",
+            "on-secondary-container": "#7a6a54",
+            "primary": "#d5c5a6",
+            "primary-fixed": "#f2e1c1",
+          },
+          fontFamily: {
+            "headline": ["IM Fell English"],
+            "body": ["IM Fell English"],
+            "label": ["Special Elite"]
+          },
+          borderRadius: {"DEFAULT": "2px", "lg": "4px", "xl": "6px", "full": "9999px"},
+        },
+      },
+    }
+  </script>
+</head>
+<body class="bg-background text-on-background">
+<!-- Main Game Canvas (Dimmed Background) -->
+<div class="relative w-[1920px] h-[1080px] mx-auto overflow-hidden bg-[#0e0c09]">
+<!-- Background Narrative Layer (The Active Game) -->
+<div class="absolute inset-0 flex justify-center opacity-40">
+<div class="manuscript-column pt-32 space-y-12">
+<h1 class="text-5xl font-serif-narrative text-on-background">The Siege of Aethelgard</h1>
+<p class="text-xl font-serif-narrative leading-relaxed">
+          The ink bleeds across the page as the fires consume the lower wards. You stand atop the ramparts, a witness to the unfolding catastrophe. Your quill remains poised, but the history of this city is being written in iron and blood rather than parchment.
+        </p>
+<div class="bg-surface-container p-8 space-y-4">
+<p class="font-mono-system text-xs uppercase tracking-widest text-on-secondary-container">System Update: Turn 1,248</p>
+<p class="font-serif-narrative text-lg italic">The morale of the garrison is fracturing. A choice must be made before the dawn breaks the silence.</p>
+</div>
+</div>
+</div>
+<!-- Overlay Dimmer -->
+<div class="absolute inset-0 bg-black/45 z-10"></div>
+<!-- Top Navigation Bar (Shared Component) -->
+<nav class="fixed top-0 w-full h-[36px] bg-[#0e0c09] flex items-center px-4 z-40 border-b border-opacity-10 border-[#c8b89a]">
+<div class="text-sm font-bold text-[#c8b89a] font-serif uppercase tracking-widest">CHRONOS</div>
+<div class="ml-auto flex gap-6 items-center">
+<span class="material-symbols-outlined text-[#7a6a54] text-lg cursor-pointer hover:text-[#8a7040]">history</span>
+<span class="material-symbols-outlined text-[#8a7040] text-lg cursor-pointer">settings</span>
+</div>
+</nav>
+<!-- Side Navigation (Shared Component - Inactive in this view) -->
+<aside class="hidden lg:flex flex-col h-full w-64 bg-[#2a2218] py-8 px-4 border-r border-opacity-10 border-[#c8b89a] absolute left-0 top-0 pt-16 z-20 opacity-30">
+<div class="mb-8">
+<h2 class="text-lg font-serif text-[#c8b89a]">The Living Manuscript</h2>
+<p class="font-mono-system text-[10px] text-[#7a6a54]">Turn: 1,248</p>
+</div>
+<div class="space-y-4">
+<div class="flex items-center gap-3 text-[#8a7040] font-bold underline decoration-2 font-mono-system text-[12px]">
+<span class="material-symbols-outlined text-sm">timeline</span> Era Overview
+        </div>
+<div class="flex items-center gap-3 text-[#7a6a54] font-mono-system text-[12px]">
+<span class="material-symbols-outlined text-sm">account_tree</span> Genealogy
+        </div>
+</div>
+</aside>
+<!-- HAMBURGER PANEL (Focus of Task) -->
+<div class="absolute right-0 top-0 w-[280px] h-full bg-[#13100c] z-50 border-l border-[#2a2218] shadow-2xl flex flex-col pt-[36px]">
+<!-- Close Action (Implied) -->
+<div class="p-6 flex justify-end">
+<span class="material-symbols-outlined text-[#7a6a54] cursor-pointer hover:text-[#c8b89a]">close</span>
+</div>
+<!-- Menu Items -->
+<div class="px-10 mt-8 space-y-10">
+<!-- MAP Link -->
+<div class="group cursor-pointer">
+<span class="font-serif-narrative text-[20px] text-[#c8b89a] ink-underline">MAP</span>
+</div>
+<!-- NEW RUN Section -->
+<div class="space-y-6">
+<div class="group cursor-pointer">
+<span class="font-serif-narrative text-[20px] text-[#c8b89a] ink-underline">NEW RUN</span>
+</div>
+<!-- Inline Sub-menu -->
+<div class="pl-2 space-y-3">
+<p class="font-mono-system text-[11px] text-[#7a6a54] uppercase tracking-tighter">Abandon this life?</p>
+<div class="flex items-center gap-4 font-serif-narrative text-[18px] text-[#8a7040]">
+<span class="cursor-pointer ink-underline hover:text-[#f2e1c1] transition-colors">Yes</span>
+<span class="text-[#2a2218] select-none">·</span>
+<span class="cursor-pointer ink-underline hover:text-[#f2e1c1] transition-colors">No</span>
+</div>
+</div>
+</div>
+<!-- Additional placeholder items for visual balance -->
+<div class="group cursor-pointer opacity-40">
+<span class="font-serif-narrative text-[20px] text-[#c8b89a] ink-underline">CHRONICLE</span>
+</div>
+<div class="group cursor-pointer opacity-40">
+<span class="font-serif-narrative text-[20px] text-[#c8b89a] ink-underline">ARCHIVE</span>
+</div>
+</div>
+<!-- Footer Marginalia -->
+<div class="mt-auto p-10">
+<p class="font-mono-system text-[10px] text-[#2a2218] uppercase tracking-widest leading-relaxed">
+          Chronos Simulation<br/>
+          v0.4.12-Alpha
+        </p>
+</div>
+</div>
+<!-- Bottom Navigation Bar (Shared Component) -->
+<footer class="fixed bottom-0 left-0 w-full z-50 flex justify-center items-center gap-12 h-[64px] px-8 bg-[#0e0c09] border-t border-opacity-10 border-[#c8b89a]">
+<div class="flex flex-col items-center justify-center text-[#7a6a54] opacity-80 hover:text-[#c8b89a] cursor-pointer">
+<span class="material-symbols-outlined" data-icon="menu_book">menu_book</span>
+<span class="font-mono-system text-[11px]">Chronicle</span>
+</div>
+<div class="flex flex-col items-center justify-center text-[#7a6a54] opacity-80 hover:text-[#c8b89a] cursor-pointer">
+<span class="material-symbols-outlined" data-icon="public">public</span>
+<span class="font-mono-system text-[11px]">Map</span>
+</div>
+<div class="flex flex-col items-center justify-center text-[#8a7040] font-bold scale-95 transition-transform duration-150">
+<span class="material-symbols-outlined" data-icon="analytics" style="font-variation-settings: 'FILL' 1;">analytics</span>
+<span class="font-mono-system text-[11px]">Status</span>
+</div>
+<div class="flex flex-col items-center justify-center text-[#7a6a54] opacity-80 hover:text-[#c8b89a] cursor-pointer">
+<span class="material-symbols-outlined" data-icon="inventory_2">inventory_2</span>
+<span class="font-mono-system text-[11px]">Archive</span>
+</div>
+</footer>
+</div>
+<!-- Background Decorative Texture (Optional, for Manuscript feel) -->
+<div class="fixed inset-0 pointer-events-none opacity-[0.03] mix-blend-overlay" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuCC_6WXnCgcZSp7NJ0vjXUohvh3-HjuVEUTlBzSkk9CdHcdSdSTo98uGze_rEi-MS4oat9epJ6LhDQTA1s3QIO1hKstkXNrrIktKRmN9YwrxYXqXLX7lOh47Mvo1PJ6SGm-OFZ_2ZuQylMsVBqnI5U2_Dd6QaGinHzLGRxDegHeB2GzKxsVFf32W6euf0kfVZ-BxlSEHapkvNjbRnRr76ggv84ZbLiXyDEN_zlHJKqAsBi2jQEQccScJ41_JHuUTcHCIJVBV6clrfE');"></div>
+</body></html>

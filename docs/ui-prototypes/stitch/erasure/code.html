@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>CHRONOS — Erasure</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=IM+Fell+English&amp;family=Special+Elite&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "tertiary": "#e2c28b",
+              "on-error": "#690005",
+              "outline": "#998f82",
+              "background": "#151310",
+              "on-background": "#e8e1db",
+              "surface": "#151310",
+              "tertiary-fixed-dim": "#e2c28b",
+              "primary-fixed-dim": "#d5c5a6",
+              "on-tertiary-container": "#fffaf9",
+              "on-error-container": "#ffdad6",
+              "tertiary-fixed": "#ffdea6",
+              "on-tertiary-fixed-variant": "#594318",
+              "surface-container": "#221f1c",
+              "on-secondary-fixed": "#241a09",
+              "error-container": "#93000a",
+              "on-primary-fixed-variant": "#51452e",
+              "inverse-surface": "#e8e1db",
+              "surface-dim": "#151310",
+              "on-surface-variant": "#d0c5b6",
+              "surface-bright": "#3c3935",
+              "on-primary": "#392f1a",
+              "primary-container": "#807258",
+              "outline-variant": "#4d463a",
+              "secondary-fixed": "#f5dfc4",
+              "primary": "#d5c5a6",
+              "surface-container-low": "#1e1b18",
+              "on-secondary-container": "#c9b59c",
+              "on-tertiary-fixed": "#271900",
+              "tertiary-container": "#8a7040",
+              "surface-variant": "#373430",
+              "inverse-primary": "#695d44",
+              "on-surface": "#e8e1db",
+              "surface-container-highest": "#373430",
+              "secondary": "#d8c3a9",
+              "on-primary-container": "#fffaf9",
+              "surface-container-high": "#2c2a26",
+              "error": "#ffb4ab",
+              "inverse-on-surface": "#33302c",
+              "secondary-container": "#554733",
+              "on-secondary-fixed-variant": "#524531",
+              "secondary-fixed-dim": "#d8c3a9",
+              "primary-fixed": "#f2e1c1",
+              "on-secondary": "#3b2e1c",
+              "on-tertiary": "#402d03",
+              "on-primary-fixed": "#231a07",
+              "surface-container-lowest": "#100e0b",
+              "surface-tint": "#d5c5a6"
+            },
+            fontFamily: {
+              "headline": ["IM Fell English", "serif"],
+              "body": ["IM Fell English", "serif"],
+              "label": ["Special Elite", "monospace"]
+            },
+            borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body {
+            background-color: #0e0c09;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+        .ink-underline:hover {
+            text-decoration: underline;
+            text-underline-offset: 4px;
+            text-decoration-thickness: 1px;
+        }
+        .manuscript-column {
+            width: 560px;
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen">
+<!-- Background Layer: Ghost of the Simulation -->
+<div class="fixed inset-0 z-0 flex justify-center opacity-10 pointer-events-none" data-alt="Faded dark parchment texture with faint silhouettes of ancient architecture and distant stars in deep shadows" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuAZ2qN9Mc01ZkBVBtU469WhMwx2MFnjoaKSEFsRQhbaGMyKn6RfH3McjIlY4f4D5V2ZeVII4YW7f596B63bBgkE2TcOeEQBQRSgHrZNzL6YOnm9hywngHtQbSu_BhjjQBETq39GXl0nYgg8tnBJUeHp8rN-H4NRpKMAJWXyQLkFBeSUr26W2XZsRYegwX5GJJp2PyYOU-9uW-xdVhx9okywXnG2BRi7HT-WHl0PROjO3VyAJfiTKRstRG48mBMsdxy7wPtMTgHY2Mo'); background-size: cover; background-position: center;">
+<div class="manuscript-column h-full border-x border-outline-variant opacity-20"></div>
+</div>
+<!-- Erasure Overlay -->
+<div class="fixed inset-0 z-10 bg-black/85"></div>
+<!-- Main Content Canvas -->
+<main class="relative z-20 w-full h-[1080px] max-w-[1920px] mx-auto flex items-center justify-center">
+<div class="manuscript-column flex flex-col items-center text-center space-y-8">
+<!-- Narrative Passage -->
+<p class="font-body text-[18px] leading-relaxed text-[#a89878] italic tracking-tight">
+                No record remains of Nikolaos Doukas. The world continued.
+            </p>
+<!-- Recursive Interaction -->
+<div class="pt-4">
+<a class="font-label text-[11px] text-[#5a4e3a] uppercase tracking-[0.2em] ink-underline transition-colors duration-300 hover:text-[#8a7040]" href="#">
+                    begin again?
+                </a>
+</div>
+</div>
+</main>
+<!-- Marginalia: Turn Record (Suppressed/Faded) -->
+<div class="fixed bottom-12 left-1/2 -translate-x-1/2 z-20 pointer-events-none opacity-20">
+<span class="font-label text-[9px] text-[#7a6a54] uppercase tracking-widest">End of Cycle 1,248</span>
+</div>
+</body></html>

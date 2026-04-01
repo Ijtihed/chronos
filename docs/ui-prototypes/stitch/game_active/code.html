@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>CHRONOS — The Living Manuscript</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&amp;family=Special+Elite&amp;family=Newsreader:opsz,wght@6..72,200..800&amp;family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        body {
+            background-color: #0e0c09;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            font-family: 'IM Fell English', serif;
+        }
+        .special-elite { font-family: 'Special Elite', cursive; }
+        .im-fell { font-family: 'IM Fell English', serif; }
+        
+        /* Custom scrollbar for the manuscript column */
+        .manuscript-column::-webkit-scrollbar { width: 3px; }
+        .manuscript-column::-webkit-scrollbar-track { background: transparent; }
+        .manuscript-column::-webkit-scrollbar-thumb { background: #2a2218; }
+
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            display: inline-block;
+            line-height: 1;
+            text-transform: none;
+            letter-spacing: normal;
+            word-wrap: normal;
+            white-space: nowrap;
+            direction: ltr;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              colors: {
+                "tertiary": "#e2c28b",
+                "on-error": "#690005",
+                "outline": "#998f82",
+                "background": "#0e0c09",
+                "on-background": "#e8e1db",
+                "surface": "#0e0c09",
+                "tertiary-fixed-dim": "#e2c28b",
+                "primary-fixed-dim": "#d5c5a6",
+                "on-tertiary-container": "#fffaf9",
+                "on-error-container": "#ffdad6",
+                "tertiary-fixed": "#ffdea6",
+                "on-tertiary-fixed-variant": "#594318",
+                "surface-container": "#2a2218",
+                "on-secondary-fixed": "#241a09",
+                "error-container": "#93000a",
+                "on-primary-fixed-variant": "#51452e",
+                "inverse-surface": "#e8e1db",
+                "surface-dim": "#0e0c09",
+                "on-surface-variant": "#d0c5b6",
+                "surface-bright": "#3c3935",
+                "on-primary": "#392f1a",
+                "primary-container": "#807258",
+                "outline-variant": "#4d463a",
+                "secondary-fixed": "#f5dfc4",
+                "primary": "#d5c5a6",
+                "surface-container-low": "#1e1b18",
+                "on-secondary-container": "#c9b59c",
+                "on-tertiary-fixed": "#271900",
+                "tertiary-container": "#8a7040",
+                "surface-variant": "#373430",
+                "inverse-primary": "#695d44",
+                "on-surface": "#e8e1db",
+                "surface-container-highest": "#373430",
+                "secondary": "#d8c3a9",
+                "on-primary-container": "#fffaf9",
+                "surface-container-high": "#2c2a26",
+                "error": "#ffb4ab",
+                "inverse-on-surface": "#33302c",
+                "secondary-container": "#554733",
+                "on-secondary-fixed-variant": "#524531",
+                "secondary-fixed-dim": "#d8c3a9",
+                "primary-fixed": "#f2e1c1",
+                "on-secondary": "#3b2e1c",
+                "on-tertiary": "#402d03",
+                "on-primary-fixed": "#231a07",
+                "surface-container-lowest": "#100e0b",
+                "surface-tint": "#d5c5a6"
+              },
+              fontFamily: {
+                "headline": ["Newsreader"],
+                "body": ["Newsreader"],
+                "label": ["Space Grotesk"]
+              },
+              borderRadius: {"DEFAULT": "2px", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+            },
+          },
+        }
+      </script>
+</head>
+<body class="bg-surface text-on-surface flex flex-col items-center min-h-screen">
+<!-- TopNavBar (The Anchor) -->
+<header class="fixed top-0 w-full h-[36px] bg-[#0e0c09] flex items-center px-4 z-[100] border-b border-opacity-10 border-[#c8b89a] style_shell_layout">
+<div class="flex-1 flex items-center">
+<span class="special-elite text-[11px] tracking-tight text-[#5a4e3a] uppercase">1453 AD · CONSTANTINOPLE · NIKOLAOS DOUKAS</span>
+</div>
+<div class="flex items-center gap-4">
+<button class="text-[#5a4e3a] flex flex-col gap-[3px] p-1">
+<div class="w-4 h-[1px] bg-[#5a4e3a]"></div>
+<div class="w-4 h-[1px] bg-[#5a4e3a]"></div>
+<div class="w-4 h-[1px] bg-[#5a4e3a]"></div>
+</button>
+</div>
+</header>
+<!-- SideNavBar (Hidden on Mobile, Logic Anchor) -->
+<aside class="hidden lg:flex flex-col fixed left-0 top-[36px] bottom-[64px] w-64 bg-[#2a2218] border-r border-opacity-10 border-[#c8b89a] py-8 px-6 z-40">
+<div class="mb-8">
+<h2 class="im-fell text-lg text-[#c8b89a] leading-tight">The Living Manuscript</h2>
+<p class="special-elite text-[10px] text-[#7a6a54] mt-1 uppercase">Turn: 1,248</p>
+</div>
+<nav class="flex flex-col gap-6">
+<a class="special-elite text-[11px] text-[#8a7040] font-bold underline decoration-2 underline-offset-4 tracking-wider uppercase" href="#">Era Overview</a>
+<a class="special-elite text-[11px] text-[#7a6a54] hover:text-[#c8b89a] transition-colors tracking-wider uppercase" href="#">Genealogy</a>
+<a class="special-elite text-[11px] text-[#7a6a54] hover:text-[#c8b89a] transition-colors tracking-wider uppercase" href="#">Resource Log</a>
+<a class="special-elite text-[11px] text-[#7a6a54] hover:text-[#c8b89a] transition-colors tracking-wider uppercase" href="#">Military</a>
+<a class="special-elite text-[11px] text-[#7a6a54] hover:text-[#c8b89a] transition-colors tracking-wider uppercase" href="#">Diplomacy</a>
+</nav>
+</aside>
+<!-- Main Content Canvas -->
+<main class="w-[560px] flex-1 mt-[36px] mb-[64px] manuscript-column overflow-y-auto px-4 py-12 space-y-16">
+<!-- Turn -2: Deeply Dimmed (18%) -->
+<section class="opacity-[0.18] space-y-6">
+<div class="special-elite text-[11px] text-[#7a6a54] tracking-widest text-center">1453 AD · EARLY SPRING</div>
+<div class="im-fell text-[18px] leading-[1.9] text-[#c8b89a] text-center italic">
+                The walls of Theodosius have held for a thousand years, yet the air today carries the metallic tang of destiny. We watched the fires on the horizon, small sparks of Ottoman ambition that threaten to consume the last vestige of Rome.
+            </div>
+<div class="w-full h-[1px] bg-[#2a2218]"></div>
+</section>
+<!-- Turn -1: Faded (48%) -->
+<section class="opacity-[0.48] space-y-6">
+<div class="special-elite text-[11px] text-[#7a6a54] tracking-widest text-center">1453 AD · MID SPRING</div>
+<div class="im-fell text-[18px] leading-[1.9] text-[#c8b89a] text-center italic">
+                The Emperor Constantine XI has called for every man capable of holding a spear. Nikolaos spent the evening sharpening his blade in the shadow of the Hagia Sophia, the gold leaf of the dome reflecting a sun that seems unwilling to set.
+            </div>
+<div class="w-full h-[1px] bg-[#2a2218]"></div>
+</section>
+<!-- Turn 0: Previous (72%) -->
+<section class="opacity-[0.72] space-y-8">
+<div class="special-elite text-[11px] text-[#7a6a54] tracking-widest text-center">1453 AD · LATE SPRING · PRELUDE</div>
+<div class="space-y-6 text-[#c8b89a]">
+<p class="im-fell text-[18px] leading-[1.9] text-center">
+                    The bells of the city have not stopped ringing for three days. To the West, the ships of the Venetians are a desperate hope; to the East, the cannons of Mehmed II are a certain reality. The manuscript of our lives is running out of blank parchment.
+                </p>
+<div class="pt-4 border-t border-[#2a2218] border-opacity-30">
+<span class="special-elite text-[13px] text-[#7a6a54] block mb-2 tracking-widest">ABBOT GENNADIOS</span>
+<p class="im-fell text-[17px] leading-[1.7] text-[#c8b89a] pl-6 border-l border-[#2a2218]">
+                        "Do not look to the walls for salvation, Nikolaos. Look to the spirit. If the city falls, the Word must survive. You have been chosen not to fight, but to remember."
+                    </p>
+</div>
+</div>
+<div class="w-full h-[1px] bg-[#2a2218]"></div>
+</section>
+<!-- Current Active Turn (100%) -->
+<section class="opacity-100 space-y-10 pb-20">
+<div class="flex flex-col items-center">
+<span class="special-elite text-[11px] text-[#7a6a54] tracking-[0.3em] uppercase mb-4">1453 AD · LATE SPRING</span>
+<div class="w-12 h-[1px] bg-[#8a7040] mb-8"></div>
+</div>
+<div class="im-fell text-[20px] leading-[1.9] text-[#c8b89a] space-y-8 text-center">
+<p>
+                    Dust chokes the streets of the Phanar district. You stand at the crossroads of the city's final hour. The Abbot's words weigh heavier than the iron mail on your chest. To your left, the breach at St. Romanus calls for blood. To your right, the hidden archives of the monastery wait in silent terror.
+                </p>
+<p>
+                    The manuscript lies open before you, the ink still wet. The simulation waits for the choice that will define the era. Will you be the shield of a dying empire, or the scribe of its rebirth?
+                </p>
+</div>
+<!-- Interactivity / Choices -->
+<div class="space-y-4 pt-10 flex flex-col items-center">
+<button class="im-fell text-[18px] text-[#8a7040] hover:underline decoration-1 underline-offset-8 transition-all group">
+                    Seek the Emperor at the Gate <span class="special-elite text-[10px] opacity-0 group-hover:opacity-100 transition-opacity ml-2 tracking-tighter">[VALOR +5]</span>
+</button>
+<button class="im-fell text-[18px] text-[#8a7040] hover:underline decoration-1 underline-offset-8 transition-all group">
+                    Bury the Sacred Codices <span class="special-elite text-[10px] opacity-0 group-hover:opacity-100 transition-opacity ml-2 tracking-tighter">[LORE +10]</span>
+</button>
+<button class="im-fell text-[18px] text-[#8a7040] hover:underline decoration-1 underline-offset-8 transition-all group">
+                    Attempt to parley with the Vizier <span class="special-elite text-[10px] opacity-0 group-hover:opacity-100 transition-opacity ml-2 tracking-tighter">[INTRACTION]</span>
+</button>
+</div>
+</section>
+</main>
+<!-- BottomNavBar (Status & Archive Anchor) -->
+<footer class="fixed bottom-0 w-full h-[64px] bg-[#0e0c09] z-[100] flex justify-center items-center px-4 style_shell_layout border-t border-opacity-10 border-[#c8b89a]">
+<div class="w-[560px] flex items-center gap-4">
+<div class="flex-1 relative group">
+<input class="w-full bg-transparent border border-[#2a2218] border-opacity-50 py-2 px-4 special-elite text-[12px] text-[#c8b89a] placeholder-[#4a3e2e] focus:ring-0 focus:border-[#8a7040] transition-colors" placeholder="..." type="text"/>
+<div class="absolute right-3 top-1/2 -translate-y-1/2 opacity-20 group-focus-within:opacity-100 transition-opacity">
+<span class="material-symbols-outlined text-[16px] text-[#8a7040]">edit_note</span>
+</div>
+</div>
+<div class="flex items-center gap-6 pl-4 border-l border-[#2a2218]">
+<button class="flex flex-col items-center justify-center text-[#7a6a54] opacity-80 hover:text-[#c8b89a] transition-all cursor-pointer">
+<span class="material-symbols-outlined text-[20px]">inventory_2</span>
+<span class="special-elite text-[9px] uppercase tracking-tighter mt-1">Archive</span>
+</button>
+<button class="flex flex-col items-center justify-center text-[#8a7040] font-bold scale-95 transition-transform">
+<span class="material-symbols-outlined text-[20px]" data-weight="fill" style="font-variation-settings: 'FILL' 1;">analytics</span>
+<span class="special-elite text-[9px] uppercase tracking-tighter mt-1">Status</span>
+</button>
+</div>
+</div>
+</footer>
+<!-- Fixed Map/Background Elements (Decorative) -->
+<div class="fixed inset-0 pointer-events-none z-[-1] opacity-[0.03]">
+<img class="w-full h-full object-cover mix-blend-overlay" data-alt="Ancient weathered parchment texture with subtle cracks, ink stains, and historical map contours of Byzantium" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCN5903cIlT7Sb2GL5qtkfDi_e8um4NoScdwW6IpACJtimRZn9vLu_36GeGs4YV48qcQcyz0Kry02vBvLn3wteN75XkIoRhV8d3g8v328UxtyjljvN1gKD0PUxzx5CqXpU3DFQyOIR2XLQ8MzLHOm_dJ2Sxyn_MUYF1GEFFfzJO_N2qfU2S7VG9VtKIc32e4CsY_neZ4c9C8m0dEmYZ-hk8srbjrb0PAn5Psafarohe0T_CeJTv8XPC8_A5ojt1Ea1Ya5SYyzBxGcw"/>
+</div>
+</body></html>

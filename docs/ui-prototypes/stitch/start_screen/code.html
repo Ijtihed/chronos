@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>CHRONOS - The Living Manuscript</title>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Google Fonts: IM Fell English, Special Elite, Newsreader (System Fallback), Space Grotesk -->
+<link href="https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&amp;family=Special+Elite&amp;family=Newsreader:opsz,wght@6..72,400;6..72,700&amp;family=Space+Grotesk:wght@300..700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "tertiary": "#e2c28b",
+                        "on-error": "#690005",
+                        "outline": "#998f82",
+                        "background": "#0e0c09",
+                        "on-background": "#c8b89a",
+                        "surface": "#0e0c09",
+                        "tertiary-fixed-dim": "#e2c28b",
+                        "primary-fixed-dim": "#d5c5a6",
+                        "on-tertiary-container": "#fffaf9",
+                        "on-error-container": "#ffdad6",
+                        "tertiary-fixed": "#ffdea6",
+                        "on-tertiary-fixed-variant": "#594318",
+                        "surface-container": "#2a2218",
+                        "on-secondary-fixed": "#241a09",
+                        "error-container": "#93000a",
+                        "on-primary-fixed-variant": "#51452e",
+                        "inverse-surface": "#e8e1db",
+                        "surface-dim": "#151310",
+                        "on-surface-variant": "#d0c5b6",
+                        "surface-bright": "#3c3935",
+                        "on-primary": "#392f1a",
+                        "primary-container": "#807258",
+                        "outline-variant": "#4d463a",
+                        "secondary-fixed": "#f5dfc4",
+                        "primary": "#d5c5a6",
+                        "surface-container-low": "#1e1b18",
+                        "on-secondary-container": "#7a6a54",
+                        "on-tertiary-fixed": "#271900",
+                        "tertiary-container": "#8a7040",
+                        "surface-variant": "#373430",
+                        "inverse-primary": "#695d44",
+                        "on-surface": "#c8b89a",
+                        "surface-container-highest": "#373430",
+                        "secondary": "#d8c3a9",
+                        "on-primary-container": "#fffaf9",
+                        "surface-container-high": "#2c2a26",
+                        "error": "#ffb4ab",
+                        "inverse-on-surface": "#33302c",
+                        "secondary-container": "#554733",
+                        "on-secondary-fixed-variant": "#524531",
+                        "secondary-fixed-dim": "#d8c3a9",
+                        "primary-fixed": "#f2e1c1",
+                        "on-secondary": "#3b2e1c",
+                        "on-tertiary": "#402d03",
+                        "on-primary-fixed": "#231a07",
+                        "surface-container-lowest": "#100e0b",
+                        "surface-tint": "#d5c5a6"
+                    },
+                    fontFamily: {
+                        "headline": ["IM Fell English", "serif"],
+                        "body": ["IM Fell English", "serif"],
+                        "label": ["Special Elite", "monospace"],
+                        "serif-display": ["IM Fell English", "serif"],
+                        "system": ["Special Elite", "monospace"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "2px",
+                        "lg": "2px",
+                        "xl": "2px",
+                        "full": "9999px"
+                    },
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            display: inline-block;
+            line-height: 1;
+            text-transform: none;
+            letter-spacing: normal;
+            word-wrap: normal;
+            white-space: nowrap;
+            direction: ltr;
+        }
+        .ink-underline-hover:hover {
+            text-decoration: underline;
+            text-decoration-thickness: 1px;
+            text-underline-offset: 4px;
+        }
+        body {
+            background-color: #0e0c09;
+            margin: 0;
+            overflow: hidden;
+        }
+        .canvas-1080 {
+            width: 1920px;
+            height: 1080px;
+            position: relative;
+            margin: 0 auto;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+    </style>
+</head>
+<body class="bg-surface text-on-surface font-body selection:bg-tertiary-container selection:text-on-tertiary-container">
+<div class="canvas-1080">
+<!-- Main Manuscript Column -->
+<main class="w-[560px] flex flex-col items-center text-center">
+<!-- Header Section -->
+<header class="mb-12">
+<h1 class="font-serif-display leading-none flex items-baseline justify-center tracking-widest">
+<span class="text-[88px] text-tertiary-container leading-none">C</span><span class="text-[64px] text-on-surface leading-none -ml-1">HRONOS</span>
+</h1>
+<!-- Irregular Ink Rule -->
+<div class="mt-4 w-full flex justify-center">
+<svg fill="none" height="2" viewbox="0 0 420 2" width="420" xmlns="http://www.w3.org/2000/svg">
+<path d="M1 1C50.5 0.5 100 1.5 150 1C200 0.5 250 1.5 300 1C350 0.5 400 1.5 419 1" stroke="#2a2218" stroke-dasharray="1 2" stroke-linecap="round" stroke-width="1.5"></path>
+</svg>
+</div>
+</header>
+<!-- Navigation Links -->
+<nav class="flex flex-col gap-8 items-center">
+<!-- Primary Action -->
+<a class="font-serif-display text-[22px] text-on-surface ink-underline-hover transition-colors active:text-primary-fixed" href="#">
+                    Begin
+                </a>
+<!-- Secondary Action -->
+<a class="font-serif-display text-[18px] text-on-secondary-container ink-underline-hover transition-colors active:text-primary-fixed" href="#">
+                    Options
+                </a>
+</nav>
+</main>
+<!-- Decorative Subtle Background Grain/Texture implied by Design System North Star -->
+<div class="absolute inset-0 pointer-events-none opacity-[0.03]" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBpNWrsofzEWVvEBd54pIX5VOA4EYTa9JLPR5OHMuUVIE8FcG4LuLuGdCk5Kv4XcVS4N0PzjB77gcuMG2neV1u6M8j07ElFFUhh5zVmzSTxKB3OCOeHhRuDTO7fmSJA2VlaUkxgCL6Y1NEWpfk_LRV18C4cJVTk5uBzD2QJFEoc9YlXxN1jxnEh3o1RAi5S4Osa1SSmdVa-6ikHeWNLEDpZZoDenAn1l4fERVyenhEbcBKYhzTYH_BBQSjHaKoMsC5faWJDYNgAb00');"></div>
+</div>
+<!-- Background Image context for the AI - although not visible on screen, requested per instructions -->
+<div class="hidden">
+<img data-alt="extreme close-up of dark aged parchment paper with subtle ink splatters and rough organic fiber texture" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD66xwhANotuLNGCQymCG7u4xtLYjS7dEQ1DGzsGN65hrnyn2Ltv40HvWo988znkff-DtblGyl0ZRjTeNpdXnx-PnsADQ8YsfbBWRKz05aV_ZF6cAhDjVHCLtraAbEH79VPJhSC4shyPdX0-mcI8Oku7vNacXACaHRcRjgZ3fCS98OpC-uwT8I0YeujiUKD4I5Mgr9D_pzcBqgLB4FQnhgt_EtybNC1YRv_RXPmNkh0pvCSHQpXXi7yXRjnG1aVcw_BacRErE58iOA"/>
+</div>
+</body></html>

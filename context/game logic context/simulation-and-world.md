@@ -26,6 +26,34 @@ Historical maps exist as open data and are a core layer of the game. The physica
 
 The map is not decorative. It is the geography of information. Where you are determines what you can know.
 
+### Region knowledge on the map
+
+When the player selects a region on the map, the game generates what the character would plausibly know about that region. This is not an encyclopedia entry — it is the character's own understanding, filtered through who they are.
+
+Knowledge has two tiers:
+
+- **Known facts** — things the character would reasonably know given their archetype, social class, location, and era. A Genoese merchant in Acre knows the trade routes to Constantinople. A farmer outside Siena knows nothing about what lies beyond the next hill.
+- **Rumors** — things the character has heard but cannot verify. A trader mentioned the Rus. A pilgrim said Jerusalem has fallen. A soldier claims the Emperor is dead. Rumors are presented as uncertain — the player sees them but knows they may not be true.
+
+What a character knows about a region depends on:
+- **Distance** — nearby regions are better known
+- **Archetype and social class** — a scholar knows about distant civilizations from texts; a peasant does not
+- **Trade and travel routes** — a merchant knows destinations their goods flow to
+- **NPC conversations** — things other characters have told the player during the run
+- **Common knowledge for the era** — everyone in 1453 Constantinople knows the Ottoman army is outside the walls
+
+Region knowledge is generated on demand when the player selects a region, as the character "recalling" what they know. Results are cached per region per turn.
+
+### Events on the map
+
+Significant events — sieges, plagues, army movements, famines — appear on the map as visual markers at their location. These are **filtered by character awareness**: an event only appears on the map if the character has plausible knowledge of it. A siege 500 miles away does not show until someone tells the player about it (through NPC conversation or travel).
+
+Events come from two sources:
+- **The HCE Events DB** — canonical historical events that the character would be aware of given their position and social class
+- **The world engine** — gameplay events (NPC autonomous actions, tension changes, player-caused consequences) promoted to map events when significant enough
+
+This means the map is always a partial view. It shows the world as the character understands it, not as it actually is. The gap between what the map shows and what is actually happening is part of the game.
+
 ## Run initialization
 
 Each run seeds from a randomly selected historical era (post 0 AD). The game generates:
