@@ -106,6 +106,6 @@ class TestNpcPovPrompt:
         raw = load_prompt(PROMPTS_DIR / "npc_pov.md")
         assert "first person" in raw.lower()
 
-    def test_forbids_modern_language(self):
+    def test_directs_real_human_voice(self):
         raw = load_prompt(PROMPTS_DIR / "npc_pov.md")
-        assert "modern" in raw.lower()
+        assert "real person" in raw.lower()

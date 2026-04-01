@@ -22,12 +22,100 @@ function showScreen(id) {
 }
 
 // -------------------------------------------------------------------
-// Start screen
+// Start screen — save/restore runs via localStorage
 // -------------------------------------------------------------------
 
-$("#btn-begin").addEventListener("click", () => startNewRun());
+function saveRunToStorage() {
+  if (runId && eraKey) {
+    localStorage.setItem("chronos_run_id", runId);
+    localStorage.setItem("chronos_era_key", eraKey);
+  }
+}
+
+function clearRunFromStorage() {
+  localStorage.removeItem("chronos_run_id");
+  localStorage.removeItem("chronos_era_key");
+}
+
+function getSavedRun() {
+  const id = localStorage.getItem("chronos_run_id");
+  const era = localStorage.getItem("chronos_era_key");
+  return id ? { runId: id, eraKey: era } : null;
+}
+
+// On page load: check for existing run
+(async function checkForExistingRun() {
+  const saved = getSavedRun();
+  if (!saved) return;
+  try {
+    const res = await fetch(`/api/run/${saved.runId}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.run_status !== "ended") {
+        $("#btn-continue").classList.remove("hidden");
+      }
+    }
+  } catch {}
+})();
+
+// Begin button — if active run exists, show confirmation first
+$("#btn-begin").addEventListener("click", () => {
+  const saved = getSavedRun();
+  const confirmEl = $("#begin-confirm");
+  if (saved && confirmEl && !confirmEl.classList.contains("was-confirmed")) {
+    confirmEl.classList.remove("hidden");
+    return;
+  }
+  confirmEl && confirmEl.classList.add("hidden");
+  startNewRun();
+});
+
+// Confirm yes — start new run (overwrite)
+const beginYes = $("#btn-begin-yes");
+if (beginYes) {
+  beginYes.addEventListener("click", () => {
+    const confirmEl = $("#begin-confirm");
+    if (confirmEl) { confirmEl.classList.add("hidden"); confirmEl.classList.add("was-confirmed"); }
+    clearRunFromStorage();
+    startNewRun();
+  });
+}
+
+// Confirm no — cancel
+const beginNo = $("#btn-begin-no");
+if (beginNo) {
+  beginNo.addEventListener("click", () => {
+    const confirmEl = $("#begin-confirm");
+    if (confirmEl) confirmEl.classList.add("hidden");
+  });
+}
+
+// Continue button — load existing run
+const continueBtn = $("#btn-continue");
+if (continueBtn) {
+  continueBtn.addEventListener("click", async () => {
+    const saved = getSavedRun();
+    if (!saved) return;
+    try {
+      const res = await fetch(`/api/run/${saved.runId}`);
+      if (!res.ok) { clearRunFromStorage(); return; }
+      state = await res.json();
+      runId = saved.runId;
+      eraKey = saved.eraKey;
+      enterGame();
+    } catch {
+      clearRunFromStorage();
+    }
+  });
+}
+
+// Begin again from erasure screen
 $("#btn-begin-again") && $("#btn-begin-again").addEventListener("click", () => {
+  clearRunFromStorage();
   showScreen("screen-start");
+  $("#btn-continue").classList.add("hidden");
+  const confirmEl = $("#begin-confirm");
+  if (confirmEl) { confirmEl.classList.add("hidden"); confirmEl.classList.remove("was-confirmed"); }
 });
 
 async function startNewRun() {
@@ -82,6 +170,7 @@ async function startNewRun() {
     runId = runData.run_id;
     eraKey = runData.era;
     state = runData.world_state;
+    saveRunToStorage();
 
     // Character info fades in when ready
     if (charSection) {
@@ -94,7 +183,10 @@ async function startNewRun() {
 
     completeProgressBar();
 
-    setTimeout(() => enterGame(), 2000);
+    setTimeout(() => {
+      showScreen("screen-transition");
+      setTimeout(() => enterGame(), 3000);
+    }, 800);
   } catch (e) {
     completeProgressBar();
     $("#loading-era-desc").textContent = `Error: ${e.message}`;
@@ -187,6 +279,7 @@ async function submitTurn(text) {
 
     if (data.erasure) {
       block.remove();
+      clearRunFromStorage();
       showErasure(data.erasure);
       return;
     }
@@ -367,6 +460,7 @@ if (newRunYes) {
     hamburgerIcon.classList.remove("hidden");
     hamburgerCloseIcon.classList.add("hidden");
     if (newRunConfirm) newRunConfirm.classList.add("hidden");
+    clearRunFromStorage();
     startNewRun();
   });
 }
