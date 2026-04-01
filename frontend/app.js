@@ -34,8 +34,14 @@ async function startNewRun() {
   showScreen("screen-loading");
   $("#loading-era-label").textContent = "";
   $("#loading-era-desc").textContent = "";
+  const eventsEl = $("#loading-events");
+  const voicesEl = $("#loading-voices");
   const charSection = $("#loading-char-section");
+  if (eventsEl) eventsEl.innerHTML = "";
+  if (voicesEl) voicesEl.innerHTML = "";
   if (charSection) charSection.classList.add("hidden");
+  const ringFill = $("#loading-ring-fill");
+  if (ringFill) ringFill.style.strokeDashoffset = "125.66";
 
   try {
     const res = await fetch("/api/run", { method: "POST" });
@@ -48,6 +54,28 @@ async function startNewRun() {
     $("#loading-era-label").textContent = `${state.era.name} — ${year} AD`;
     $("#loading-era-desc").textContent = state.era.description;
 
+    // Historical events
+    if (eventsEl && data.loading_events) {
+      let evHtml = "";
+      for (const ev of data.loading_events) {
+        evHtml += `<p class="font-body text-[16px] leading-relaxed text-on-secondary-container">${esc(ev)}</p>`;
+      }
+      eventsEl.innerHTML = evHtml;
+    }
+
+    // Voices of the age
+    if (voicesEl && data.loading_voices) {
+      let voHtml = "";
+      for (const v of data.loading_voices) {
+        voHtml += `<blockquote class="pl-4" style="border-left: 1px solid #2a2218;">`;
+        voHtml += `<p class="font-body italic text-[17px] leading-relaxed text-on-surface">${esc(v.quote)}</p>`;
+        voHtml += `<cite class="block mt-1 font-system text-[10px] text-on-secondary-container not-italic tracking-tight">${esc(v.source)}</cite>`;
+        voHtml += `</blockquote>`;
+      }
+      voicesEl.innerHTML = voHtml;
+    }
+
+    // Character
     if (charSection) {
       charSection.classList.remove("hidden");
       const charLabel = $("#loading-char-label");
@@ -56,10 +84,9 @@ async function startNewRun() {
       if (charDesc) charDesc.textContent = state.player.description;
     }
 
-    const ringFill = $("#loading-ring-fill");
     if (ringFill) ringFill.style.strokeDashoffset = "0";
 
-    setTimeout(() => enterGame(), 2000);
+    setTimeout(() => enterGame(), 3000);
   } catch (e) {
     $("#loading-era-desc").textContent = `Error: ${e.message}`;
   }

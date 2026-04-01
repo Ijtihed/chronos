@@ -82,4 +82,7 @@ ERA = {
         {"role": "Shipmaster", "archetype": "sailor", "social_class": "free"},
         {"role": "Gotland silver merchant", "archetype": "merchant", "social_class": "wealthy_free"},
     ],
+    "loading_events": ['793 AD — Norse raiders sack Lindisfarne. The Viking Age begins.', '845 AD — Ragnar Lothbrok besieges Paris with 120 ships.', '865 AD — The Great Heathen Army lands in England.', '867 AD — The Norse capture York. The Danelaw is born.'],
+    "loading_voices": [{'quote': 'From the fury of the Northmen, O Lord, deliver us.', 'source': 'Frankish prayer, 9th century'}, {'quote': 'Cattle die, kinsmen die, you yourself will die. But the reputation of the dead never dies.', 'source': 'Havamal, verse 77'}],
+
 }

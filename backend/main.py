@@ -113,7 +113,13 @@ async def new_run(req: RunRequest = RunRequest()):
         state = create_initial_state()
 
     await save_session(state)
-    return {"run_id": state.run_id, "era": era_key, "world_state": state.model_dump()}
+    return {
+        "run_id": state.run_id,
+        "era": era_key,
+        "world_state": state.model_dump(),
+        "loading_events": era_config.get("loading_events", []),
+        "loading_voices": era_config.get("loading_voices", []),
+    }
 
 
 @app.get("/api/runs")

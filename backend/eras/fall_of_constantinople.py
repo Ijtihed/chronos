@@ -71,4 +71,7 @@ ERA = {
         {"role": "Jewish physician", "archetype": "healer", "social_class": "minority"},
         {"role": "Slavic refugee from Thessaloniki", "archetype": "refugee", "social_class": "displaced"},
     ],
+    "loading_events": ['1422 AD — Murad II besieges Constantinople but fails to take it.', '1444 AD — The Crusade of Varna ends in Ottoman victory. No western relief is coming.', '1452 AD — Mehmed II builds the fortress of Rumelihisarı, choking the Bosphorus.', '1453 AD — The siege begins. 80,000 Ottoman troops face 7,000 defenders.'],
+    "loading_voices": [{'quote': 'The city has fallen and I am still alive.', 'source': 'Attributed to Constantine XI Palaiologos'}, {'quote': 'The spider weaves the curtains in the palace of the Caesars.', 'source': 'Mehmed II, quoting Persian poetry after entering the city'}],
+
 }

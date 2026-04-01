@@ -83,4 +83,7 @@ ERA = {
         {"role": "Genoese ship captain", "archetype": "sailor", "social_class": "merchant"},
         {"role": "Orphaned child of a guild master", "archetype": "orphan", "social_class": "displaced"},
     ],
+    "loading_events": ['1347 AD — Genoese ships bring plague from Caffa to Messina. The Black Death enters Europe.', '1348 AD — The plague reaches Florence. Boccaccio will later write that the dead outnumber the living.', '1348 AD — Flagellant processions sweep through Germany and France.', '1349 AD — Jewish communities across Europe are scapegoated and massacred.'],
+    "loading_voices": [{'quote': 'Father abandoned child, wife husband, one brother another; for this illness seemed to strike through breath and sight.', 'source': 'Boccaccio, The Decameron, 1353'}, {'quote': 'So many died that all believed it was the end of the world.', 'source': 'Agnolo di Tura, Chronicle of Siena'}],
+
 }

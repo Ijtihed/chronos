@@ -68,4 +68,7 @@ ERA = {
         {"role": "Local bishop", "archetype": "clergy", "social_class": "religious"},
         {"role": "Visigoth scout", "archetype": "outsider", "social_class": "barbarian"},
     ],
+    "loading_events": ['395 AD — Emperor Theodosius dies. The Roman Empire splits permanently into East and West.', '402 AD — The Western court flees Rome for the marshes of Ravenna.', '406 AD — Vandals, Alans, and Suevi cross the frozen Rhine into Gaul. The frontier collapses.', '408 AD — Stilicho, last effective defender of the West, is executed by Honorius.'],
+    "loading_voices": [{'quote': 'The city which had taken the whole world was itself taken.', 'source': 'Jerome, Letter 127'}, {'quote': 'Rome is not bricks and mortar. Rome is wherever Romans stand.', 'source': 'Attributed, 5th century'}],
+
 }

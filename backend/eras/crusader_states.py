@@ -72,4 +72,7 @@ ERA = {
         {"role": "Templar treasurer", "archetype": "administrator", "social_class": "military_order"},
         {"role": "Local Maronite farmer", "archetype": "peasant", "social_class": "local_christian"},
     ],
+    "loading_events": ['1187 AD — Saladin defeats the Crusaders at Hattin. Jerusalem falls.', '1189 AD — The Third Crusade begins. Richard, Philip, and Frederick march east.', '1190 AD — Frederick Barbarossa drowns crossing a river in Anatolia.', '1191 AD — Richard the Lionheart takes Acre after a brutal siege.'],
+    "loading_voices": [{'quote': 'The Franks came from their lands in a great host, like locusts in number.', 'source': 'Ibn al-Athir, The Complete History'}, {'quote': 'God wills it.', 'source': 'Crusader battle cry, attributed to Urban II'}],
+
 }
