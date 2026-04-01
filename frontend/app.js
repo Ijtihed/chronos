@@ -33,6 +33,94 @@ function show(el) { el.classList.remove("hidden"); }
 function hide(el) { el.classList.add("hidden"); }
 
 // ------------------------------------------------------------------
+// Persistence — survive page reload
+// ------------------------------------------------------------------
+
+function saveRunLocally() {
+  if (runId) {
+    localStorage.setItem("chronos_run_id", runId);
+  }
+  if (eraKey) {
+    localStorage.setItem("chronos_era_key", eraKey);
+  }
+}
+
+function clearLocalRun() {
+  localStorage.removeItem("chronos_run_id");
+  localStorage.removeItem("chronos_era_key");
+}
+
+async function tryResumeRun() {
+  const savedRunId = localStorage.getItem("chronos_run_id");
+  if (!savedRunId) return false;
+
+  try {
+    const resp = await fetch(`/api/run/${savedRunId}?_t=${Date.now()}`);
+    if (!resp.ok) {
+      clearLocalRun();
+      return false;
+    }
+    state = await resp.json();
+    runId = savedRunId;
+    eraKey = localStorage.getItem("chronos_era_key") || "";
+
+    hide(startScreen);
+    show(narrativeEl);
+    show(inputBar);
+    renderResumedRun();
+    prepareGlobe();
+    return true;
+  } catch {
+    clearLocalRun();
+    return false;
+  }
+}
+
+function renderResumedRun() {
+  const loc = state.locations.find((l) => l.id === state.player.location);
+  const year = state.current_year || state.era.year_start;
+
+  let h = `<div class="year-mark">${esc(state.era.name)} \u2014 ${state.era.year_start} AD</div>`;
+  h += `<p>${esc(state.era.description)}</p>`;
+  h += `<p>You are <strong>${esc(state.player.name)}</strong>, ${esc(
+    state.player.role.toLowerCase()
+  )}. ${esc(state.player.description)}</p>`;
+
+  if (loc) {
+    h += `<p>${esc(loc.description)}</p>`;
+  }
+
+  introEl.innerHTML = h;
+
+  turnsEl.innerHTML = "";
+  for (const ev of state.events) {
+    const block = document.createElement("div");
+    block.className = "turn-block";
+
+    let bh = `<div class="year-mark">${esc(String(
+      Math.round(state.era.year_start + ev.turn * (state.era.years_per_turn || 0.25))
+    ))} AD</div>`;
+    bh += `<div class="narration">${esc(ev.description)}</div>`;
+    block.innerHTML = bh;
+    turnsEl.appendChild(block);
+  }
+
+  if (state.run_status === "active") {
+    setInputState("active");
+  } else if (state.run_status === "dead_observing") {
+    setInputState("observing");
+  } else if (state.run_status === "ended") {
+    setInputState("ended");
+  }
+
+  if (turnsEl.lastChild) {
+    turnsEl.lastChild.scrollIntoView({ behavior: "smooth" });
+  }
+
+  input.focus();
+}
+
+// ------------------------------------------------------------------
 // Run start
 // ------------------------------------------------------------------
 
@@ -46,6 +134,7 @@ async function startNewRun() {
     runId = data.run_id;
     eraKey = data.era;
     state = data.world_state;
+    saveRunLocally();
     hide(startScreen);
     hide(startLoading);
     show(narrativeEl);
@@ -188,6 +277,7 @@ async function submitTurn() {
       block.innerHTML = "";
       appendErasureBlock(data.erasure);
       setInputState("ended");
+      clearLocalRun();
       if (globeReady && mapModule) mapModule.updateMarkers(state);
       return;
     }
@@ -303,7 +393,15 @@ document.addEventListener("keydown", (e) => {
 });
 
 // ------------------------------------------------------------------
-// Init
+// Init — try to resume existing run, otherwise show start screen
 // ------------------------------------------------------------------
 
-loadMapModule();
+async function init() {
+  await loadMapModule();
+  const resumed = await tryResumeRun();
+  if (!resumed) {
+    show(startScreen);
+  }
+}
+
+init();
