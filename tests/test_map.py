@@ -102,6 +102,25 @@ class TestBorderData:
         assert sources.exists(), "sources.md missing"
 
 
+class TestVisitedLocations:
+    def test_initial_state_starts_with_visited(self):
+        state = create_initial_state()
+        assert "ariminum" in state.visited_locations
+
+    def test_visited_locations_in_state_dump(self):
+        state = create_initial_state()
+        d = state.model_dump()
+        assert "visited_locations" in d
+        assert isinstance(d["visited_locations"], list)
+
+    def test_apply_action_tracks_location(self):
+        from backend.world_state import apply_action
+        state = create_initial_state()
+        action = {"action_type": "observe", "era_description": "Waits."}
+        new = apply_action(state, action)
+        assert state.player.location in new.visited_locations
+
+
 class TestGeoEndpoint:
     @pytest.mark.asyncio
     @respx.mock

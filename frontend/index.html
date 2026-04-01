@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CHRONOS</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -49,10 +50,7 @@
             font-size: 0.9em;
         }
 
-        .narration {
-            margin-bottom: 14px;
-            color: #b8a880;
-        }
+        .narration { margin-bottom: 14px; color: #b8a880; }
 
         .npc-block {
             margin-bottom: 14px;
@@ -128,7 +126,6 @@
 
         .loading-text { color: #3a3428; font-style: italic; }
         .error-text { color: #805040; }
-
         strong { color: #d0c090; font-weight: 600; }
 
         #start-screen {
@@ -160,6 +157,50 @@
         }
         #start-screen .begin-btn:hover { border-color: #484030; }
 
+        #map-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 100;
+            background: #0e0e0e;
+        }
+
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+
+        .leaflet-container { background: #0e0e0e; }
+
+        .marker-player {
+            background: #c8a050;
+            border: 2px solid #e0c878;
+            border-radius: 50%;
+            box-shadow: 0 0 8px rgba(200, 160, 80, 0.5);
+        }
+
+        .marker-visited {
+            background: #7a9070;
+            border: 2px solid #90a888;
+            border-radius: 50%;
+        }
+
+        .marker-unvisited {
+            background: #3a3428;
+            border: 1px solid #504838;
+            border-radius: 50%;
+            opacity: 0.6;
+        }
+
+        .marker-faded {
+            background: #1e1c18;
+            border: 1px solid #2a2620;
+            border-radius: 50%;
+            opacity: 0.3;
+        }
+
         .hidden { display: none; }
     </style>
 </head>
@@ -180,6 +221,12 @@
         <button id="act-btn" disabled>&rarr;</button>
     </div>
 
+    <div id="map-container" class="hidden">
+        <div id="map"></div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="map.js"></script>
     <script src="app.js"></script>
 </body>
 </html>

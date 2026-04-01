@@ -79,6 +79,7 @@ class WorldState(BaseModel):
     locations: List[Location]
     events: List[Event] = Field(default_factory=list)
     turn: int = 0
+    visited_locations: List[str] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -247,6 +248,7 @@ def create_initial_state() -> WorldState:
         ],
         events=[],
         turn=0,
+        visited_locations=["ariminum"],
     )
 
 
@@ -261,6 +263,9 @@ def apply_action(state: WorldState, action: dict) -> WorldState:
     new.current_year = int(
         new.era.year_start + new.turn * new.era.years_per_turn
     )
+
+    if new.player.location not in new.visited_locations:
+        new.visited_locations.append(new.player.location)
 
     new.events.append(
         Event(

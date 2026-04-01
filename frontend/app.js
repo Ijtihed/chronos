@@ -11,6 +11,7 @@ const inputBar = $("#input-bar");
 
 let state = null;
 let runId = null;
+let eraKey = null;
 
 function show(el) { el.classList.remove("hidden"); }
 function hide(el) { el.classList.add("hidden"); }
@@ -23,6 +24,7 @@ async function startNewRun() {
     const res = await fetch("/api/run", { method: "POST" });
     const data = await res.json();
     runId = data.run_id;
+    eraKey = data.era;
     state = data.world_state;
     hide(startScreen);
     show(narrativeEl);
@@ -100,6 +102,7 @@ async function submitTurn() {
       block.innerHTML = "";
       appendErasureBlock(data.erasure);
       setInputState("ended");
+      if (typeof ChronosMap !== "undefined") ChronosMap.updateMarkers(state);
       return;
     }
 
@@ -110,6 +113,10 @@ async function submitTurn() {
       setInputState("observing");
     } else {
       setInputState("active");
+    }
+
+    if (typeof ChronosMap !== "undefined" && ChronosMap.isVisible()) {
+      ChronosMap.updateMarkers(state);
     }
   } catch (e) {
     block.querySelector(".loading-text").innerHTML = `<span class="error-text">${esc(
@@ -185,3 +192,24 @@ actBtn.addEventListener("click", () => {
   if (!actBtn.disabled) submitTurn();
 });
 startBtn.addEventListener("click", startNewRun);
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "m" || e.key === "M") {
+    if (!state || !runId) return;
+    if (document.activeElement === input) return;
+
+    const narrativeVisible = !narrativeEl.classList.contains("hidden");
+    if (typeof ChronosMap !== "undefined") {
+      if (narrativeVisible) {
+        hide(narrativeEl);
+        hide(inputBar);
+        ChronosMap.show(state, eraKey);
+      } else {
+        ChronosMap.hide();
+        show(narrativeEl);
+        if (state.run_status === "active") show(inputBar);
+        else if (state.run_status === "dead_observing") show(inputBar);
+      }
+    }
+  }
+});
