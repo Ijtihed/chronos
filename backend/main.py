@@ -267,6 +267,41 @@ async def npc_perception(run_id: str, npc_id: str):
 
 
 # ------------------------------------------------------------------
+# Historical context (highlight a sentence)
+# ------------------------------------------------------------------
+
+class ContextRequest(BaseModel):
+    text: str
+    era_name: str = ""
+    year: int = 0
+
+@app.post("/api/run/{run_id}/context")
+async def explain_context(run_id: str, req: ContextRequest):
+    state = await _load_or_404(run_id)
+    snippet = req.text.strip()[:500]
+    if not snippet:
+        raise HTTPException(400, "No text provided")
+
+    era = state.era.name
+    year = state.current_year or state.era.year_start
+
+    prompt = (
+        f"You are a concise historical narrator for a game set in {era}, {year} AD. "
+        f"The player highlighted this passage:\n\n\"{snippet}\"\n\n"
+        f"In 2-3 sentences, explain the real historical context behind what is described. "
+        f"Be specific about real people, places, or events referenced. "
+        f"Do not repeat the passage. Do not use modern language. Stay in the voice of a scholarly chronicler."
+    )
+
+    try:
+        text = await chat(prompt)
+    except Exception:
+        text = "The archives offer no further illumination on this matter."
+
+    return {"context": text}
+
+
+# ------------------------------------------------------------------
 # Turn handlers
 # ------------------------------------------------------------------
 

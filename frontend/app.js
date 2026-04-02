@@ -211,7 +211,7 @@ function enterGame() {
     const year = state.current_year || state.era.year_start;
 
     let introHtml = `<div class="mb-12">`;
-    introHtml += `<div class="font-system text-[10px] tracking-[0.15em] text-tertiary-container uppercase mb-4">${esc(state.era.name)} — ${year} AD</div>`;
+    introHtml += `<div class="font-system text-[10px] tracking-[0.15em] text-tertiary-container mb-4">${esc(state.era.name)} — ${year} AD</div>`;
     introHtml += `<p class="font-body text-[18px] leading-relaxed text-on-surface mb-4">${esc(state.era.description)}</p>`;
     introHtml += `<p class="font-body text-[18px] leading-relaxed text-on-surface mb-4">You are <strong class="text-primary-fixed">${esc(state.player.name)}</strong>, ${esc(state.player.role.toLowerCase())}. ${esc(state.player.description)}</p>`;
     if (loc) {
@@ -282,17 +282,24 @@ async function submitTurn(text) {
   const input = $("#player-input");
   const obsInput = $("#obs-input");
 
-  // Lock input immediately — show "the world is happening"
+  // Lock ALL input immediately
   if (input) {
     input.value = "";
     input.disabled = true;
     input.placeholder = "The world is happening...";
+    input.style.pointerEvents = "none";
+    input.style.opacity = "0.3";
   }
   if (obsInput) {
     obsInput.value = "";
     obsInput.disabled = true;
     obsInput.placeholder = "The world is happening...";
+    obsInput.style.pointerEvents = "none";
+    obsInput.style.opacity = "0.3";
   }
+  // Also block the bottom bar entirely
+  const bottomBar = $("#bottom-bar");
+  if (bottomBar) bottomBar.style.pointerEvents = "none";
 
   const turnsContainer = $("#turns-container");
   const block = document.createElement("div");
@@ -339,13 +346,19 @@ async function submitTurn(text) {
     block.innerHTML = `<p class="font-body italic text-[16px] text-on-secondary-container">${esc(text)}</p><p class="font-system text-[10px] text-dead-tint mt-2">Something went wrong. ${esc(e.message)}</p>`;
   } finally {
     turnInProgress = false;
+    const bottomBar = $("#bottom-bar");
+    if (bottomBar) bottomBar.style.pointerEvents = "";
     if (input) {
       input.disabled = false;
       input.placeholder = "";
+      input.style.pointerEvents = "";
+      input.style.opacity = "";
     }
     if (obsInput) {
       obsInput.disabled = false;
       obsInput.placeholder = "TRAVEL ONLY...";
+      obsInput.style.pointerEvents = "";
+      obsInput.style.opacity = "";
     }
     if (state && state.run_status === "active" && input) input.focus();
     if (state && state.run_status === "dead_observing" && obsInput) obsInput.focus();
@@ -356,7 +369,7 @@ function renderTurn(el, playerText, data) {
   const { parsed_action: pa, npc_responses, world_state: ws } = data;
   const ambient = data.ambient_activity || [];
 
-  let h = `<div class="font-system text-[10px] tracking-[0.12em] text-[#2a2218] uppercase mb-4">${ws.current_year} AD</div>`;
+  let h = `<div class="font-system text-[10px] tracking-[0.12em] text-[#2a2218] mb-4">${ws.current_year} AD</div>`;
 
   // Ambient world activity FIRST — what NPCs are doing around you
   if (ambient.length) {
@@ -387,7 +400,7 @@ function renderTurn(el, playerText, data) {
   // NPC reactions to the player (if any)
   for (const r of npc_responses || []) {
     h += `<div class="my-4 pl-4" style="border-left: 2px solid #2a2218;">`;
-    h += `<div class="font-system text-[9px] tracking-[0.1em] text-on-secondary-container uppercase mb-1">${esc(r.npc_name)}</div>`;
+    h += `<div class="font-system text-[9px] tracking-[0.1em] text-on-secondary-container mb-1">${esc(r.npc_name)}</div>`;
     h += `<p class="font-body text-[17px] leading-relaxed text-on-surface">${esc(r.pov)}</p>`;
     h += `</div>`;
   }
@@ -435,32 +448,33 @@ const hamburgerPanel = $("#hamburger-panel");
 const hamburgerOverlay = $("#hamburger-overlay");
 const hamburgerIcon = $("#hamburger-icon");
 const hamburgerCloseIcon = $("#hamburger-close-icon");
+const panelCloseBtn = $("#btn-panel-close");
+
+function openPanel() {
+  hamburgerPanel.classList.add("open");
+  hamburgerOverlay.classList.remove("hidden");
+  if (hamburgerIcon) hamburgerIcon.classList.add("hidden");
+  if (hamburgerCloseIcon) hamburgerCloseIcon.classList.remove("hidden");
+}
+
+function closePanel() {
+  hamburgerPanel.classList.remove("open");
+  hamburgerOverlay.classList.add("hidden");
+  if (hamburgerIcon) hamburgerIcon.classList.remove("hidden");
+  if (hamburgerCloseIcon) hamburgerCloseIcon.classList.add("hidden");
+  var nrc = $("#new-run-confirm");
+  if (nrc) nrc.classList.add("hidden");
+}
 
 if (hamburgerBtn) {
   hamburgerBtn.addEventListener("click", () => {
-    const isOpen = hamburgerPanel.classList.contains("open");
-    if (isOpen) {
-      hamburgerPanel.classList.remove("open");
-      hamburgerOverlay.classList.add("hidden");
-      hamburgerIcon.classList.remove("hidden");
-      hamburgerCloseIcon.classList.add("hidden");
-    } else {
-      hamburgerPanel.classList.add("open");
-      hamburgerOverlay.classList.remove("hidden");
-      hamburgerIcon.classList.add("hidden");
-      hamburgerCloseIcon.classList.remove("hidden");
-    }
+    if (hamburgerPanel.classList.contains("open")) closePanel();
+    else openPanel();
   });
 }
 
-if (hamburgerOverlay) {
-  hamburgerOverlay.addEventListener("click", () => {
-    hamburgerPanel.classList.remove("open");
-    hamburgerOverlay.classList.add("hidden");
-    hamburgerIcon.classList.remove("hidden");
-    hamburgerCloseIcon.classList.add("hidden");
-  });
-}
+if (hamburgerOverlay) hamburgerOverlay.addEventListener("click", closePanel);
+if (panelCloseBtn) panelCloseBtn.addEventListener("click", closePanel);
 
 // Map toggle from hamburger
 const mapBtn = $("#btn-map-hamburger");
@@ -475,20 +489,17 @@ if (mapBtn) {
       mapContainer.classList.remove("hidden");
       if (manuscript) manuscript.style.display = "none";
       if (bottomBar) bottomBar.classList.add("hidden");
-      if (mapText) mapText.textContent = "MANUSCRIPT";
+      if (mapText) mapText.textContent = "Manuscript";
       if (typeof ChronosMap !== "undefined") ChronosMap.show(state, eraKey, runId);
     } else {
       mapContainer.classList.add("hidden");
       if (manuscript) manuscript.style.display = "";
       if (state && state.run_status === "active" && bottomBar) bottomBar.classList.remove("hidden");
-      if (mapText) mapText.textContent = "MAP";
+      if (mapText) mapText.textContent = "Map";
       if (typeof ChronosMap !== "undefined") ChronosMap.hide();
     }
 
-    hamburgerPanel.classList.remove("open");
-    hamburgerOverlay.classList.add("hidden");
-    hamburgerIcon.classList.remove("hidden");
-    hamburgerCloseIcon.classList.add("hidden");
+    closePanel();
   });
 }
 
@@ -503,11 +514,7 @@ if (newRunBtn) {
 const newRunYes = $("#btn-new-run-yes");
 if (newRunYes) {
   newRunYes.addEventListener("click", () => {
-    hamburgerPanel.classList.remove("open");
-    hamburgerOverlay.classList.add("hidden");
-    hamburgerIcon.classList.remove("hidden");
-    hamburgerCloseIcon.classList.add("hidden");
-    if (newRunConfirm) newRunConfirm.classList.add("hidden");
+    closePanel();
     clearRunFromStorage();
     startNewRun();
   });
@@ -561,67 +568,116 @@ function completeProgressBar() {
 }
 
 // -------------------------------------------------------------------
-// Word definition overlay
+// Selection overlay: single word → definition, multi-word → context
 // -------------------------------------------------------------------
 
-(function initWordDefinitions() {
-  const tooltip = document.getElementById("word-tooltip");
-  if (!tooltip) return;
+(function initSelectionOverlays() {
+  var tooltip = document.getElementById("word-tooltip");
+  var ctxBtn = document.getElementById("context-btn");
+  var ctxPanel = document.getElementById("context-panel");
+  if (!tooltip || !ctxBtn || !ctxPanel) return;
 
-  let debounce = null;
+  var debounce = null;
+  var pendingText = "";
 
-  document.addEventListener("selectionchange", () => {
+  function hideAll() {
+    tooltip.style.display = "none";
+    ctxBtn.style.display = "none";
+    ctxPanel.style.display = "none";
+    pendingText = "";
+  }
+
+  document.addEventListener("mousedown", function (e) {
+    if (e.target === ctxBtn || ctxBtn.contains(e.target)) return;
+    hideAll();
+  });
+
+  document.addEventListener("selectionchange", function () {
     clearTimeout(debounce);
     debounce = setTimeout(handleSelection, 300);
   });
 
-  document.addEventListener("mousedown", () => {
-    tooltip.style.display = "none";
-  });
+  function inManuscript(node) {
+    if (!node) return false;
+    var el = node.parentElement || node;
+    var ms = document.getElementById("manuscript-inner") || document.getElementById("manuscript");
+    return ms && ms.contains(el);
+  }
 
-  async function handleSelection() {
-    const sel = window.getSelection();
-    if (!sel || sel.isCollapsed) { tooltip.style.display = "none"; return; }
-
-    const text = sel.toString().trim();
-    if (!text || text.includes(" ") || text.length < 2 || text.length > 30) {
-      tooltip.style.display = "none";
-      return;
-    }
-
-    const container = sel.anchorNode && sel.anchorNode.parentElement;
-    if (!container) return;
-    const manuscript = document.getElementById("manuscript-inner") || document.getElementById("manuscript");
-    if (!manuscript || !manuscript.contains(container)) return;
-
-    try {
-      const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(text.toLowerCase())}`);
-      if (!res.ok) { tooltip.style.display = "none"; return; }
-      const data = await res.json();
-      if (!data || !data[0]) return;
-
-      const entry = data[0];
-      const meaning = entry.meanings && entry.meanings[0];
-      const def = meaning && meaning.definitions && meaning.definitions[0];
-      if (!def) return;
-
-      tooltip.innerHTML =
-        `<div class="def-word">${esc(entry.word)}</div>` +
-        (meaning.partOfSpeech ? `<div class="def-pos">${esc(meaning.partOfSpeech)}</div>` : "") +
-        `<div class="def-meaning">${esc(def.definition)}</div>`;
-
-      const range = sel.getRangeAt(0);
-      const rect = range.getBoundingClientRect();
-      tooltip.style.left = Math.min(rect.left, window.innerWidth - 320) + "px";
-      tooltip.style.top = (rect.top - tooltip.offsetHeight - 8) + "px";
-      if (parseInt(tooltip.style.top) < 40) {
-        tooltip.style.top = (rect.bottom + 8) + "px";
-      }
-      tooltip.style.display = "block";
-    } catch {
-      tooltip.style.display = "none";
+  function positionAt(el, rect, maxW) {
+    var left = Math.min(rect.left + rect.width / 2 - 40, window.innerWidth - (maxW || 320));
+    if (left < 8) left = 8;
+    el.style.left = left + "px";
+    el.style.top = (rect.top - el.offsetHeight - 8) + "px";
+    if (parseInt(el.style.top) < 40) {
+      el.style.top = (rect.bottom + 8) + "px";
     }
   }
+
+  async function handleSelection() {
+    var sel = window.getSelection();
+    if (!sel || sel.isCollapsed) return;
+
+    var text = sel.toString().trim();
+    if (!text || text.length < 2) return;
+    if (!inManuscript(sel.anchorNode)) return;
+
+    var range = sel.getRangeAt(0);
+    var rect = range.getBoundingClientRect();
+    var hasSpaces = text.includes(" ");
+
+    if (!hasSpaces && text.length <= 30) {
+      ctxBtn.style.display = "none";
+      try {
+        var res = await fetch("https://api.dictionaryapi.dev/api/v2/entries/en/" + encodeURIComponent(text.toLowerCase()));
+        if (!res.ok) return;
+        var data = await res.json();
+        if (!data || !data[0]) return;
+        var entry = data[0];
+        var meaning = entry.meanings && entry.meanings[0];
+        var def = meaning && meaning.definitions && meaning.definitions[0];
+        if (!def) return;
+
+        tooltip.innerHTML =
+          '<div class="def-word">' + esc(entry.word) + "</div>" +
+          (meaning.partOfSpeech ? '<div class="def-pos">' + esc(meaning.partOfSpeech) + "</div>" : "") +
+          '<div class="def-meaning">' + esc(def.definition) + "</div>";
+        tooltip.style.display = "block";
+        positionAt(tooltip, rect, 320);
+      } catch { /* ignore */ }
+    } else if (hasSpaces && text.length >= 10) {
+      tooltip.style.display = "none";
+      pendingText = text.substring(0, 500);
+      ctxBtn.style.display = "block";
+      positionAt(ctxBtn, rect, 120);
+    }
+  }
+
+  ctxBtn.addEventListener("click", async function () {
+    if (!pendingText || !runId) return;
+    var rect = { left: parseInt(ctxBtn.style.left), top: parseInt(ctxBtn.style.top), width: 80, height: 20, bottom: parseInt(ctxBtn.style.top) + 28 };
+
+    ctxBtn.style.display = "none";
+    ctxPanel.innerHTML = '<span class="ctx-loading">Searching the archives...</span>';
+    ctxPanel.style.display = "block";
+    positionAt(ctxPanel, rect, 380);
+
+    try {
+      var res = await fetch("/api/run/" + runId + "/context", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: pendingText }),
+      });
+      if (!res.ok) throw new Error();
+      var data = await res.json();
+      ctxPanel.textContent = data.context;
+    } catch {
+      ctxPanel.textContent = "The archives offer no further illumination on this matter.";
+    }
+    ctxPanel.style.display = "block";
+    positionAt(ctxPanel, rect, 380);
+    pendingText = "";
+  });
 })();
 
 // -------------------------------------------------------------------
