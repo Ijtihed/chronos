@@ -26,9 +26,12 @@ Tracking:
 ## Observations (not blocking, worth tracking)
 
 - **NPC response length compliance:** The `llama3.1:8b` model frequently exceeds the "2-4 sentences" constraint. May need `max_tokens` or prompt rewording.
-- **Disposition shift granularity:** Fixed ladder (`grim -> cautious -> warming`) may need continuous values or multi-dimensional disposition (trust, fear, respect) for deeper NPC relationships.
 - **Ambient activity volume:** The simulation-first rebuild generates 2-4 NPC actions per turn at the player's location. This may need tuning — too few feels dead, too many feels noisy.
 - **Loading screen generation time:** Character generation via Ollama takes 1-2 minutes. The two-step loading flow (preview instant, characters in background) mitigates this but the wait is still long.
+- **Turn latency with all-NPC LLM calls:** Every NPC now gets an LLM call every turn (full for nearby, light for offscreen). With 12 NPCs this means 12 concurrent Ollama calls per turn. Latency depends on `OLLAMA_NUM_PARALLEL` setting and available VRAM. May need to swap Ollama for vLLM/SGLang if turns take >15s.
+- **Utility scoring opportunity set:** The 10 hardcoded world opportunities (trade_caravan_passing, siege_threat, etc.) may need era-specific variants. A 1990s run shouldn't advertise "siege_threat" in the same way as a medieval one.
+- **Consequence queue growth during time-skip:** Skipping 30 turns generates rumor consequences every 3 turns at high-tension locations. Queue cleanup runs each turn but the event list grows linearly. May need event list pruning for very long runs.
+- **Frontend skip button:** The `/api/run/{id}/skip` endpoint exists but the frontend has no UI for it. Needs a time-advance button or keyboard shortcut.
 
 ## Closed
 
@@ -56,3 +59,9 @@ Tracking:
 - [x] **Two-step loading flow** — Era info (events, voices, description) loads instantly via preview endpoint. Character generation happens in background. Prevents empty loading screen. (2026-04-01)
 - [x] **NPC voice and tone** — NPCs speak like real people, not poets or narrators. Blunt, messy, emotional, sometimes crude. Swearing is fine when it fits. Two normal people talking, not a dramatic reading. Language adapts to era naturally but register is always conversational. (2026-04-01)
 - [x] **Era coverage expansion** — The game covers all post-0 AD history including 1800s, 1900s, and 2000s. A run in 2003 Baghdad uses the same mechanics as 410 AD Italia. Modern eras planned for expansion beyond the current 5-era starter set. CShapes 2.0 for post-1886 borders. (2026-04-01)
+- [x] **Disposition shift granularity** — Expanded from 7 to 13 dispositions in a coherent chain (hostile → fearful → wary → grim → guarded → suspicious → cautious → neutral → reserved → formal → engaged → fervent → commanding → warming). All archetype baselines are now reachable. Drift toward baseline every 5 turns. The needs system provides the multi-dimensional inner state (17 needs) that the old fixed ladder lacked. (2026-04-06)
+- [x] **NPC autonomy internals** — NPCs now have personality traits (5), inner needs (17), utility scoring against world opportunities, and event-driven permanent trait shifts. Decisions are made by the scoring system; the LLM narrates. Every NPC gets an LLM call every turn — no rule-based shortcuts. (2026-04-06)
+- [x] **Time acceleration mechanism** — Player-triggered via POST /api/run/{id}/skip with ticks 1-30. Runs stages 1-4 of the pipeline per tick. Returns a re-grounding passage (sensory, present-tense, who is nearby). No recap. Frontend button not yet built. (2026-04-06)
+- [x] **Autonomous world pipeline** — 7-stage pipeline: drift → consequences → events → NPC actions → player input → narrative → persistence. Stages 1-4 run without the player. Structural drift (tension, disposition, needs, rumors) and probabilistic events (skirmishes, unrest, trade disruption, refugee flight) are LLM-free. (2026-04-06)
+- [x] **Consequence queue** — Actions schedule delayed effects on WorldState. 8 effect types: tension_shift, rumor, trade_disruption, npc_arrival, event_spawn, material_change, disposition_shift, need_pressure. Validated at fire time. Cleaned up after processing. (2026-04-06)
+- [x] **SQLite performance** — WAL mode + synchronous=NORMAL + busy_timeout=5000 + 64MB cache + temp_store=MEMORY. Per-session asyncio lock on turn/skip endpoints prevents double-submit. (2026-04-06)

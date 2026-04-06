@@ -54,6 +54,35 @@ Events come from two sources:
 
 This means the map is always a partial view. It shows the world as the character understands it, not as it actually is. The gap between what the map shows and what is actually happening is part of the game.
 
+## Autonomous world systems
+
+The world runs whether the player does anything or not. Three LLM-free systems operate every turn before NPC actions:
+
+### Structural drift
+
+Every turn, the world shifts structurally without any LLM calls:
+
+- **Tension drift** — every 3 turns, a random location's tension escalates one step. Critical-tension locations have a 15% chance to spread tension to adjacent locations.
+- **Disposition drift** — every 5 turns, each NPC's disposition drifts one step toward their archetype baseline. A soldier forced into "warming" toward an enemy gradually returns to "guarded." A refugee scared into "hostile" drifts back to "fearful."
+- **Needs decay** — all NPC needs decay every turn at type-specific rates. Survival/safety decay fastest (3-5 per turn + tension bonus). Social/trade/duty decay at medium rate (2-4). Knowledge/power/faith decay slowest (1-2). Higher local tension accelerates survival/safety decay.
+- **Rumor propagation** — every 3 turns, locations with high tension or recent events schedule rumors at adjacent locations 1-2 turns in the future.
+
+### Probabilistic world events
+
+Every turn, location-level and NPC-level rules fire independently:
+
+- Armed skirmishes (30% at critical tension with soldiers present)
+- Civilian unrest (20% at high tension without soldiers)
+- Tension spreading to neighbors (15% from critical locations)
+- Food shortage rumors (25% where famine events exist)
+- Trade route disruption (40% during sieges, delayed 2 turns)
+- Merchant attraction (20% at peaceful locations)
+- Refugee flight (50% for refugee-archetype NPCs in high-tension locations, toward lowest-tension neighbor)
+
+### Disposition chain
+
+NPCs have 13 possible dispositions in a coherent chain: hostile → fearful → wary → grim → guarded → suspicious → cautious → neutral → reserved → formal → engaged → fervent → commanding → warming. Shifts move one step at a time. Each archetype has a baseline disposition they drift toward over time.
+
 ## Run initialization
 
 Each run seeds from a randomly selected historical era (post 0 AD). The game generates:

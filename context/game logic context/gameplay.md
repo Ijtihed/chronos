@@ -24,26 +24,54 @@ The simulation operates at the level of weeks, months, and years. Each turn repr
 
 ## How a turn works
 
-Every turn, the world moves forward. NPCs act autonomously — they pursue their own goals, react to events around them, travel between locations, interact with each other. This happens continuously as background activity. The player witnesses what unfolds at their location.
+Every turn runs a 7-stage autonomous pipeline:
 
-The player types one decision in natural language. The simulation interprets it. The consequences ripple outward — but the player's action is one thread among many. The narrative is dominated by what is happening in the world, not by the player's action in isolation.
+1. **Structural drift** (no LLM) — tension escalates and spreads between locations, NPC dispositions drift toward archetype baselines, NPC needs decay, rumors propagate from high-tension locations to neighbors.
+2. **Scheduled consequences** (no LLM) — delayed effects from past actions fire. A betrayal on turn 5 might spread as a rumor on turn 7, shift NPC dispositions on turn 9, and increase tension on turn 12. Invalid consequences (target died, world diverged) are cancelled.
+3. **World events** (no LLM, probabilistic) — skirmishes erupt at high-tension locations with soldiers, civilian unrest breaks out where there are no soldiers, tension spreads to neighbors, trade routes are cut during sieges, refugees flee to safer locations, peaceful towns attract merchants.
+4. **NPC autonomous actions** (LLM) — every NPC acts every turn. NPCs at the player's location get a full LLM call with rich context. All other NPCs get a lighter LLM call with their dominant need and local tension. The world is always alive everywhere. The utility scoring system picks what each NPC does based on their inner needs; the LLM narrates how they do it.
+5. **Player input** (optional) — if the player typed something, it is parsed, applied, and consequences scheduled. If not, this stage is skipped.
+6. **Narrative assembly** — what the player sees is composed from ambient NPC activity + world events + player action consequences.
+7. **Persistence** — state saved to SQLite.
+
+Stages 1-4 run whether or not the player does anything. The player's input is one optional slice.
 
 **Sometimes nobody cares.** If the player does something minor in a place where nothing is at stake, the world may not react at all. A grain deal in a peaceful town produces no drama. The same deal during a siege changes lives.
 
-**Inaction is a valid decision.** If the player types something like "wait" or "do nothing" or speeds up time, the character acts autonomously based on their archetype, backstory, and current situation. The world does not pause. Time passes regardless. Events unfold.
+**Inaction is a valid decision.** If the player types something like "wait" or "do nothing" or speeds up time, the character acts autonomously based on their archetype, personality, and current needs. The world does not pause. Time passes regardless. Events unfold.
+
+**Time acceleration.** The player can skip 1-30 turns at once (`POST /api/run/{id}/skip`). The pipeline runs stages 1-4 for each skipped turn. After all ticks complete, a re-grounding passage describes where the player is, who is nearby, and the current year. No recap of what happened — that information must be gathered by traveling and talking to NPCs.
 
 **Anachronistic language is silently interpreted.** If a player uses modern phrasing — "broker a deal," "go viral," "DM the general" — the game translates this into era-appropriate action without correcting or breaking immersion. The intent is preserved; the language is adapted.
 
+## Consequence queue
+
+Significant actions schedule delayed effects that fire on future turns. This gives the world momentum — past decisions haunt the present. Effect types: tension shifts, rumors, trade disruptions, NPC arrivals, event spawns, material changes, disposition shifts, and need pressure.
+
+Consequences are validated when they fire, not just when they're scheduled. If the world has diverged (the target NPC died, the location was destroyed, the player changed history), obsolete consequences are cancelled. The queue is cleaned up each turn.
+
 ## NPC autonomy
 
-NPCs are not reactive to the player. They are autonomous agents living their own simulated lives. Every turn:
+NPCs are not reactive to the player. They are autonomous agents with inner lives. Every NPC has:
 
-- NPCs at the player's location act in the background — the player witnesses their activity as ambient narrative
-- NPCs elsewhere make their own decisions based on their archetype, goals, and the current state of the world
+**Personality traits** — five core traits (ambition, compassion, courage, piety, pragmatism) rolled randomly within archetype-specific ranges at creation. No two soldiers are identical. A high-compassion soldier behaves differently from a high-ambition one.
+
+**Inner needs** — 17 need types (survival, safety, family, social, trade, profit, power, reputation, honor, duty, loyalty, faith, knowledge, order, community, harvest, stability) calculated from archetype + personality traits. Needs decay every turn. When a need drops below 30 it becomes urgent; below 15 it becomes critical and overrides all other behavior.
+
+**Need-driven decisions** — the world advertises opportunities at each location (trade caravan, siege threat, food shortage, peaceful conditions, etc.). Each NPC scores these against their depleted needs using Maslow-style urgency curves — survival needs spike exponentially when critical. The NPC picks from the top-3 scoring options with weighted random selection (deliberate imperfection). The LLM's job is to narrate this decision, not to make it.
+
+**Event-driven shifts** — witnessing death spikes survival needs. Betrayal permanently lowers loyalty. Prolonged hunger permanently increases pragmatism and decreases compassion. These shifts are logged in the NPC's needs history.
+
+Every turn:
+
+- Every NPC in the game gets an LLM call — the world is alive everywhere, not just at the player's location
+- NPCs at the player's location get a full LLM call with rich context — the player witnesses their activity as ambient narrative
+- NPCs elsewhere get a lighter LLM call with their dominant need and local tension — they still act genuinely
 - NPCs travel between locations on their own, following trade routes, military orders, religious pilgrimages, or flight from danger
 - NPCs interact with each other — alliances form, conflicts emerge, trust builds or breaks — independently of the player
+- When multiple NPCs target the same entity, archetype-priority conflict resolution determines who proceeds
 
-NPC behavior is grounded in historical context. A centurion follows military logic. A merchant follows trade logic. A refugee follows survival logic. Their decisions are what would most plausibly happen given who they are, where they are, and what's happening around them.
+NPC behavior is grounded in historical context and driven by their inner state. A centurion with critical duty needs defends the walls. A merchant with critical survival needs abandons trade and flees. A refugee with depleted safety automatically moves toward lower-tension locations. Their decisions are what would most plausibly happen given who they are, what they need, and what's happening around them.
 
 The player may influence NPCs through their actions, but NPCs are not waiting for the player to do something. They have their own lives.
 

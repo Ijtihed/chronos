@@ -7,11 +7,11 @@
 ## Current project status
 
 **Phase 0 — Proof of Life: COMPLETE** (2026-03-31).
-**Phase 1 — Playable Text Loop: REBUILT simulation-first** (2026-04-01). Core systems work. Turn loop now: world simulates (NPCs act) then player acts. Ambient NPC activity visible each turn. NPC perception endpoint built. Pending full playtest against success criteria.
+**Phase 1 — Playable Text Loop: REBUILT simulation-first** (2026-04-01). Core systems work. Autonomous world simulation rebuilt (2026-04-06): 7-stage pipeline, NPC personality/needs, structural drift, probabilistic events, utility scoring, consequence queue, time-skip endpoint. 493 tests.
 **Phase 2 — The Map: COMPLETE** (2026-04-01). 2D Leaflet map with historical borders, visited/unvisited NPC markers, toggle with narrative.
 **Next: Phase 2.5 — Map Intelligence + HCE.** Events DB, ground context, region knowledge on click, event markers, word definitions overlay.
 
-**Core design:** CHRONOS is a historical simulation observed through one person's perspective. NPCs are autonomous subagents — they travel, interact, act independently every turn. The player is a lens, not a protagonist. The narrative is dominated by world activity, not player actions. Sometimes nobody cares what the player did. The player can speed up time. In the future, the same simulation can be viewed through different characters' perspectives.
+**Core design:** CHRONOS is a historical simulation observed through one person's perspective. NPCs are autonomous subagents with personality traits and inner needs — they travel, interact, act independently every turn based on utility scoring against their situation. The player is a lens, not a protagonist. The narrative is dominated by world activity, not player actions. Sometimes nobody cares what the player did. The player can speed up time. Every NPC gets an LLM call every turn — the world is always alive everywhere, not just at the player's location. In the future, the same simulation can be viewed through different characters' perspectives.
 
 ## Read in this order
 
@@ -29,7 +29,7 @@
 |----------|------|
 | `context/game logic context/` | Full design narrative (this index + linked files); **living** — update when design decisions are made |
 | `context/other/` | Lessons learned, architectural post-mortems, design mistakes to avoid |
-| `backend/` | Python server (FastAPI) — action parser, NPC engine, world engine, world state, death engine, character gen, HKE, persistence |
+| `backend/` | Python server (FastAPI) — action parser, NPC engine, world engine, NPC personality/needs, world drift, world events, world state, death engine, character gen, HKE, persistence |
 | `frontend/` | Browser UI (HTML/JS/Tailwind), Leaflet map, geo data |
 | `prompts/` | LLM prompt templates — design artifacts, reviewed separately from code |
 | `tests/` | Automated test suite (unit, integration with mocked LLM, live with Ollama) |

@@ -399,21 +399,36 @@ Use this shape:
 
 ### Phase 1
 
-- **Completed:** 2026-04-01 (rebuilt simulation-first)
-- **Success criteria:** Core systems built and turn loop rebuilt to simulation-first architecture. Pending full playtest.
-  - *Infrastructure:* 5 eras, character generation, travel, death/aging, memory decay, erasure, RAG/HKE v1, SQLite persistence, unified turn endpoint — all working.
-  - *Simulation-first rebuild:* World simulates every turn (NPCs act autonomously), player action is one thread. Ambient NPC activity visible at player's location. NPCs can travel between locations. NPC perception endpoint built.
+- **Completed:** 2026-04-01 (rebuilt simulation-first), **Autonomous world simulation added:** 2026-04-06
+- **Success criteria:** Core systems built and turn loop rebuilt to simulation-first architecture. Autonomous world systems added: 7-stage pipeline, NPC personality/needs, structural drift, probabilistic events, utility scoring, consequence queue, time-skip.
+  - *Infrastructure:* 5 eras, character generation, travel, death/aging, memory decay, erasure, RAG/HKE v1, SQLite persistence (WAL mode, per-session locking), unified turn endpoint — all working.
+  - *Simulation-first rebuild:* World simulates every turn via 7-stage pipeline (drift → consequences → events → NPC actions → player → narrative → save). Player input is one optional stage. NPCs act autonomously at all locations every turn via LLM calls. NPC perception endpoint built.
+  - *Autonomous world systems (2026-04-06):*
+    - NPC personality traits (ambition/compassion/courage/piety/pragmatism) generated from archetype ranges
+    - 17 NPC needs that decay each turn with Maslow-style urgency curves
+    - Event-driven need shifts with permanent trait changes
+    - Scheduled consequence queue on WorldState (delayed effects fire on future turns)
+    - Structural drift: tension spreads, dispositions drift to archetype baselines, needs decay, rumors propagate
+    - Probabilistic world events: skirmishes, civilian unrest, trade disruption, refugee flight, merchant attraction
+    - Utility scoring: NPCs choose actions based on needs vs situation; LLM narrates the decision
+    - Time-skip endpoint: POST /api/run/{id}/skip advances 1-30 turns
+    - Conflict resolution: archetype-priority when NPCs target the same entity
+    - Expanded disposition chain (13 states) so all archetype baselines are reachable
+    - 493 tests, 0 failures
   - *What was wrong initially:* Turn loop was player-centric (player acts, world reacts). Rebuilt to world-simulates-then-player-acts. See context/other/lessons-learned.md.
 - **Planned vs actual:**
   - All mechanical systems shipped as planned.
   - The simulation-first architecture was not in the original plan — it emerged from playtesting feedback. The initial build felt like a text adventure, not a simulation.
   - NPC autonomy (travel, NPC-on-NPC interaction, ambient activity) added in the rebuild.
   - Two-step loading flow (era preview instant, characters in background) added to fix empty loading screen.
+  - Autonomous world systems (personality, needs, drift, events, utility scoring, consequence queue) added 2026-04-06 — not in original Phase 1 plan but architecturally foundational.
 - **Carryover:**
-  - NPC autonomy needs playtesting — is 2-4 NPCs acting per turn enough? Too many? Too few?
+  - NPC autonomy needs playtesting — is 2-4 NPCs acting per turn at the player's location enough? Too many? Too few?
   - NPC-on-NPC interactions are generated but shallow — they name an interaction partner but don't track persistent NPC-NPC relationships yet (Phase 5).
   - Relevance filter for player action reactions may still need tuning.
   - Loading screen events/voices are hardcoded per era config — should eventually come from HCE Events DB.
+  - Frontend has no skip/time-advance button yet — endpoint exists but no UI.
+  - Utility scoring opportunities are hardcoded — may need era-specific opportunity sets.
 
 ### Phase 2
 
