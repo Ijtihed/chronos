@@ -1,0 +1,182 @@
+[
+  {
+    "year": 1402,
+    "region": "Anatolia",
+    "event": "Battle of Ankara — Timur defeats Sultan Bayezid I, shattering Ottoman power and delaying the threat to Constantinople by decades",
+    "significance": "civilizational",
+    "type": "war",
+    "affects": ["military", "political_stability", "trade"],
+    "wikidata_qid": "Q160627"
+  },
+  {
+    "year": 1403,
+    "region": "Anatolia",
+    "event": "Ottoman Interregnum begins — Bayezid's sons war for succession, fragmenting the empire into rival sultanates",
+    "significance": "civilizational",
+    "type": "political",
+    "affects": ["political_stability", "military"],
+    "wikidata_qid": "Q862760"
+  },
+  {
+    "year": 1413,
+    "region": "Anatolia",
+    "event": "Mehmed I reunifies the Ottoman Empire after defeating his brothers, ending the interregnum",
+    "significance": "regional",
+    "type": "political",
+    "affects": ["political_stability", "military"],
+    "wikidata_qid": "Q171053"
+  },
+  {
+    "year": 1421,
+    "region": "Anatolia",
+    "event": "Murad II becomes Sultan — begins rebuilding Ottoman military power and turning attention back toward Constantinople",
+    "significance": "regional",
+    "type": "political",
+    "affects": ["military", "political_stability"],
+    "wikidata_qid": "Q171057"
+  },
+  {
+    "year": 1422,
+    "region": "Byzantine Empire",
+    "event": "First Ottoman siege of Constantinople under Murad II — the walls hold but the empire's vulnerability is exposed",
+    "significance": "civilizational",
+    "type": "war",
+    "affects": ["military", "population", "trade", "political_stability"],
+    "wikidata_qid": "Q1523932"
+  },
+  {
+    "year": 1423,
+    "region": "Byzantine Empire",
+    "event": "Thessalonica sold to Venice — the Byzantines cannot defend their second city and hand it to a trading power",
+    "significance": "regional",
+    "type": "political",
+    "affects": ["trade", "political_stability"],
+    "wikidata_qid": "Q957505"
+  },
+  {
+    "year": 1430,
+    "region": "Byzantine Empire",
+    "event": "Fall of Thessalonica to the Ottomans — Venice loses the city after seven years, population massacred or enslaved",
+    "significance": "civilizational",
+    "type": "war",
+    "affects": ["military", "population", "trade"],
+    "wikidata_qid": "Q578654"
+  },
+  {
+    "year": 1439,
+    "region": "Mediterranean",
+    "event": "Council of Florence — Byzantine Emperor John VIII agrees to union of Eastern and Western churches in exchange for military aid that never materializes",
+    "significance": "civilizational",
+    "type": "religious",
+    "affects": ["religion", "political_stability"],
+    "wikidata_qid": "Q184810"
+  },
+  {
+    "year": 1440,
+    "region": "Balkans",
+    "event": "Ottoman siege of Belgrade repelled by Hungarian forces under John Hunyadi",
+    "significance": "regional",
+    "type": "war",
+    "affects": ["military", "political_stability"],
+    "wikidata_qid": "Q1477416"
+  },
+  {
+    "year": 1443,
+    "region": "Balkans",
+    "event": "Crusade of Varna launched — Hungarian, Polish, and Wallachian forces march against the Ottomans",
+    "significance": "regional",
+    "type": "war",
+    "affects": ["military", "religion"],
+    "wikidata_qid": "Q326936"
+  },
+  {
+    "year": 1444,
+    "region": "Balkans",
+    "event": "Battle of Varna — Crusader army destroyed, King Władysław III killed. Last serious Western attempt to save Constantinople fails",
+    "significance": "civilizational",
+    "type": "war",
+    "affects": ["military", "political_stability", "religion"],
+    "wikidata_qid": "Q170266"
+  },
+  {
+    "year": 1446,
+    "region": "Balkans",
+    "event": "Ottoman devastation of the Morea — Byzantine despotate in the Peloponnese ravaged, Hexamilion wall destroyed",
+    "significance": "regional",
+    "type": "war",
+    "affects": ["military", "population", "infrastructure"],
+    "wikidata_qid": "Q16958429"
+  },
+  {
+    "year": 1448,
+    "region": "Balkans",
+    "event": "Second Battle of Kosovo — Hunyadi defeated again. Ottoman control of the Balkans is now uncontested",
+    "significance": "regional",
+    "type": "war",
+    "affects": ["military", "political_stability"],
+    "wikidata_qid": "Q170301"
+  },
+  {
+    "year": 1451,
+    "region": "Anatolia",
+    "event": "Mehmed II becomes Sultan at age 19 — immediately begins planning the conquest of Constantinople",
+    "significance": "civilizational",
+    "type": "political",
+    "affects": ["military", "political_stability"],
+    "wikidata_qid": "Q34503"
+  },
+  {
+    "year": 1452,
+    "region": "Byzantine Empire",
+    "event": "Rumeli Hisarı fortress constructed on the Bosphorus — Mehmed II cuts Constantinople's Black Sea supply line",
+    "significance": "regional",
+    "type": "war",
+    "affects": ["military", "trade", "infrastructure"],
+    "wikidata_qid": "Q746559"
+  },
+  {
+    "year": 1452,
+    "region": "Byzantine Empire",
+    "event": "Venetian and Genoese communities in Constantinople debate whether to fight or negotiate — the city's Italian quarters are divided",
+    "significance": "local",
+    "type": "political",
+    "affects": ["trade", "political_stability"],
+    "wikidata_qid": null
+  },
+  {
+    "year": 1453,
+    "region": "Byzantine Empire",
+    "event": "Siege of Constantinople begins — Mehmed II's army of 80,000 surrounds the city with the largest cannon ever built",
+    "significance": "civilizational",
+    "type": "war",
+    "affects": ["military", "population", "trade", "political_stability", "religion"],
+    "wikidata_qid": "Q105765"
+  },
+  {
+    "year": 1453,
+    "region": "Byzantine Empire",
+    "event": "Fall of Constantinople — the city falls on May 29. Emperor Constantine XI dies fighting. The Byzantine Empire ends after 1,100 years",
+    "significance": "civilizational",
+    "type": "war",
+    "affects": ["military", "population", "trade", "political_stability", "religion", "culture"],
+    "wikidata_qid": "Q105765"
+  },
+  {
+    "year": 1453,
+    "region": "Mediterranean",
+    "event": "Greek scholars flee to Italy carrying manuscripts — accelerating the Italian Renaissance and the transmission of classical knowledge",
+    "significance": "civilizational",
+    "type": "cultural",
+    "affects": ["culture", "religion"],
+    "wikidata_qid": null
+  },
+  {
+    "year": 1410,
+    "region": "Byzantine Empire",
+    "event": "Constantinople's population has fallen below 50,000 — once a city of half a million, it is now a collection of villages inside ancient walls",
+    "significance": "regional",
+    "type": "economic",
+    "affects": ["population", "trade", "infrastructure"],
+    "wikidata_qid": null
+  }
+]
