@@ -135,7 +135,7 @@ class TestNpcImpacts:
         }
         new = apply_action(initial_state, action)
         gallus = next(n for n in new.npcs if n.id == "centurion_gallus")
-        assert gallus.disposition == "cautious"
+        assert gallus.disposition == "guarded"
 
     def test_negative_impact_shifts_disposition(self, initial_state):
         action = {
@@ -177,7 +177,7 @@ class TestNpcImpacts:
         }
         new = apply_action(initial_state, action)
         gallus = next(n for n in new.npcs if n.id == "centurion_gallus")
-        assert gallus.disposition == "cautious"
+        assert gallus.disposition == "guarded"
 
     def test_ignores_malformed_impacts(self, initial_state):
         action = {
@@ -238,23 +238,23 @@ class TestNpcMemory:
 
 
 class TestDispositionShifts:
-    def test_grim_to_cautious(self):
-        assert _shift_positive("grim") == "cautious"
+    def test_grim_to_guarded(self):
+        assert _shift_positive("grim") == "guarded"
 
     def test_fervent_to_engaged(self):
         assert _shift_positive("fervent") == "engaged"
 
-    def test_hostile_to_wary(self):
-        assert _shift_positive("hostile") == "wary"
+    def test_hostile_to_fearful(self):
+        assert _shift_positive("hostile") == "fearful"
 
-    def test_cautious_to_warming(self):
-        assert _shift_positive("cautious") == "warming"
+    def test_cautious_to_neutral(self):
+        assert _shift_positive("cautious") == "neutral"
 
     def test_unknown_positive_stays_same(self):
         assert _shift_positive("confused") == "confused"
 
-    def test_warming_to_cautious_negative(self):
-        assert _shift_negative("warming") == "cautious"
+    def test_warming_to_engaged_negative(self):
+        assert _shift_negative("warming") == "engaged"
 
     def test_grim_to_hostile_negative(self):
         assert _shift_negative("grim") == "hostile"

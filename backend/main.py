@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+from collections import defaultdict
 from pathlib import Path
 from string import Template
 
@@ -47,7 +48,13 @@ from backend.player_knowledge import (
     filter_historical_events,
     _knowledge_tier,
 )
-from backend.world_engine import advance_world, player_skip_turn, simulate_turn
+from backend.world_engine import (
+    advance_world,
+    advance_world_skip,
+    generate_arrival_catchup,
+    player_skip_turn,
+    simulate_turn,
+)
 from backend.world_state import (
     Event,
     WorldState,
@@ -61,6 +68,8 @@ from backend.world_state import (
 logger = logging.getLogger("chronos")
 
 app = FastAPI(title="CHRONOS", version="0.2.0")
+
+_session_locks: dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
 
 _NPC_PERCEPTION_PATH = (
     Path(__file__).resolve().parent.parent / "prompts" / "npc_perception.md"
@@ -189,6 +198,11 @@ async def reset_run(run_id: str):
 
 @app.post("/api/run/{run_id}/turn")
 async def take_turn(run_id: str, req: TurnRequest):
+    async with _session_locks[run_id]:
+        return await _execute_turn(run_id, req)
+
+
+async def _execute_turn(run_id: str, req: TurnRequest) -> dict:
     state = await _load_or_404(run_id)
 
     if state.run_status == "ended":
@@ -262,6 +276,65 @@ async def take_turn(run_id: str, req: TurnRequest):
         "player_view": pv.model_dump(),
         "npc_responses": npc_responses,
         "death": death_info,
+    }
+
+
+# ------------------------------------------------------------------
+# Skip / time advance
+# ------------------------------------------------------------------
+
+class SkipRequest(BaseModel):
+    ticks: int = 1
+
+
+@app.post("/api/run/{run_id}/skip")
+async def skip_turns(run_id: str, req: SkipRequest):
+    async with _session_locks[run_id]:
+        return await _execute_skip(run_id, req)
+
+
+async def _execute_skip(run_id: str, req: SkipRequest) -> dict:
+    state = await _load_or_404(run_id)
+
+    if state.run_status != "active":
+        raise HTTPException(403, f"Run is '{state.run_status}'")
+
+    ticks = max(1, min(30, req.ticks))
+    state_before = state.model_dump()
+
+    state = await advance_world_skip(state, ticks=ticks)
+
+    nearby = npcs_near_player(state)
+    player_loc = get_player_location(state)
+
+    regrounding = (
+        f"Time passes. It is now year {state.current_year} AD. "
+        f"You are in {player_loc.name}. "
+    )
+    if nearby:
+        npc_names = ", ".join(n.name for n in nearby[:3])
+        regrounding += f"{npc_names} {'is' if len(nearby[:3]) == 1 else 'are'} nearby."
+    else:
+        regrounding += "The area seems quiet."
+
+    await save_session(state)
+
+    pv = build_player_view(state, run_id)
+    narrative = build_narrative_output([], {"action_type": "skip", "era_description": regrounding}, [])
+    await append_turn_log(
+        run_id=run_id, turn_number=state.turn,
+        player_input=f"[skip {ticks} turns]",
+        parsed_action={"action_type": "skip", "ticks": ticks},
+        ambient_activity=[], npc_responses=[],
+        state_changes=compute_state_diff(state_before, state.model_dump()),
+        narrative_output=narrative,
+        player_view_snapshot=pv.model_dump(),
+    )
+
+    return {
+        "ticks_advanced": ticks,
+        "regrounding": regrounding,
+        "player_view": pv.model_dump(),
     }
 
 
@@ -593,6 +666,9 @@ async def _handle_observation(state: WorldState, text: str) -> dict:
             }
 
     state.turn += 1
+    state.current_year = int(
+        state.era.year_start + state.turn * state.era.years_per_turn
+    )
     state = decay_memories(state)
     if state.run_status == "ended":
         erasure_text = await generate_erasure(state)
@@ -695,7 +771,7 @@ async def _schedule_player_consequences(state: WorldState, parsed: dict) -> None
                 await schedule_consequence(
                     run_id=state.run_id, source_event_id=None,
                     trigger_turn=state.turn + 1,
-                    target_type="npc", target_id=target_npc.id,
+                    target_type="location", target_id=target_npc.location,
                     effect_type="tension_shift",
                     effect_payload={"delta": 1},
                 )

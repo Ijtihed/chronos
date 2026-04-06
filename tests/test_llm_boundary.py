@@ -41,7 +41,7 @@ class TestNPCEffect:
 
 class TestShiftDisposition:
     def test_positive_shift(self):
-        assert shift_disposition("grim", 1) == "cautious"
+        assert shift_disposition("grim", 1) == "guarded"
 
     def test_negative_shift(self):
         assert shift_disposition("grim", -1) == "hostile"
@@ -60,7 +60,7 @@ class TestApplyNPCEffect:
         apply_npc_effect(state, effect)
 
         gallus = next(n for n in state.npcs if n.id == "centurion_gallus")
-        assert gallus.disposition == "cautious"
+        assert gallus.disposition == "guarded"
 
     def test_negative_disposition_shift(self):
         state = create_initial_state()
@@ -166,7 +166,7 @@ class TestThreatenNowBounded:
         new = apply_action(state, action)
 
         gallus_after = next(n for n in new.npcs if n.id == "centurion_gallus")
-        assert gallus_after.disposition == "wary"
+        assert gallus_after.disposition == "guarded"
         assert gallus_after.disposition != "hostile"
 
     def test_threaten_from_grim_goes_hostile(self):

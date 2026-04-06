@@ -18,6 +18,7 @@ from pydantic import ValidationError
 
 from backend.llm import chat, load_prompt
 from backend.llm_schemas import CharacterGenResponse, character_gen_default
+from backend.npc_personality import generate_personality, calculate_needs
 from backend.world_state import Location, NPC, PlayerCharacter, WorldState, Era
 
 logger = logging.getLogger("chronos.character_gen")
@@ -160,12 +161,15 @@ async def _generate_single_npc(
         data = character_gen_default(archetype["role"], location.name, index=index)
 
     npc_id = f"npc_{archetype['archetype']}_{index}"
+    arch_key = archetype["archetype"]
+    personality = generate_personality(arch_key)
+    needs = calculate_needs(arch_key, personality)
 
     return NPC(
         id=npc_id,
         name=data.name or f"NPC {index}",
         role=archetype["role"],
-        archetype=archetype["archetype"],
+        archetype=arch_key,
         social_class=archetype.get("social_class", ""),
         location=location.id,
         description=data.description,
@@ -173,4 +177,6 @@ async def _generate_single_npc(
         relationship_to_player=data.relationship_to_player or f"Aware of the {player_role}.",
         memory_of_player=0.1,
         last_interaction_turn=0,
+        personality=personality,
+        needs=needs,
     )

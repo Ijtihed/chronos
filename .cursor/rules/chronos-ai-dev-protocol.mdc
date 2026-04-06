@@ -31,6 +31,10 @@ Every **LLM call** in this project has a **corresponding prompt template**. Prom
 
 When you are **unsure** whether a prompt will produce the right output, **say so**. Suggest what to test and how **before** committing it to the codebase.
 
+## Keeping docs current
+
+When a code change **adds, removes, or changes** a command, endpoint, build step, dependency, or any workflow a developer or player would follow, **update `README.md`** in the same session. This includes new API endpoints, new CLI scripts, changed test commands, schema migrations, and new required setup steps. If the project structure listing in the README is stale, fix it. The README is the first thing someone reads — it must never be wrong.
+
 ## What you never do
 
 - Never add a data model field, character attribute, or world state property that isn't grounded in the context docs

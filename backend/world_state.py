@@ -50,6 +50,34 @@ class PlayerCharacter(BaseModel):
     birth_year: int = 0
 
 
+class PersonalityTraits(BaseModel):
+    ambition: int = 50
+    compassion: int = 50
+    courage: int = 50
+    piety: int = 50
+    pragmatism: int = 50
+
+
+class NpcNeeds(BaseModel):
+    survival: float = 50.0
+    safety: float = 50.0
+    family: float = 50.0
+    social: float = 50.0
+    trade: float = 0.0
+    profit: float = 0.0
+    power: float = 0.0
+    reputation: float = 0.0
+    honor: float = 0.0
+    duty: float = 0.0
+    loyalty: float = 50.0
+    faith: float = 0.0
+    knowledge: float = 0.0
+    order: float = 0.0
+    community: float = 50.0
+    harvest: float = 0.0
+    stability: float = 50.0
+
+
 class NPC(BaseModel):
     id: str
     name: str
@@ -63,6 +91,10 @@ class NPC(BaseModel):
     memory_of_player: float = 0.0
     last_interaction_turn: int = 0
     stored_povs: List[str] = Field(default_factory=list)
+    personality: PersonalityTraits = Field(default_factory=PersonalityTraits)
+    needs: NpcNeeds = Field(default_factory=NpcNeeds)
+    needs_history: List[Dict] = Field(default_factory=list)
+    last_simulated_turn: int = 0
 
 
 class Event(BaseModel):
@@ -71,6 +103,27 @@ class Event(BaseModel):
     description: str
     target: Optional[str] = None
     location: Optional[str] = None
+
+
+CONSEQUENCE_EFFECT_TYPES = (
+    "tension_shift", "rumor", "trade_disruption",
+    "npc_arrival", "event_spawn", "material_change",
+    "disposition_shift", "need_pressure",
+)
+
+CONSEQUENCE_TARGET_TYPES = ("location", "npc", "region", "global")
+
+
+class ScheduledConsequence(BaseModel):
+    id: str = Field(default_factory=lambda: uuid.uuid4().hex[:12])
+    source_event_id: Optional[str] = None
+    trigger_turn: int
+    target_type: str  # one of CONSEQUENCE_TARGET_TYPES
+    target_id: Optional[str] = None
+    effect_type: str  # one of CONSEQUENCE_EFFECT_TYPES
+    effect_payload: Dict = Field(default_factory=dict)
+    superseded: bool = False
+    fired: bool = False
 
 
 class WorldState(BaseModel):
@@ -86,6 +139,7 @@ class WorldState(BaseModel):
     visited_locations: List[str] = Field(default_factory=list)
     ground_context: Optional[Dict] = None
     historical_divergences: List[Dict] = Field(default_factory=list)
+    consequence_queue: List[ScheduledConsequence] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -123,6 +177,13 @@ def npcs_near_player(state: WorldState) -> List[NPC]:
 
 def create_initial_state() -> WorldState:
     """Create a hardcoded Roman Late Empire scenario for testing."""
+    from backend.npc_personality import generate_personality, calculate_needs
+
+    soldier_personality = generate_personality("soldier")
+    soldier_needs = calculate_needs("soldier", soldier_personality)
+    clergy_personality = generate_personality("clergy")
+    clergy_needs = calculate_needs("clergy", clergy_personality)
+
     return WorldState(
         run_id=uuid.uuid4().hex[:12],
         run_status="active",
@@ -178,6 +239,8 @@ def create_initial_state() -> WorldState:
                 ),
                 memory_of_player=0.3,
                 last_interaction_turn=0,
+                personality=soldier_personality,
+                needs=soldier_needs,
             ),
             NPC(
                 id="deacon_paulus",
@@ -202,6 +265,8 @@ def create_initial_state() -> WorldState:
                 ),
                 memory_of_player=0.2,
                 last_interaction_turn=0,
+                personality=clergy_personality,
+                needs=clergy_needs,
             ),
         ],
         locations=[
@@ -299,7 +364,6 @@ def apply_action(state: WorldState, action: dict) -> WorldState:
         _apply_target_fallback(new, action)
 
     _update_npc_memory(new, action)
-    _escalate_tension(new)
 
     return new
 
@@ -399,21 +463,33 @@ def build_story_summary(state: WorldState) -> str:
 # ---------------------------------------------------------------------------
 
 _POSITIVE_SHIFTS = {
-    "hostile": "wary",
+    "hostile": "fearful",
+    "fearful": "wary",
     "wary": "cautious",
-    "grim": "cautious",
+    "grim": "guarded",
+    "guarded": "cautious",
     "suspicious": "cautious",
-    "cautious": "warming",
+    "cautious": "neutral",
+    "neutral": "reserved",
+    "reserved": "formal",
+    "formal": "engaged",
     "fervent": "engaged",
     "engaged": "warming",
+    "commanding": "warming",
 }
 
 _NEGATIVE_SHIFTS = {
-    "warming": "cautious",
-    "engaged": "wary",
-    "cautious": "wary",
+    "warming": "engaged",
+    "engaged": "formal",
+    "formal": "reserved",
+    "reserved": "neutral",
+    "commanding": "formal",
+    "neutral": "cautious",
+    "cautious": "guarded",
+    "guarded": "grim",
     "wary": "hostile",
     "grim": "hostile",
+    "fearful": "hostile",
     "fervent": "suspicious",
     "suspicious": "hostile",
 }
@@ -440,7 +516,10 @@ def shift_disposition(disposition: str, direction: int) -> str:
 # NPCEffect application — bounded mutation from LLM output
 # ---------------------------------------------------------------------------
 
-_ALLOWED_NPC_EFFECT_FIELDS = frozenset({"disposition", "location"})
+_ALLOWED_NPC_EFFECT_FIELDS = frozenset({
+    "disposition", "location", "needs", "needs_history",
+    "personality", "last_simulated_turn",
+})
 
 import logging as _logging
 _effect_logger = _logging.getLogger("chronos.npc_effect")

@@ -103,13 +103,14 @@ Modern eras (1800s, 1900s, 2000s) planned for future expansion.
 ```
 backend/              Python server (FastAPI)
   main.py               API — unified turn endpoint, run management, map geo, NPC perception
-  world_state.py         Data models, state mutation
-  world_engine.py        Simulation engine — NPC autonomous actions every turn
+  world_state.py         Data models, state mutation, consequence queue
+  world_engine.py        Simulation engine — NPC autonomous actions, consequence processing
+  npc_personality.py     Personality traits, needs system, decay, event-driven shifts
   action_parser.py       Player input → structured action (LLM)
   npc_engine.py          NPC POV generation (LLM + RAG)
   death_engine.py        Death check, memory decay, erasure
   character_gen.py       Character + NPC generation at run start (LLM)
-  persistence.py         SQLite session storage
+  persistence.py         SQLite session storage (WAL mode, performance-tuned)
   llm.py                 Ollama client — auto-selects best model
   eras/                  5 era configs with locations, archetypes, coordinates
   hke/                   Historical Knowledge Engine (RAG — Chroma + Gutenberg/Wikipedia)
@@ -120,7 +121,7 @@ frontend/             Browser UI
   geo/                    GeoJSON border files + Natural Earth coastlines
 prompts/              LLM prompt templates (design artifacts)
 context/              Game design docs (source of truth)
-tests/                126 automated tests
+tests/                493 automated tests
 ```
 
 ## API
@@ -131,6 +132,7 @@ tests/                126 automated tests
 | POST | `/api/run` | Create new run (generates characters via LLM) |
 | GET | `/api/run/{id}` | Get run state |
 | POST | `/api/run/{id}/turn` | Player types anything — action, travel, or inaction |
+| POST | `/api/run/{id}/skip` | Advance time N ticks (1-30) without player action |
 | GET | `/api/run/{id}/npc/{npc_id}/perception` | Character's subjective impression of an NPC |
 | POST | `/api/run/{id}/reset` | Reset run |
 | GET | `/api/runs` | List all runs |
@@ -149,15 +151,41 @@ All LLM calls are local via Ollama. No API keys. No cost.
 
 ## Architecture
 
-Simulation-first turn loop:
+7-stage autonomous pipeline (stages 1-4 run without the player):
 
 ```
-1. World simulates (NPCs act autonomously — travel, argue, trade, flee)
-2. Player action parsed (if they typed something)
-3. World state mutated
-4. Death check
-5. NPC reactions generated (only for NPCs who actually care)
-6. Everything returned to frontend
+1. Structural drift — tension, dispositions, needs decay, rumors (no LLM)
+2. Scheduled consequences — delayed effects from past actions fire (no LLM)
+3. World events — probabilistic skirmishes, unrest, trade disruption (no LLM)
+4. NPC autonomous actions — utility-scored decisions, LLM narration for nearby NPCs
+5. Player action parsed (if they typed something)
+6. Narrative assembled — what the player sees
+7. State saved to database
 ```
 
 The player is not the center. They are one person in a living world.
+
+### NPC autonomy
+
+Every NPC has personality traits (ambition, compassion, courage, piety, pragmatism) and 17 inner needs (survival, safety, duty, faith, trade, etc.) that decay each turn. When needs go critical, they override normal behavior. A merchant who normally chases profit will flee if survival spikes during a siege. Events permanently shift traits — prolonged hunger makes NPCs more pragmatic and less compassionate.
+
+### Consequence queue
+
+Significant actions schedule delayed effects. A betrayal on turn 5 might spread as a rumor on turn 7, shift NPC dispositions on turn 9, and increase tension on turn 12. Consequences are validated when they fire — if the world has diverged (the target NPC died, the location was destroyed), obsolete consequences are cancelled.
+
+## After pulling / updating
+
+If you already have the repo and are pulling new changes:
+
+```bash
+source .venv/bin/activate
+pip install -r requirements.txt
+
+# Delete old database (schema may have changed)
+rm -f data/chronos.db
+
+# Run tests to verify
+python -m pytest tests/ --ignore=tests/test_live.py -q
+```
+
+The database is recreated automatically on first run. Existing save games from before the schema change are not compatible — start a new run.

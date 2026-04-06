@@ -8,8 +8,9 @@ from __future__ import annotations
 
 import json
 import logging
+from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, AsyncIterator, Dict, List, Optional
 
 import aiosqlite
 
@@ -20,9 +21,28 @@ logger = logging.getLogger("chronos.persistence")
 DB_PATH = Path(__file__).resolve().parent.parent / "data" / "chronos.db"
 
 
+async def _configure_connection(db: aiosqlite.Connection) -> None:
+    """Apply performance PRAGMAs to a freshly opened connection."""
+    await db.execute("PRAGMA journal_mode = WAL")
+    await db.execute("PRAGMA synchronous = NORMAL")
+    await db.execute("PRAGMA busy_timeout = 5000")
+    await db.execute("PRAGMA cache_size = -65536")
+    await db.execute("PRAGMA temp_store = MEMORY")
+
+
+@asynccontextmanager
+async def _connect() -> AsyncIterator[aiosqlite.Connection]:
+    """Open a configured database connection as an async context manager."""
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    async with aiosqlite.connect(str(DB_PATH)) as db:
+        await _configure_connection(db)
+        yield db
+
+
 async def init_db() -> None:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     async with aiosqlite.connect(str(DB_PATH)) as db:
+        await _configure_connection(db)
         await db.execute(
             """
             CREATE TABLE IF NOT EXISTS sessions (
@@ -97,7 +117,8 @@ async def init_db() -> None:
                 target_id       TEXT,
                 effect_type     TEXT NOT NULL CHECK(effect_type IN (
                     'tension_shift','rumor','trade_disruption',
-                    'npc_arrival','event_spawn','material_change'
+                    'npc_arrival','event_spawn','material_change',
+                    'disposition_shift','need_pressure'
                 )),
                 effect_payload  TEXT NOT NULL,
                 fired           INTEGER DEFAULT 0,
@@ -117,8 +138,7 @@ async def init_db() -> None:
 
 
 async def save_session(state: WorldState) -> None:
-    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    async with aiosqlite.connect(str(DB_PATH)) as db:
+    async with _connect() as db:
         await db.execute(
             """
             INSERT INTO sessions (run_id, state_json, created_at, updated_at)
@@ -135,7 +155,7 @@ async def save_session(state: WorldState) -> None:
 async def load_session(run_id: str) -> Optional[WorldState]:
     if not DB_PATH.exists():
         return None
-    async with aiosqlite.connect(str(DB_PATH)) as db:
+    async with _connect() as db:
         cursor = await db.execute(
             "SELECT state_json FROM sessions WHERE run_id = ?", (run_id,)
         )
@@ -148,7 +168,7 @@ async def load_session(run_id: str) -> Optional[WorldState]:
 async def delete_session(run_id: str) -> None:
     if not DB_PATH.exists():
         return
-    async with aiosqlite.connect(str(DB_PATH)) as db:
+    async with _connect() as db:
         await db.execute("DELETE FROM sessions WHERE run_id = ?", (run_id,))
         await db.commit()
 
@@ -156,7 +176,7 @@ async def delete_session(run_id: str) -> None:
 async def list_sessions() -> List[dict]:
     if not DB_PATH.exists():
         return []
-    async with aiosqlite.connect(str(DB_PATH)) as db:
+    async with _connect() as db:
         cursor = await db.execute(
             """
             SELECT run_id, created_at, updated_at
@@ -303,8 +323,7 @@ async def append_turn_log(
     player_view_snapshot: dict,
 ) -> None:
     """Append one turn log row. Never updates existing rows."""
-    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    async with aiosqlite.connect(str(DB_PATH)) as db:
+    async with _connect() as db:
         await db.execute(
             """
             INSERT INTO turn_logs (
@@ -332,7 +351,7 @@ async def get_turn_logs(run_id: str) -> List[dict]:
     """Retrieve all turn logs for a run, ordered by turn number."""
     if not DB_PATH.exists():
         return []
-    async with aiosqlite.connect(str(DB_PATH)) as db:
+    async with _connect() as db:
         db.row_factory = aiosqlite.Row
         cursor = await db.execute(
             """
@@ -380,8 +399,7 @@ async def insert_historical_event(
     polity_context: Optional[dict] = None,
 ) -> int:
     """Insert a single historical event. Returns the new row id."""
-    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    async with aiosqlite.connect(str(DB_PATH)) as db:
+    async with _connect() as db:
         cursor = await db.execute(
             """
             INSERT INTO historical_events
@@ -414,7 +432,7 @@ async def query_historical_events(
     """Query historical events within a year range, optionally filtered."""
     if not DB_PATH.exists():
         return []
-    async with aiosqlite.connect(str(DB_PATH)) as db:
+    async with _connect() as db:
         db.row_factory = aiosqlite.Row
         clauses = ["year >= ? AND year <= ?"]
         params: list = [year_start, year_end]
@@ -451,7 +469,7 @@ async def count_historical_events() -> int:
     """Total number of events in the historical_events table."""
     if not DB_PATH.exists():
         return 0
-    async with aiosqlite.connect(str(DB_PATH)) as db:
+    async with _connect() as db:
         cursor = await db.execute("SELECT COUNT(*) FROM historical_events")
         row = await cursor.fetchone()
         return row[0] if row else 0
@@ -461,7 +479,7 @@ async def event_exists_by_qid(qid: str) -> bool:
     """Check if an event with this Wikidata QID already exists."""
     if not DB_PATH.exists():
         return False
-    async with aiosqlite.connect(str(DB_PATH)) as db:
+    async with _connect() as db:
         cursor = await db.execute(
             "SELECT 1 FROM historical_events WHERE wikidata_qid = ? LIMIT 1",
             (qid,),
@@ -483,8 +501,7 @@ async def schedule_consequence(
     effect_payload: dict,
 ) -> int:
     """Schedule a future consequence. Returns the new row id."""
-    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    async with aiosqlite.connect(str(DB_PATH)) as db:
+    async with _connect() as db:
         cursor = await db.execute(
             """
             INSERT INTO consequence_queue
@@ -510,7 +527,7 @@ async def get_pending_consequences(run_id: str, current_turn: int) -> List[dict]
     """Fetch all unfired, non-superseded consequences due by current_turn."""
     if not DB_PATH.exists():
         return []
-    async with aiosqlite.connect(str(DB_PATH)) as db:
+    async with _connect() as db:
         db.row_factory = aiosqlite.Row
         cursor = await db.execute(
             """
@@ -542,7 +559,7 @@ async def mark_consequence_fired(consequence_id: int) -> None:
     """Mark a consequence as fired after successful application."""
     if not DB_PATH.exists():
         return
-    async with aiosqlite.connect(str(DB_PATH)) as db:
+    async with _connect() as db:
         await db.execute(
             "UPDATE consequence_queue SET fired = 1 WHERE id = ?",
             (consequence_id,),
@@ -554,7 +571,7 @@ async def mark_consequence_superseded(consequence_id: int) -> None:
     """Mark a consequence as superseded (world diverged, no longer valid)."""
     if not DB_PATH.exists():
         return
-    async with aiosqlite.connect(str(DB_PATH)) as db:
+    async with _connect() as db:
         await db.execute(
             "UPDATE consequence_queue SET superseded = 1 WHERE id = ?",
             (consequence_id,),
@@ -572,7 +589,7 @@ async def supersede_downstream_consequences(
     """
     if not DB_PATH.exists():
         return 0
-    async with aiosqlite.connect(str(DB_PATH)) as db:
+    async with _connect() as db:
         cursor = await db.execute(
             """
             UPDATE consequence_queue
