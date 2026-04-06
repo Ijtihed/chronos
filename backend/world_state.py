@@ -95,6 +95,7 @@ class NPC(BaseModel):
     needs: NpcNeeds = Field(default_factory=NpcNeeds)
     needs_history: List[Dict] = Field(default_factory=list)
     last_simulated_turn: int = 0
+    emotional_state: str = ""
 
 
 class Event(BaseModel):
@@ -417,22 +418,6 @@ def _update_npc_memory(state: WorldState, action: dict) -> None:
             npc.memory_of_player = min(1.0, npc.memory_of_player + 0.05)
 
 
-def _escalate_tension(state: WorldState) -> None:
-    """World entropy: tension at player's location creeps up every 3 turns."""
-    if state.turn % 3 != 0:
-        return
-    for loc in state.locations:
-        if loc.id != state.player.location:
-            continue
-        idx = (
-            TENSION_LEVELS.index(loc.political_tension)
-            if loc.political_tension in TENSION_LEVELS
-            else 2
-        )
-        if idx < len(TENSION_LEVELS) - 1:
-            loc.political_tension = TENSION_LEVELS[idx + 1]
-
-
 # ---------------------------------------------------------------------------
 # Story summary (fed into prompts)
 # ---------------------------------------------------------------------------
@@ -518,7 +503,7 @@ def shift_disposition(disposition: str, direction: int) -> str:
 
 _ALLOWED_NPC_EFFECT_FIELDS = frozenset({
     "disposition", "location", "needs", "needs_history",
-    "personality", "last_simulated_turn",
+    "personality", "last_simulated_turn", "emotional_state",
 })
 
 import logging as _logging

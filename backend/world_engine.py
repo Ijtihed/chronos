@@ -35,11 +35,6 @@ from backend.llm_schemas import (
     autonomous_action_default,
 )
 from backend.npc_personality import choose_autonomous_action
-from backend.persistence import (
-    get_pending_consequences,
-    mark_consequence_fired,
-    mark_consequence_superseded,
-)
 from backend.world_drift import (
     tick_disposition_drift,
     tick_needs_decay,
@@ -47,6 +42,7 @@ from backend.world_drift import (
     tick_tension,
 )
 from backend.world_events import tick_world_events
+from backend.utils import graph_distance as _graph_distance_shared
 from backend.world_state import (
     TENSION_LEVELS,
     Event,
@@ -77,23 +73,7 @@ def _graph_distance(
     loc_a: str, loc_b: str, state: WorldState,
 ) -> int:
     """BFS distance between two locations. Returns 999 if unreachable."""
-    if loc_a == loc_b:
-        return 0
-    loc_map = {loc.id: loc for loc in state.locations}
-    visited = {loc_a}
-    queue = [(loc_a, 0)]
-    while queue:
-        current, dist = queue.pop(0)
-        loc = loc_map.get(current)
-        if not loc:
-            continue
-        for neighbor_id in loc.neighbors:
-            if neighbor_id == loc_b:
-                return dist + 1
-            if neighbor_id not in visited:
-                visited.add(neighbor_id)
-                queue.append((neighbor_id, dist + 1))
-    return 999
+    return _graph_distance_shared(loc_a, loc_b, state)
 
 
 def get_npc_simulation_tier(
@@ -219,7 +199,6 @@ async def simulate_turn(state: WorldState) -> Tuple[WorldState, List[dict]]:
 
     # --- STAGE 2: Scheduled consequences (no LLM) ---
     _process_in_memory_consequences(new)
-    await _process_consequences(new)
 
     # --- STAGE 3: World events (no LLM) ---
     tick_world_events(new)
@@ -379,6 +358,11 @@ async def player_skip_turn(state: WorldState) -> dict:
         character_role=state.player.role,
         character_description=state.player.description,
         character_disposition=state.player.disposition,
+        dominant_need="getting through the day",
+        urgent_needs="nothing urgent",
+        chosen_opportunity="daily life",
+        what_character_knows=_format_ground_context_field(gc, "what_character_knows", "What anyone in your position would know."),
+        local_rumors=_format_ground_context_field(gc, "local_rumors", "Nothing specific."),
         other_npcs_here=other_names,
         location_name=player_loc.name,
         year=state.current_year or state.era.year_start,
@@ -404,7 +388,32 @@ async def player_skip_turn(state: WorldState) -> dict:
     }
 
 
+def _format_urgent_needs(npc: NPC) -> str:
+    """Format urgent needs as a human-readable string. Never returns empty."""
+    from backend.npc_personality import get_urgent_needs
+    urgent = get_urgent_needs(npc.needs)
+    if not urgent:
+        return "nothing urgent"
+    return ", ".join(n.replace("_", " ") for n in urgent)
+
+
+def _format_ground_context_field(gc: dict, field: str, fallback: str) -> str:
+    """Extract a ground context field. Never returns empty."""
+    val = gc.get(field)
+    if not val:
+        return fallback
+    if isinstance(val, list):
+        if not val:
+            return fallback
+        if len(val) == 1:
+            return val[0]
+        return "; ".join(val)
+    return str(val)
+
+
 async def _npc_autonomous_action(npc: NPC, state: WorldState, nearby_npcs: List[NPC]) -> dict:
+    from backend.npc_personality import get_dominant_need
+
     raw_template = load_prompt(_AUTONOMOUS_TEMPLATE_PATH)
 
     try:
@@ -418,12 +427,19 @@ async def _npc_autonomous_action(npc: NPC, state: WorldState, nearby_npcs: List[
         n.name for n in nearby_npcs if n.id != npc.id
     ) or "no one"
 
+    opp_type = choose_autonomous_action(npc, state)
+
     gc = state.ground_context or {}
     prompt = Template(raw_template).safe_substitute(
         character_name=npc.name,
         character_role=npc.role,
         character_description=npc.description,
         character_disposition=npc.disposition,
+        dominant_need=get_dominant_need(npc.needs).replace("_", " "),
+        urgent_needs=_format_urgent_needs(npc),
+        chosen_opportunity=opp_type.replace("_", " "),
+        what_character_knows=_format_ground_context_field(gc, "what_character_knows", "What anyone in your position would know."),
+        local_rumors=_format_ground_context_field(gc, "local_rumors", "Nothing specific."),
         other_npcs_here=other_names,
         location_name=npc_loc.name,
         year=state.current_year or state.era.year_start,
@@ -524,11 +540,19 @@ async def generate_arrival_catchup(
         nearby = [n for n in state.npcs if n.location == npc.location and n.id != npc.id]
         other_names = ", ".join(n.name for n in nearby) or "no one"
 
+        from backend.npc_personality import get_dominant_need
+        opp_type = choose_autonomous_action(npc, state)
+
         prompt = Template(raw_template).safe_substitute(
             character_name=npc.name,
             character_role=npc.role,
             character_description=npc.description,
             character_disposition=npc.disposition,
+            dominant_need=get_dominant_need(npc.needs).replace("_", " "),
+            urgent_needs=_format_urgent_needs(npc),
+            chosen_opportunity=opp_type.replace("_", " "),
+            what_character_knows=_format_ground_context_field(gc, "what_character_knows", "What anyone in your position would know."),
+            local_rumors=_format_ground_context_field(gc, "local_rumors", "Nothing specific."),
             other_npcs_here=other_names,
             location_name=npc_loc.name,
             year=state.current_year or state.era.year_start,
@@ -555,33 +579,6 @@ async def generate_arrival_catchup(
     ]
 
 
-# ---------------------------------------------------------------------------
-# DB-based consequence queue processing (stage 2b — legacy compat)
-# ---------------------------------------------------------------------------
-
-async def _process_consequences(state: WorldState) -> None:
-    """Fire all pending consequences for this turn.
-
-    Two-phase validation: consequences are checked at fire time, not just
-    at schedule time. Invalid consequences are superseded silently.
-    """
-    try:
-        pending = await get_pending_consequences(state.run_id, state.turn)
-    except Exception:
-        return
-
-    for c in pending:
-        if _validate_consequence(c, state):
-            _apply_consequence(c, state)
-            try:
-                await mark_consequence_fired(c["id"])
-            except Exception:
-                logger.error("Failed to mark consequence %d as fired", c["id"])
-        else:
-            try:
-                await mark_consequence_superseded(c["id"])
-            except Exception:
-                logger.error("Failed to mark consequence %d as superseded", c["id"])
 
 
 def _validate_consequence(consequence: dict, state: WorldState) -> bool:

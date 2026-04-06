@@ -179,7 +179,6 @@ class NPCEffect(BaseModel):
     npc_id: str
     disposition_shift: Optional[int] = None  # -1, 0, or 1 only
     location_change: Optional[str] = None
-    goal_update: Optional[str] = None
 
     @field_validator("disposition_shift", mode="before")
     @classmethod

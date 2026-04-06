@@ -333,7 +333,8 @@ All **20** era buckets are **playable** with ingested corpus + smoke-tested arch
 
 **Recommended local models:**
 
-- `llama3.1:8b` — general reasoning, NPC voices, narrative
+- `llama3.1:70b` — preferred when hardware supports it (48GB+ RAM). Richer NPC voices, more historically grounded responses. Auto-selected if available locally.
+- `llama3.1:8b` — minimum viable model. Works on 16GB. Default fallback.
 - `mistral:7b` — fast, good for high-volume per-turn calls
 - `nomic-embed-text` — embeddings, completely free
 

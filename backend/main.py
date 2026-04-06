@@ -39,8 +39,6 @@ from backend.persistence import (
     load_session,
     query_historical_events,
     save_session,
-    schedule_consequence,
-    supersede_downstream_consequences,
 )
 from backend.llm_schemas import leaks_raw_numbers, scrub_leaked_numbers
 from backend.player_knowledge import (
@@ -52,11 +50,13 @@ from backend.world_engine import (
     advance_world,
     advance_world_skip,
     generate_arrival_catchup,
+    mark_consequence_superseded_mem,
     player_skip_turn,
     simulate_turn,
 )
 from backend.world_state import (
     Event,
+    ScheduledConsequence,
     WorldState,
     apply_action,
     create_initial_state,
@@ -238,7 +238,7 @@ async def _execute_turn(run_id: str, req: TurnRequest) -> dict:
     # --- Step 3b: Schedule consequences from significant actions ---
     sig = parsed.get("significance_score", 0.0)
     if sig >= 0.5:
-        await _schedule_player_consequences(state, parsed)
+        _schedule_player_consequences(state, parsed)
 
     # --- Step 3c: Check for historical divergence ---
     if sig >= 0.6:
@@ -252,6 +252,7 @@ async def _execute_turn(run_id: str, req: TurnRequest) -> dict:
     pov_tasks = [generate_npc_pov(npc, parsed, state) for npc in relevant]
     pov_results = await asyncio.gather(*pov_tasks, return_exceptions=True)
     npc_responses = _build_npc_responses(relevant, pov_results)
+    _store_povs(state, relevant, pov_results)
 
     death_info = death_result if death_result["died"] else None
     if death_result["died"]:
@@ -587,6 +588,7 @@ async def _handle_travel(
         pov_tasks = [generate_npc_pov(npc, arrival_action, state) for npc in nearby[:3]]
         pov_results = await asyncio.gather(*pov_tasks, return_exceptions=True)
         arrival_povs = _build_npc_responses(nearby[:3], pov_results)
+        _store_povs(state, nearby[:3], pov_results)
 
     await save_session(state)
 
@@ -734,6 +736,21 @@ def _filter_relevant(nearby_npcs, npc_impacts):
     ]
 
 
+_MAX_STORED_POVS = 10
+
+
+def _store_povs(state, npcs, pov_results):
+    """Append generated POV text to each NPC's stored_povs. Cap at 10."""
+    for npc, pov in zip(npcs, pov_results):
+        if not isinstance(pov, str) or pov.startswith("["):
+            continue
+        target = next((n for n in state.npcs if n.id == npc.id), None)
+        if target:
+            target.stored_povs.append(pov)
+            if len(target.stored_povs) > _MAX_STORED_POVS:
+                target.stored_povs = target.stored_povs[-_MAX_STORED_POVS:]
+
+
 def _build_npc_responses(npcs, pov_results):
     responses = []
     for npc, pov in zip(npcs, pov_results):
@@ -754,62 +771,58 @@ async def _load_or_404(run_id: str) -> WorldState:
     return state
 
 
-async def _schedule_player_consequences(state: WorldState, parsed: dict) -> None:
-    """Schedule downstream consequences from a significant player action."""
+def _schedule_player_consequences(state: WorldState, parsed: dict) -> None:
+    """Schedule downstream consequences from a significant player action.
+
+    Writes directly to state.consequence_queue (in-memory).
+    """
     action_type = parsed.get("action_type", "other")
     target = parsed.get("target")
     sig = parsed.get("significance_score", 0.5)
     player_loc = state.player.location
 
-    try:
-        if action_type in ("betray", "attack", "threaten", "steal"):
-            target_npc = next(
-                (n for n in state.npcs if target and target.lower() in n.name.lower()),
-                None,
-            )
-            if target_npc:
-                await schedule_consequence(
-                    run_id=state.run_id, source_event_id=None,
-                    trigger_turn=state.turn + 1,
-                    target_type="location", target_id=target_npc.location,
-                    effect_type="tension_shift",
-                    effect_payload={"delta": 1},
-                )
-
-        if sig >= 0.6:
-            await schedule_consequence(
-                run_id=state.run_id, source_event_id=None,
-                trigger_turn=state.turn + 2,
-                target_type="location", target_id=player_loc,
-                effect_type="rumor",
-                effect_payload={
-                    "rumor_text": f"People talk about what {state.player.name} did — {parsed.get('era_description', 'something noteworthy')}.",
-                },
-            )
-
-        if sig >= 0.8:
-            await schedule_consequence(
-                run_id=state.run_id, source_event_id=None,
-                trigger_turn=state.turn + 3,
-                target_type="location", target_id=player_loc,
+    if action_type in ("betray", "attack", "threaten", "steal"):
+        target_npc = next(
+            (n for n in state.npcs if target and target.lower() in n.name.lower()),
+            None,
+        )
+        if target_npc:
+            state.consequence_queue.append(ScheduledConsequence(
+                trigger_turn=state.turn + 1,
+                target_type="location", target_id=target_npc.location,
                 effect_type="tension_shift",
                 effect_payload={"delta": 1},
-            )
+            ))
 
-        if action_type in ("trade", "negotiate") and sig >= 0.5:
-            await schedule_consequence(
-                run_id=state.run_id, source_event_id=None,
-                trigger_turn=state.turn + 3,
-                target_type="location", target_id=player_loc,
-                effect_type="event_spawn",
-                effect_payload={
-                    "description": f"The consequences of {state.player.name}'s {action_type} continue to unfold.",
-                    "location": player_loc,
-                    "action_type": "ambient",
-                },
-            )
-    except Exception as exc:
-        logger.warning("Failed to schedule player consequences: %s", exc)
+    if sig >= 0.6:
+        state.consequence_queue.append(ScheduledConsequence(
+            trigger_turn=state.turn + 2,
+            target_type="location", target_id=player_loc,
+            effect_type="rumor",
+            effect_payload={
+                "rumor_text": f"People talk about what {state.player.name} did — {parsed.get('era_description', 'something noteworthy')}.",
+            },
+        ))
+
+    if sig >= 0.8:
+        state.consequence_queue.append(ScheduledConsequence(
+            trigger_turn=state.turn + 3,
+            target_type="location", target_id=player_loc,
+            effect_type="tension_shift",
+            effect_payload={"delta": 1},
+        ))
+
+    if action_type in ("trade", "negotiate") and sig >= 0.5:
+        state.consequence_queue.append(ScheduledConsequence(
+            trigger_turn=state.turn + 3,
+            target_type="location", target_id=player_loc,
+            effect_type="event_spawn",
+            effect_payload={
+                "description": f"The consequences of {state.player.name}'s {action_type} continue to unfold.",
+                "location": player_loc,
+                "action_type": "ambient",
+            },
+        ))
 
 
 async def _check_historical_divergence(state: WorldState, parsed: dict) -> None:
@@ -856,7 +869,7 @@ async def _check_historical_divergence(state: WorldState, parsed: dict) -> None:
                     "action_type": action_type,
                 }
                 state.historical_divergences.append(divergence)
-                await supersede_downstream_consequences(state.run_id, ev["id"])
+                mark_consequence_superseded_mem(state, str(ev["id"]))
                 logger.info(
                     "Historical divergence: player action '%s' contradicts '%s'",
                     parsed.get("intent", ""), ev["event"],

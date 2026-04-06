@@ -95,6 +95,8 @@ class TestNpcPovPrompt:
             era_description=state.era.description,
             era_feel="The empire crumbles around us.",
             material_conditions="Grain is scarce. Prices rise.",
+            what_character_knows="What anyone in your position would know.",
+            local_rumors="Nothing specific.",
             location_name=player_loc.name,
             year=state.current_year or state.era.year_start,
             story_so_far=build_story_summary(state),

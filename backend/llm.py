@@ -1,7 +1,13 @@
 """Shared Ollama client for all local LLM calls.
 
-Model selection: prefers llama3.1:70b if available (better quality on
-capable hardware), falls back to llama3.1:8b. Checked once at startup.
+Model selection: prefers llama3.1:70b if available locally (better quality
+on capable hardware), falls back to llama3.1:8b. Checked once at startup.
+
+This is consistent with MODEL TIER POLICY in roadmap.md: both 70b and 8b
+are local Ollama models with zero API cost. The policy constraint is
+"local only for everything except the action parser frontier swap point."
+70b produces richer NPC voices and more historically grounded responses
+when the hardware can run it; 8b is the minimum viable local model.
 """
 
 from __future__ import annotations

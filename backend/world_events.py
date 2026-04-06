@@ -10,8 +10,8 @@ import random
 import uuid
 from typing import List, Optional
 
+from backend.utils import TENSION_LEVELS, tension_index, tension_numeric
 from backend.world_state import (
-    TENSION_LEVELS,
     Event,
     Location,
     NPC,
@@ -19,20 +19,6 @@ from backend.world_state import (
     WorldState,
     npcs_at_location,
 )
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-def _tension_numeric(tension: str) -> int:
-    return {"low": 10, "moderate": 40, "high": 70, "critical": 95}.get(tension, 40)
-
-
-def _tension_index(tension: str) -> int:
-    if tension in TENSION_LEVELS:
-        return TENSION_LEVELS.index(tension)
-    return 1
 
 
 def _get_npcs_at(location_id: str, state: WorldState) -> List[NPC]:
@@ -54,7 +40,7 @@ def _lowest_tension_adjacent(npc_location: str, state: WorldState) -> Optional[s
     for neighbor_id in npc_loc.neighbors:
         for loc in state.locations:
             if loc.id == neighbor_id:
-                t = _tension_numeric(loc.political_tension)
+                t = tension_numeric(loc.political_tension)
                 if t < best_tension:
                     best_tension = t
                     best_id = neighbor_id
@@ -67,7 +53,7 @@ def _lowest_tension_adjacent(npc_location: str, state: WorldState) -> Optional[s
 # ---------------------------------------------------------------------------
 
 def _check_armed_skirmish(loc: Location, state: WorldState) -> Optional[Event]:
-    if _tension_numeric(loc.political_tension) < 80:
+    if tension_numeric(loc.political_tension) < 80:
         return None
     if not any(n.archetype in ("soldier", "general") for n in _get_npcs_at(loc.id, state)):
         return None
@@ -82,7 +68,7 @@ def _check_armed_skirmish(loc: Location, state: WorldState) -> Optional[Event]:
 
 
 def _check_civilian_unrest(loc: Location, state: WorldState) -> Optional[Event]:
-    if _tension_numeric(loc.political_tension) < 60:
+    if tension_numeric(loc.political_tension) < 60:
         return None
     if any(n.archetype in ("soldier", "general") for n in _get_npcs_at(loc.id, state)):
         return None
@@ -97,7 +83,7 @@ def _check_civilian_unrest(loc: Location, state: WorldState) -> Optional[Event]:
 
 
 def _check_tension_spread(loc: Location, state: WorldState) -> Optional[dict]:
-    if _tension_numeric(loc.political_tension) < 90:
+    if tension_numeric(loc.political_tension) < 90:
         return None
     if random.random() >= 0.15:
         return None
@@ -152,7 +138,7 @@ def _check_siege_trade_disruption(loc: Location, state: WorldState) -> Optional[
 
 
 def _check_attract_merchant(loc: Location, state: WorldState) -> Optional[Event]:
-    if _tension_numeric(loc.political_tension) >= 30:
+    if tension_numeric(loc.political_tension) >= 30:
         return None
     if random.random() >= 0.20:
         return None
@@ -176,7 +162,7 @@ def _check_refugee_flight(npc: NPC, state: WorldState) -> Optional[str]:
         npc_loc = next(l for l in state.locations if l.id == npc.location)
     except StopIteration:
         return None
-    if _tension_numeric(npc_loc.political_tension) < 70:
+    if tension_numeric(npc_loc.political_tension) < 70:
         return None
     if random.random() >= 0.50:
         return None
@@ -207,7 +193,7 @@ def tick_world_events(state: WorldState) -> WorldState:
         if spread:
             for target_loc in state.locations:
                 if target_loc.id == spread["target_id"]:
-                    idx = _tension_index(target_loc.political_tension)
+                    idx = tension_index(target_loc.political_tension)
                     new_idx = min(len(TENSION_LEVELS) - 1, idx + spread["delta"])
                     target_loc.political_tension = TENSION_LEVELS[new_idx]
                     break

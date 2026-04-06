@@ -20,6 +20,7 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
+from backend.utils import graph_distance as _graph_distance_shared
 from backend.world_state import WorldState, get_player_location
 
 
@@ -97,24 +98,7 @@ def graph_distance(
     loc_a: str, loc_b: str, state: WorldState,
 ) -> int:
     """BFS shortest path between two location IDs. Returns 999 if unreachable."""
-    if loc_a == loc_b:
-        return 0
-
-    adj: Dict[str, Dict[str, int]] = {}
-    for loc in state.locations:
-        adj[loc.id] = dict(loc.neighbors)
-
-    visited = {loc_a}
-    queue: deque[tuple[str, int]] = deque([(loc_a, 0)])
-    while queue:
-        current, dist = queue.popleft()
-        for neighbor in adj.get(current, {}):
-            if neighbor == loc_b:
-                return dist + 1
-            if neighbor not in visited:
-                visited.add(neighbor)
-                queue.append((neighbor, dist + 1))
-    return 999
+    return _graph_distance_shared(loc_a, loc_b, state)
 
 
 def _resolve_event_location(

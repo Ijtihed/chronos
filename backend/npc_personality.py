@@ -10,7 +10,8 @@ from __future__ import annotations
 import random
 from typing import Dict, List, Optional
 
-from backend.world_state import NPC, NpcNeeds, PersonalityTraits, TENSION_LEVELS
+from backend.utils import tension_index as _tension_index_util
+from backend.world_state import NPC, NpcNeeds, PersonalityTraits
 
 
 # ---------------------------------------------------------------------------
@@ -141,9 +142,7 @@ _SLOW_DECAY_NEEDS = frozenset({
 
 
 def _tension_index(tension: str) -> int:
-    if tension in TENSION_LEVELS:
-        return TENSION_LEVELS.index(tension)
-    return 1
+    return _tension_index_util(tension)
 
 
 def decay_needs(

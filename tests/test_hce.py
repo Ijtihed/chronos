@@ -17,7 +17,6 @@ from backend.hce import (
     schedule_canonical_consequences,
 )
 from backend.persistence import (
-    get_pending_consequences,
     init_db,
     insert_historical_event,
 )
@@ -199,8 +198,7 @@ class TestScheduleCanonicalConsequences:
         )
         count = await schedule_canonical_consequences(state_with_events)
         assert count >= 1
-        pending = await get_pending_consequences(state_with_events.run_id, 10)
-        assert len(pending) >= 1
+        assert len(state_with_events.consequence_queue) >= 1
 
     @pytest.mark.asyncio
     async def test_no_events_no_consequences(self, state_with_events):

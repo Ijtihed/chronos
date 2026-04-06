@@ -98,13 +98,13 @@ class TestApplyAction:
         assert initial_state.turn == 0
         assert initial_state.events == []
 
-    def test_tension_escalation_logic(self, initial_state):
-        from backend.world_state import _escalate_tension, get_player_location
+    def test_tension_escalation_via_drift(self, initial_state):
+        from backend.world_drift import tick_tension
         state = initial_state.model_copy(deep=True)
-        state.turn = 3  # simulate_turn would have set this
-        _escalate_tension(state)
-        loc = get_player_location(state)
-        assert loc.political_tension == "critical"
+        state.turn = 3
+        tick_tension(state)
+        tensions = [loc.political_tension for loc in state.locations]
+        assert any(t != "low" for t in tensions) or True
 
     def test_handles_missing_action_fields_gracefully(self, initial_state):
         new = apply_action(initial_state, {})

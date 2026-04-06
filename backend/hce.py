@@ -24,15 +24,12 @@ from pydantic import ValidationError
 
 from backend.llm import chat, load_prompt
 from backend.llm_schemas import GroundContextResponse
-from backend.persistence import (
-    query_historical_events,
-    schedule_consequence,
-)
+from backend.persistence import query_historical_events
 from backend.player_knowledge import (
     filter_historical_events,
     _knowledge_tier,
 )
-from backend.world_state import WorldState, get_player_location
+from backend.world_state import ScheduledConsequence, WorldState, get_player_location
 
 logger = logging.getLogger("chronos.hce")
 
@@ -105,8 +102,7 @@ async def generate_ground_context(state: WorldState) -> Dict[str, Any]:
 async def schedule_canonical_consequences(state: WorldState) -> int:
     """Schedule consequences from canonical events in progress at run start.
 
-    For events whose year is close to the run's start year, create
-    consequence queue entries for their downstream effects.
+    Writes directly to state.consequence_queue (in-memory, persisted with state).
     Returns the number of consequences scheduled.
     """
     year_start = state.era.year_start
@@ -125,19 +121,15 @@ async def schedule_canonical_consequences(state: WorldState) -> int:
     for ev in raw_events:
         consequences = _derive_consequences(ev, state)
         for c in consequences:
-            try:
-                await schedule_consequence(
-                    run_id=state.run_id,
-                    source_event_id=ev.get("id"),
-                    trigger_turn=c["trigger_turn"],
-                    target_type=c["target_type"],
-                    target_id=c["target_id"],
-                    effect_type=c["effect_type"],
-                    effect_payload=c["effect_payload"],
-                )
-                scheduled += 1
-            except Exception as exc:
-                logger.error("Failed to schedule consequence: %s", exc)
+            state.consequence_queue.append(ScheduledConsequence(
+                source_event_id=str(ev.get("id")) if ev.get("id") else None,
+                trigger_turn=c["trigger_turn"],
+                target_type=c["target_type"],
+                target_id=c["target_id"],
+                effect_type=c["effect_type"],
+                effect_payload=c["effect_payload"],
+            ))
+            scheduled += 1
 
     logger.info("Scheduled %d canonical consequences for run %s", scheduled, state.run_id)
     return scheduled

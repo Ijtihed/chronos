@@ -2,7 +2,7 @@
 
 > **Model tier:** LOCAL (Ollama llama3.1:8b)
 > **Purpose:** What an NPC does this turn. Their own life. Nothing to do with the player.
-> **Volume:** 2-4 NPCs per turn. Lightweight.
+> **Volume:** 2-4 NPCs per turn at the player's location. Full context.
 
 ---
 
@@ -12,15 +12,21 @@ $era_description
 
 The world right now: $era_feel
 Daily reality: $material_conditions
+What you know: $what_character_knows
+What you've heard: $local_rumors
 
 Who you are: $character_description
 How you feel: $character_disposition
+What drives you right now: $dominant_need
+What's pressing: $urgent_needs
+The situation you're responding to: $chosen_opportunity
+
 Other people here: $other_npcs_here
 
 What's been happening:
 $story_so_far
 
-What do you do? Normal life stuff. Work, argue, eat, worry, fix things, avoid people, make deals, pray, steal, sleep. Whatever someone like you actually does on a normal day.
+What do you do? Your action should be driven by what you need most right now. If you're desperate for safety, you act on that. If you need to trade, you trade. If your faith is shaken, you pray or doubt. Act on what matters to you, not on what sounds dramatic.
 
 You do NOT notice or care about $player_name unless they directly affected your life recently. They are just another person in town. You have your own problems.
 

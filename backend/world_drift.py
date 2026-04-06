@@ -15,29 +15,12 @@ from backend.npc_personality import (
     ARCHETYPE_BASELINE_DISPOSITION,
     decay_needs,
 )
+from backend.utils import TENSION_LEVELS, tension_index, tension_numeric
 from backend.world_state import (
-    TENSION_LEVELS,
     ScheduledConsequence,
     WorldState,
     shift_disposition,
 )
-
-
-# ---------------------------------------------------------------------------
-# 3a: Tension drift
-# ---------------------------------------------------------------------------
-
-def _tension_index(tension: str) -> int:
-    if tension in TENSION_LEVELS:
-        return TENSION_LEVELS.index(tension)
-    return 1
-
-
-def _tension_numeric(tension: str) -> int:
-    """Map tension string to a 0-100 scale for threshold checks."""
-    return {
-        "low": 10, "moderate": 40, "high": 70, "critical": 95,
-    }.get(tension, 40)
 
 
 def tick_tension(state: WorldState) -> WorldState:
@@ -53,19 +36,19 @@ def tick_tension(state: WorldState) -> WorldState:
         return state
 
     loc = random.choice(state.locations)
-    idx = _tension_index(loc.political_tension)
+    idx = tension_index(loc.political_tension)
     if idx < len(TENSION_LEVELS) - 1:
         loc.political_tension = TENSION_LEVELS[idx + 1]
 
     for loc in state.locations:
-        if _tension_numeric(loc.political_tension) >= 90:
+        if tension_numeric(loc.political_tension) >= 90:
             if random.random() < 0.15:
                 neighbor_ids = list(loc.neighbors.keys())
                 if neighbor_ids:
                     spread_to = random.choice(neighbor_ids)
                     for other in state.locations:
                         if other.id == spread_to:
-                            other_idx = _tension_index(other.political_tension)
+                            other_idx = tension_index(other.political_tension)
                             if other_idx < len(TENSION_LEVELS) - 1:
                                 other.political_tension = TENSION_LEVELS[other_idx + 1]
                             break
@@ -154,7 +137,7 @@ def tick_rumor_propagation(state: WorldState) -> WorldState:
         return state
 
     for loc in state.locations:
-        if _tension_numeric(loc.political_tension) < 60:
+        if tension_numeric(loc.political_tension) < 60:
             significant = [
                 e for e in state.events
                 if e.location == loc.id
