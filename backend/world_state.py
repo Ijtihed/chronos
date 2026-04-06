@@ -85,6 +85,7 @@ class WorldState(BaseModel):
     turn: int = 0
     visited_locations: List[str] = Field(default_factory=list)
     ground_context: Optional[Dict] = None
+    historical_divergences: List[Dict] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------

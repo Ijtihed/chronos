@@ -36,10 +36,17 @@ from backend.persistence import (
     init_db,
     list_sessions,
     load_session,
+    query_historical_events,
     save_session,
+    schedule_consequence,
+    supersede_downstream_consequences,
 )
 from backend.llm_schemas import leaks_raw_numbers, scrub_leaked_numbers
-from backend.player_knowledge import build_player_view
+from backend.player_knowledge import (
+    build_player_view,
+    filter_historical_events,
+    _knowledge_tier,
+)
 from backend.world_engine import advance_world, player_skip_turn, simulate_turn
 from backend.world_state import (
     Event,
@@ -211,6 +218,15 @@ async def take_turn(run_id: str, req: TurnRequest):
     # --- Step 3: Apply player action ---
     state = apply_action(state, parsed)
 
+    # --- Step 3b: Schedule consequences from significant actions ---
+    sig = parsed.get("significance_score", 0.0)
+    if sig >= 0.5:
+        await _schedule_player_consequences(state, parsed)
+
+    # --- Step 3c: Check for historical divergence ---
+    if sig >= 0.6:
+        await _check_historical_divergence(state, parsed)
+
     # --- Step 4: Death check ---
     death_result = await check_death(state, parsed)
 
@@ -320,6 +336,74 @@ async def explain_context(run_id: str, req: ContextRequest):
         text = "The archives offer no further illumination on this matter."
 
     return {"context": text}
+
+
+# ------------------------------------------------------------------
+# Region knowledge (map click)
+# ------------------------------------------------------------------
+
+class RegionKnowledge(BaseModel):
+    polity_name: str
+    known_facts: list
+    rumors: list
+    ignorance_acknowledged: bool
+    character_note: str
+
+_REGION_KNOWLEDGE_PROMPT_PATH = (
+    Path(__file__).resolve().parent.parent / "prompts" / "region_knowledge.md"
+)
+
+
+@app.get("/api/run/{run_id}/region/{polity_name}")
+async def region_knowledge(run_id: str, polity_name: str):
+    state = await _load_or_404(run_id)
+
+    year = state.current_year or state.era.year_start
+    raw_events = await query_historical_events(
+        year_start=year - 100, year_end=year + 5, region=polity_name,
+    )
+
+    filtered = filter_historical_events(raw_events, state)
+
+    known_facts = [
+        ev.event for ev in filtered
+        if ev.knowledge_quality in ("witnessed", "known")
+    ]
+    rumors = [
+        ev.event for ev in filtered
+        if ev.knowledge_quality.startswith("rumor")
+    ]
+
+    tier = _knowledge_tier(state.player.archetype)
+    ignorance = len(known_facts) == 0 and tier == "low"
+
+    character_note = ""
+    try:
+        raw_template = load_prompt(_REGION_KNOWLEDGE_PROMPT_PATH)
+        player_loc = get_player_location(state)
+        prompt = Template(raw_template).safe_substitute(
+            character_name=state.player.name,
+            character_role=state.player.role,
+            character_archetype=state.player.archetype,
+            location_name=player_loc.name,
+            year=year,
+            era_description=state.era.description,
+            region_name=polity_name,
+            known_facts="\n".join(f"- {f}" for f in known_facts) or "Nothing specific.",
+            rumors="\n".join(f"- {r}" for r in rumors) or "No rumors heard.",
+        )
+        character_note = await chat(prompt)
+        character_note = character_note.strip().split("\n")[0][:200]
+    except Exception:
+        character_note = f"You know little of {polity_name}."
+
+    return RegionKnowledge(
+        polity_name=polity_name,
+        known_facts=known_facts,
+        rumors=rumors,
+        ignorance_acknowledged=ignorance,
+        character_note=character_note,
+    ).model_dump()
 
 
 # ------------------------------------------------------------------
@@ -586,6 +670,118 @@ async def _load_or_404(run_id: str) -> WorldState:
     if state is None:
         raise HTTPException(404, f"Run '{run_id}' not found")
     return state
+
+
+async def _schedule_player_consequences(state: WorldState, parsed: dict) -> None:
+    """Schedule downstream consequences from a significant player action."""
+    action_type = parsed.get("action_type", "other")
+    target = parsed.get("target")
+    sig = parsed.get("significance_score", 0.5)
+    player_loc = state.player.location
+
+    try:
+        if action_type in ("betray", "attack", "threaten", "steal"):
+            target_npc = next(
+                (n for n in state.npcs if target and target.lower() in n.name.lower()),
+                None,
+            )
+            if target_npc:
+                await schedule_consequence(
+                    run_id=state.run_id, source_event_id=None,
+                    trigger_turn=state.turn + 1,
+                    target_type="npc", target_id=target_npc.id,
+                    effect_type="tension_shift",
+                    effect_payload={"delta": 1},
+                )
+
+        if sig >= 0.6:
+            await schedule_consequence(
+                run_id=state.run_id, source_event_id=None,
+                trigger_turn=state.turn + 2,
+                target_type="location", target_id=player_loc,
+                effect_type="rumor",
+                effect_payload={
+                    "rumor_text": f"People talk about what {state.player.name} did — {parsed.get('era_description', 'something noteworthy')}.",
+                },
+            )
+
+        if sig >= 0.8:
+            await schedule_consequence(
+                run_id=state.run_id, source_event_id=None,
+                trigger_turn=state.turn + 3,
+                target_type="location", target_id=player_loc,
+                effect_type="tension_shift",
+                effect_payload={"delta": 1},
+            )
+
+        if action_type in ("trade", "negotiate") and sig >= 0.5:
+            await schedule_consequence(
+                run_id=state.run_id, source_event_id=None,
+                trigger_turn=state.turn + 3,
+                target_type="location", target_id=player_loc,
+                effect_type="event_spawn",
+                effect_payload={
+                    "description": f"The consequences of {state.player.name}'s {action_type} continue to unfold.",
+                    "location": player_loc,
+                    "action_type": "ambient",
+                },
+            )
+    except Exception as exc:
+        logger.warning("Failed to schedule player consequences: %s", exc)
+
+
+async def _check_historical_divergence(state: WorldState, parsed: dict) -> None:
+    """Detect if a significant player action contradicts canonical history.
+
+    Uses keyword matching on action_type + location + year proximity.
+    No LLM call — pure heuristic.
+    """
+    action_type = parsed.get("action_type", "")
+    target = (parsed.get("target") or "").lower()
+    player_loc = state.player.location
+    year = state.current_year or state.era.year_start
+
+    type_map = {
+        "defend": "war", "attack": "war", "fight": "war", "siege": "war",
+        "betray": "political", "negotiate": "political", "alliance": "political",
+        "trade": "economic", "hoard": "economic",
+        "prevent": "war", "save": "war", "flee": "war",
+    }
+    search_type = type_map.get(action_type)
+
+    try:
+        candidates = await query_historical_events(
+            year_start=year - 5, year_end=year + 5,
+            region=state.era.region,
+            event_type=search_type,
+        )
+
+        if not candidates:
+            candidates = await query_historical_events(
+                year_start=year - 5, year_end=year + 5,
+            )
+
+        for ev in candidates:
+            if not ev.get("canonical"):
+                continue
+            ev_text = ev.get("event", "").lower()
+            if target and target in ev_text:
+                divergence = {
+                    "turn": state.turn,
+                    "canonical_event_id": ev["id"],
+                    "canonical_event": ev["event"],
+                    "player_action": parsed.get("era_description", ""),
+                    "action_type": action_type,
+                }
+                state.historical_divergences.append(divergence)
+                await supersede_downstream_consequences(state.run_id, ev["id"])
+                logger.info(
+                    "Historical divergence: player action '%s' contradicts '%s'",
+                    parsed.get("intent", ""), ev["event"],
+                )
+                break
+    except Exception as exc:
+        logger.warning("Divergence check failed (non-fatal): %s", exc)
 
 
 # ------------------------------------------------------------------

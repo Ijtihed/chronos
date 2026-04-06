@@ -216,10 +216,18 @@ async def _fetch_wikipedia_summary(title: str) -> str | None:
 
 async def _get_wikipedia_title_for_qid(qid: str) -> str | None:
     """Get the English Wikipedia article title for a Wikidata entity."""
-    url = f"https://www.wikidata.org/wiki/Special:EntityData/{qid}.json"
+    url = f"https://www.wikidata.org/w/api.php"
+    params = {
+        "action": "wbgetentities",
+        "ids": qid,
+        "props": "sitelinks",
+        "sitefilter": "enwiki",
+        "format": "json",
+    }
+    headers = {"User-Agent": "CHRONOS-BuildScript/1.0 (historical-simulation-project)"}
     async with httpx.AsyncClient(timeout=15.0) as client:
         try:
-            resp = await client.get(url)
+            resp = await client.get(url, params=params, headers=headers)
             if resp.status_code == 200:
                 data = resp.json()
                 entity = data.get("entities", {}).get(qid, {})
@@ -283,7 +291,7 @@ async def _structure_events_with_llm(
     )
 
     try:
-        raw_response = await chat(prompt, json_mode=True)
+        raw_response = await chat(prompt, json_mode=True, model="llama3.1:8b")
         parsed = json.loads(raw_response)
         if isinstance(parsed, dict) and "events" in parsed:
             parsed = parsed["events"]
@@ -441,6 +449,36 @@ async def build_era(era: str, year_start: int, year_end: int, region: str) -> di
 # CLI entry point
 # ---------------------------------------------------------------------------
 
+async def dry_run_era(era: str, year_start: int, year_end: int, region: str) -> None:
+    """Print SPARQL queries and expected shapes without touching DB or LLM."""
+    print(f"\n=== DRY RUN: {era} ({year_start}-{year_end}, region: {region}) ===\n")
+
+    total_results = 0
+    for event_type, q_classes in EVENT_TYPE_CLASSES.items():
+        query = _build_sparql_query(event_type, q_classes, year_start, year_end, region)
+        print(f"--- {event_type} ---")
+        print(f"Wikidata classes: {', '.join(f'wd:{q}' for q in q_classes)}")
+        print(f"Year range: {year_start}-{year_end}")
+
+        try:
+            results = await _query_sparql(query)
+            print(f"Results: {len(results)} events found")
+            for r in results[:3]:
+                label = r.get("eventLabel", {}).get("value", "?")
+                year = _extract_year(r)
+                loc = r.get("locationLabel", {}).get("value", "?")
+                print(f"  - [{year}] {label} (location: {loc})")
+            if len(results) > 3:
+                print(f"  ... and {len(results) - 3} more")
+            total_results += len(results)
+        except Exception as e:
+            print(f"  SPARQL query failed: {e}")
+        print()
+
+    print(f"=== TOTAL: {total_results} raw events across all types ===")
+    print("(Dry run — nothing written to DB. Remove --dry-run to execute.)")
+
+
 async def main():
     parser = argparse.ArgumentParser(
         description="Populate historical_events DB from Wikidata + Wikipedia"
@@ -449,8 +487,22 @@ async def main():
     parser.add_argument("--start", type=int, help="Start year")
     parser.add_argument("--end", type=int, help="End year")
     parser.add_argument("--region", type=str, help="Region name for SPARQL filtering")
-    parser.add_argument("--all", action="store_true", help="Build all 5 starter eras")
+    parser.add_argument("--all", action="store_true", help="Build all starter eras")
+    parser.add_argument("--dry-run", action="store_true",
+                        help="Print SPARQL queries and results without writing to DB")
     args = parser.parse_args()
+
+    if args.dry_run:
+        if args.all:
+            for era_def in STARTER_ERAS:
+                await dry_run_era(
+                    era_def["era"], era_def["start"], era_def["end"], era_def["region"]
+                )
+        elif all([args.era, args.start, args.end, args.region]):
+            await dry_run_era(args.era, args.start, args.end, args.region)
+        else:
+            parser.error("Provide --era, --start, --end, --region (or use --all)")
+        return
 
     await init_db()
 

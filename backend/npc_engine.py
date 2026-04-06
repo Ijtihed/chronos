@@ -35,6 +35,7 @@ async def generate_npc_pov(
     query = action.get("era_description", action.get("intent", ""))
     historical_context = retrieve_context(state.era.name, query) if query else ""
 
+    gc = state.ground_context or {}
     prompt = template.safe_substitute(
         npc_name=npc.name,
         npc_role=npc.role,
@@ -43,6 +44,8 @@ async def generate_npc_pov(
         relationship_to_player=npc.relationship_to_player,
         player_name=state.player.name,
         era_description=state.era.description,
+        era_feel=gc.get("era_feel", ""),
+        material_conditions=gc.get("material_conditions", player_loc.material_conditions),
         location_name=player_loc.name,
         year=state.current_year or state.era.year_start,
         story_so_far=build_story_summary(state),

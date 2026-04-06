@@ -43,6 +43,7 @@ class ActionParserResponse(BaseModel):
     is_travel: bool = False
     destination: Optional[str] = None
     is_inaction: bool = False
+    significance_score: float = Field(default=0.2, ge=0.0, le=1.0)
 
     @field_validator("npc_impacts", mode="before")
     @classmethod
@@ -58,6 +59,15 @@ class ActionParserResponse(BaseModel):
             elif isinstance(item, NpcImpact):
                 out.append(item)
         return out
+
+    @field_validator("significance_score", mode="before")
+    @classmethod
+    def clamp_significance(cls, v):
+        try:
+            f = float(v)
+        except (TypeError, ValueError):
+            return 0.2
+        return max(0.0, min(1.0, f))
 
     @field_validator("action_type", mode="before")
     @classmethod

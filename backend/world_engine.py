@@ -142,6 +142,7 @@ async def player_skip_turn(state: WorldState) -> dict:
     nearby = npcs_near_player(state)
     other_names = ", ".join(n.name for n in nearby) or "no one"
 
+    gc = state.ground_context or {}
     prompt = Template(raw_template).safe_substitute(
         character_name=state.player.name,
         character_role=state.player.role,
@@ -151,6 +152,8 @@ async def player_skip_turn(state: WorldState) -> dict:
         location_name=player_loc.name,
         year=state.current_year or state.era.year_start,
         era_description=state.era.description,
+        era_feel=gc.get("era_feel", ""),
+        material_conditions=gc.get("material_conditions", player_loc.material_conditions),
         story_so_far=build_story_summary(state),
         player_name=state.player.name,
     )
@@ -182,6 +185,7 @@ async def _npc_autonomous_action(npc: NPC, state: WorldState, nearby_npcs: List[
         n.name for n in nearby_npcs if n.id != npc.id
     ) or "no one"
 
+    gc = state.ground_context or {}
     prompt = Template(raw_template).safe_substitute(
         character_name=npc.name,
         character_role=npc.role,
@@ -191,6 +195,8 @@ async def _npc_autonomous_action(npc: NPC, state: WorldState, nearby_npcs: List[
         location_name=npc_loc.name,
         year=state.current_year or state.era.year_start,
         era_description=state.era.description,
+        era_feel=gc.get("era_feel", ""),
+        material_conditions=gc.get("material_conditions", npc_loc.material_conditions),
         story_so_far=build_story_summary(state),
         player_name=state.player.name,
     )

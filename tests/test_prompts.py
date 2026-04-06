@@ -93,6 +93,8 @@ class TestNpcPovPrompt:
             relationship_to_player=npc.relationship_to_player,
             player_name=state.player.name,
             era_description=state.era.description,
+            era_feel="The empire crumbles around us.",
+            material_conditions="Grain is scarce. Prices rise.",
             location_name=player_loc.name,
             year=state.current_year or state.era.year_start,
             story_so_far=build_story_summary(state),

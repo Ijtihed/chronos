@@ -32,6 +32,12 @@ If the player intends to DO NOTHING (wait, rest, let events unfold), set is_inac
 
 For npc_impacts: decide which characters are ACTUALLY affected by this action. Not everyone reacts to everything. Only include NPCs whose lives are genuinely touched. Set "relevant" to true ONLY for those whose perspective the player should hear. Most actions affect 1-3 people, not everyone.
 
+Rate the historical significance of this action on a scale of 0.0 to 1.0:
+- 0.0–0.2: trivial (rest, eat, observe, talk casually)
+- 0.3–0.5: notable (travel, trade, confront someone, seek information)
+- 0.6–0.8: significant (betray someone, prevent an event, kill, major negotiation)
+- 0.9–1.0: major (prevent a battle, save/end a life, change a political situation)
+
 Respond with ONLY a JSON object, no other text:
 
-{"action_type": "a short label for this action — use whatever fits", "target": "person, place, or thing the action is directed at, or null", "intent": "brief summary of what the player is trying to accomplish", "era_description": "one sentence describing how this plays out, in third person", "is_travel": false, "destination": "location_id if traveling, else null", "is_inaction": false, "npc_impacts": [{"name": "NPC name", "sentiment": "positive" or "negative" or "neutral", "relevant": true or false, "reason": "one-line reason"}]}
+{"action_type": "a short label for this action — use whatever fits", "target": "person, place, or thing the action is directed at, or null", "intent": "brief summary of what the player is trying to accomplish", "era_description": "one sentence describing how this plays out, in third person", "is_travel": false, "destination": "location_id if traveling, else null", "is_inaction": false, "significance_score": 0.2, "npc_impacts": [{"name": "NPC name", "sentiment": "positive" or "negative" or "neutral", "relevant": true or false, "reason": "one-line reason"}]}
