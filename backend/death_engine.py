@@ -158,6 +158,57 @@ def _decay_modifier(npc) -> float:
     return 1.0
 
 
+_MEMORY_FADE_PATH = Path(__file__).resolve().parent.parent / "prompts" / "memory_fade.md"
+
+
+def _build_memory_summary(state: WorldState) -> str:
+    """Build a plain-text summary of who remembers the player and how strongly."""
+    rememberers = [
+        (npc.name, npc.role, npc.memory_of_player)
+        for npc in state.npcs
+        if npc.memory_of_player > 0
+    ]
+    if not rememberers:
+        return "No one remembers."
+    rememberers.sort(key=lambda x: -x[2])
+    lines = []
+    for name, role, mem in rememberers:
+        if mem > 0.7:
+            lines.append(f"{name} ({role}) — remembers clearly")
+        elif mem > 0.3:
+            lines.append(f"{name} ({role}) — remembers faintly")
+        else:
+            lines.append(f"{name} ({role}) — barely remembers")
+    return "\n".join(lines)
+
+
+async def generate_memory_fade(state: WorldState) -> str:
+    """Generate one fade-framing sentence for observation mode."""
+    rememberers = [n for n in state.npcs if n.memory_of_player > 0]
+    if not rememberers:
+        return f"No one in {get_player_location(state).name} remembers {state.player.name}."
+
+    try:
+        raw_template = load_prompt(_MEMORY_FADE_PATH)
+        player_loc = get_player_location(state)
+        prompt = Template(raw_template).safe_substitute(
+            player_name=state.player.name,
+            player_role=state.player.role,
+            location_name=player_loc.name,
+            year=state.current_year or state.era.year_start,
+            memory_summary=_build_memory_summary(state),
+        )
+        text = await chat(prompt)
+        if leaks_raw_numbers(text):
+            text = scrub_leaked_numbers(text)
+        return text.strip().split("\n")[0][:200]
+    except Exception:
+        count = len(rememberers)
+        if count == 1:
+            return f"Only {rememberers[0].name} still remembers {state.player.name}."
+        return f"{count} people still remember {state.player.name}. Fewer than last week."
+
+
 async def generate_erasure(state: WorldState) -> str:
     """Generate the final erasure passage when the run ends."""
     raw_template = load_prompt(_ERASURE_PATH)

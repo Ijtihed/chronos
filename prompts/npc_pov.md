@@ -16,7 +16,10 @@ What you know: $what_character_knows
 What you've heard: $local_rumors
 
 Who you are: $npc_description
+Your place in this world: $social_class
 How you feel right now: $npc_disposition
+What drives you right now: $dominant_need
+What's pressing: $urgent_needs
 Your history with $player_name: $relationship_to_player
 
 What's been happening:

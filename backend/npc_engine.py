@@ -16,6 +16,7 @@ from pydantic import ValidationError
 from backend.hke.retrieve import retrieve_context
 from backend.llm import chat, load_prompt
 from backend.llm_schemas import NPCPOVResponse, leaks_raw_numbers, scrub_leaked_numbers
+from backend.npc_personality import get_dominant_need, get_urgent_needs
 from backend.world_state import (
     NPC,
     WorldState,
@@ -50,11 +51,17 @@ async def generate_npc_pov(
     else:
         rumors_str = "; ".join(raw_rumors)
 
+    urgent = get_urgent_needs(npc.needs)
+    urgent_str = ", ".join(n.replace("_", " ") for n in urgent) if urgent else "nothing urgent"
+
     prompt = template.safe_substitute(
         npc_name=npc.name,
         npc_role=npc.role,
         npc_description=npc.description,
+        social_class=npc.social_class or npc.archetype,
         npc_disposition=npc.disposition,
+        dominant_need=get_dominant_need(npc.needs).replace("_", " "),
+        urgent_needs=urgent_str,
         relationship_to_player=npc.relationship_to_player,
         player_name=state.player.name,
         era_description=state.era.description,

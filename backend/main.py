@@ -25,6 +25,7 @@ from backend.death_engine import (
     check_death,
     decay_memories,
     generate_erasure,
+    generate_memory_fade,
 )
 from backend.eras import ALL_ERAS, random_era
 from backend.llm import chat, load_prompt, ollama_ok
@@ -648,6 +649,7 @@ async def _handle_observation(state: WorldState, text: str) -> dict:
             state.player.location = dest_id
             if dest_id not in state.visited_locations:
                 state.visited_locations.append(dest_id)
+            fade_text = await generate_memory_fade(state)
             await save_session(state)
             pv = build_player_view(state, state.run_id)
             narrative = build_narrative_output([], parsed, [])
@@ -665,22 +667,25 @@ async def _handle_observation(state: WorldState, text: str) -> dict:
                 "player_view": pv.model_dump(),
                 "npc_responses": [],
                 "death": None,
+                "memory_fade": fade_text,
             }
 
-    state.turn += 1
-    state.current_year = int(
-        state.era.year_start + state.turn * state.era.years_per_turn
-    )
+    # World keeps moving even after death — run full simulation
+    state, ambient = await simulate_turn(state)
     state = decay_memories(state)
+
+    # Generate fade framing
+    fade_text = await generate_memory_fade(state)
+
     if state.run_status == "ended":
         erasure_text = await generate_erasure(state)
         await save_session(state)
         pv = build_player_view(state, state.run_id)
-        narrative = build_narrative_output([], parsed, [], erasure=erasure_text)
+        narrative = build_narrative_output(ambient, parsed, [], erasure=erasure_text)
         await append_turn_log(
             run_id=state.run_id, turn_number=state.turn,
             player_input=text, parsed_action=parsed,
-            ambient_activity=[], npc_responses=[],
+            ambient_activity=ambient, npc_responses=[],
             state_changes=compute_state_diff(state_before, state.model_dump()),
             narrative_output=narrative,
             player_view_snapshot=pv.model_dump(),
@@ -689,21 +694,22 @@ async def _handle_observation(state: WorldState, text: str) -> dict:
 
     await save_session(state)
     pv = build_player_view(state, state.run_id)
-    narrative = build_narrative_output([], parsed, [])
+    narrative = build_narrative_output(ambient, parsed, [])
     await append_turn_log(
         run_id=state.run_id, turn_number=state.turn,
         player_input=text, parsed_action=parsed,
-        ambient_activity=[], npc_responses=[],
+        ambient_activity=ambient, npc_responses=[],
         state_changes=compute_state_diff(state_before, state.model_dump()),
         narrative_output=narrative,
         player_view_snapshot=pv.model_dump(),
     )
     return {
-        "ambient_activity": [],
+        "ambient_activity": ambient,
         "parsed_action": parsed,
         "player_view": pv.model_dump(),
         "npc_responses": [],
         "death": None,
+        "memory_fade": fade_text,
     }
 
 
@@ -728,7 +734,7 @@ def _filter_relevant(nearby_npcs, npc_impacts):
     if not has_relevant_field:
         return nearby_npcs[:2] if nearby_npcs else []
     if not relevant_names:
-        return nearby_npcs[:1] if nearby_npcs else []
+        return []
 
     return [
         npc for npc in nearby_npcs
