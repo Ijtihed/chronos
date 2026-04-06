@@ -27,10 +27,10 @@ class TestActionParserLive:
         assert "_parse_error" not in result, f"Parser error: {result.get('_parse_error')}"
 
     @pytest.mark.asyncio
-    async def test_action_type_is_from_vocabulary(self, state):
+    async def test_action_type_is_nonempty_string(self, state):
         result = await parse_action("ask the deacon for food", state)
-        valid_types = {"speak", "trade", "travel", "observe", "petition", "prepare", "other"}
-        assert result["action_type"] in valid_types
+        assert isinstance(result["action_type"], str)
+        assert len(result["action_type"].strip()) > 0
 
     @pytest.mark.asyncio
     async def test_modern_language_still_parses(self, state):

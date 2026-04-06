@@ -201,15 +201,28 @@ def _extract_year(binding: dict) -> int | None:
 # ---------------------------------------------------------------------------
 
 async def _fetch_wikipedia_summary(title: str) -> str | None:
-    """Fetch 2-3 sentence extract from Wikipedia REST API."""
-    url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{title}"
+    """Fetch 2-3 sentence extract from MediaWiki API (more reliable than REST)."""
+    url = "https://en.wikipedia.org/w/api.php"
+    params = {
+        "action": "query",
+        "titles": title,
+        "prop": "extracts",
+        "exintro": "true",
+        "explaintext": "true",
+        "exsentences": "3",
+        "format": "json",
+    }
     headers = {"User-Agent": "CHRONOS-BuildScript/1.0 (historical-simulation-project)"}
     async with httpx.AsyncClient(timeout=15.0) as client:
         try:
-            resp = await client.get(url, headers=headers)
+            resp = await client.get(url, params=params, headers=headers)
             if resp.status_code == 200:
                 data = resp.json()
-                return data.get("extract", "")[:500]
+                pages = data.get("query", {}).get("pages", {})
+                for page in pages.values():
+                    extract = page.get("extract", "")
+                    if extract:
+                        return extract[:500]
         except Exception:
             pass
     return None
@@ -319,6 +332,9 @@ async def _structure_events_with_llm(
 # Main pipeline
 # ---------------------------------------------------------------------------
 
+_WINDOW_SIZE = 20
+
+
 async def build_era(era: str, year_start: int, year_end: int, region: str) -> dict:
     """Build events for one era. Returns coverage stats."""
     logger.info("=== Building era: %s (%d-%d, region: %s) ===", era, year_start, year_end, region)
@@ -326,31 +342,40 @@ async def build_era(era: str, year_start: int, year_end: int, region: str) -> di
     all_raw_events: list[dict] = []
 
     for event_type, q_classes in EVENT_TYPE_CLASSES.items():
-        query = _build_sparql_query(event_type, q_classes, year_start, year_end, region)
-        logger.info("Querying Wikidata for %s events...", event_type)
+        # Split into 20-year windows to avoid LIMIT truncation
+        win_start = year_start
+        while win_start < year_end:
+            win_end = min(win_start + _WINDOW_SIZE, year_end)
+            query = _build_sparql_query(event_type, q_classes, win_start, win_end, region)
+            logger.info("Querying Wikidata for %s events (%d-%d)...", event_type, win_start, win_end)
 
-        try:
-            results = await _query_sparql(query)
-            logger.info("  Found %d raw results for %s", len(results), event_type)
-        except Exception as e:
-            logger.error("  SPARQL query failed for %s: %s", event_type, e)
-            results = []
+            try:
+                results = await _query_sparql(query)
+                logger.info("  Found %d raw results for %s (%d-%d)",
+                            len(results), event_type, win_start, win_end)
+            except Exception as e:
+                logger.error("  SPARQL query failed for %s (%d-%d): %s",
+                             event_type, win_start, win_end, e)
+                results = []
 
-        for binding in results:
-            qid = _extract_qid(binding.get("event", {}).get("value", ""))
-            year = _extract_year(binding)
-            if not qid or not year:
-                continue
+            for binding in results:
+                qid = _extract_qid(binding.get("event", {}).get("value", ""))
+                year = _extract_year(binding)
+                if not qid or not year:
+                    continue
 
-            all_raw_events.append({
-                "qid": qid,
-                "label": binding.get("eventLabel", {}).get("value", ""),
-                "description": binding.get("eventDescription", {}).get("value", ""),
-                "year": year,
-                "location": binding.get("locationLabel", {}).get("value", ""),
-                "country": binding.get("countryLabel", {}).get("value", ""),
-                "source_type": event_type,
-            })
+                all_raw_events.append({
+                    "qid": qid,
+                    "label": binding.get("eventLabel", {}).get("value", ""),
+                    "description": binding.get("eventDescription", {}).get("value", ""),
+                    "year": year,
+                    "location": binding.get("locationLabel", {}).get("value", ""),
+                    "country": binding.get("countryLabel", {}).get("value", ""),
+                    "source_type": event_type,
+                })
+
+            win_start += _WINDOW_SIZE
+            await asyncio.sleep(0.5)  # rate limit between windows
 
     # Deduplicate by QID
     seen_qids: set[str] = set()
