@@ -53,8 +53,10 @@ EVENT_TYPE_CLASSES: dict[str, list[str]] = {
     "epidemic": ["Q170483", "Q3241045"],            # epidemic, disease outbreak
     "famine": ["Q168247"],                          # famine
     "political": ["Q45382", "Q217602", "Q131558"],  # coup, treaty, annexation
+    "religious": ["Q15893266", "Q80117", "Q1047113", "Q3966183"],  # ecumenical council, schism, religious persecution, religious war
+    "economic": ["Q11032", "Q721790", "Q476068"],  # trade route, trade war, economic crisis
     "natural_disaster": ["Q7944", "Q8068", "Q7692360"],  # earthquake, flood, volcanic eruption
-    "cultural": ["Q3030248", "Q2091629"],           # founding, council (ecumenical/religious)
+    "cultural": ["Q3030248", "Q2091629"],           # founding, council
 }
 
 # Era definitions for --all mode.

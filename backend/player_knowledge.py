@@ -278,18 +278,23 @@ def filter_historical_events(
         else:
             dist = graph_distance(player_loc_id, event_loc_id, state)
 
+        ev_type = ev.get("type", "cultural")
+        thresholds = KNOWLEDGE_MATRIX.get((tier, ev_type))
+        known_max = (thresholds["known"] if thresholds else 1) + \
+            _get_overrides(archetype).get(ev_type, 0)
+
+        # Each hop beyond the known threshold represents an intermediary
+        intermediaries = max(0, dist - known_max) if dist > known_max else 0
+
         quality = classify_event_knowledge(
-            tier, archetype, ev.get("type", "cultural"), dist,
+            tier, archetype, ev_type, dist, intermediaries,
         )
         if quality == "unknown":
             continue
 
         acc = None
         if quality.startswith("rumor"):
-            thresholds = KNOWLEDGE_MATRIX.get((tier, ev.get("type", "cultural")))
-            known_max = (thresholds["known"] if thresholds else 1) + \
-                _get_overrides(archetype).get(ev.get("type", "cultural"), 0)
-            acc = rumor_accuracy(dist, known_max)
+            acc = rumor_accuracy(dist, known_max, intermediaries)
 
         results.append(HistoricalEventView(
             year=ev.get("year", 0),
