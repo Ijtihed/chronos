@@ -29,12 +29,8 @@ from backend.persistence import (
     schedule_consequence,
 )
 from backend.player_knowledge import (
-    classify_event_knowledge,
     filter_historical_events,
-    rumor_accuracy,
-    _get_overrides,
     _knowledge_tier,
-    KNOWLEDGE_MATRIX,
 )
 from backend.world_state import WorldState, get_player_location
 

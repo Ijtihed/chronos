@@ -19,7 +19,7 @@ import re
 import sys
 import uuid
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Tuple
 
 import httpx
 from bs4 import BeautifulSoup
@@ -47,6 +47,9 @@ WIKIPEDIA_HTML_API = "https://en.wikipedia.org/api/rest_v1/page/html/{title}"
 
 def chunk_text(text: str, chunk_size: int, overlap: int) -> List[str]:
     """Split text into overlapping chunks by word count."""
+    if chunk_size <= 0:
+        return []
+    step = max(1, chunk_size - overlap)
     words = text.split()
     chunks = []
     i = 0
@@ -54,7 +57,7 @@ def chunk_text(text: str, chunk_size: int, overlap: int) -> List[str]:
         chunk = " ".join(words[i : i + chunk_size])
         if chunk.strip():
             chunks.append(chunk)
-        i += chunk_size - overlap
+        i += step
     return chunks
 
 

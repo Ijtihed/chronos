@@ -10,13 +10,10 @@ CHRONOS's architecture.
 
 from __future__ import annotations
 
-import logging
 import re
 from typing import List, Optional
 
 from pydantic import BaseModel, Field, field_validator
-
-logger = logging.getLogger("chronos.llm_schemas")
 
 
 # ---------------------------------------------------------------------------

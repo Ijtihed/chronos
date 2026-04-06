@@ -104,7 +104,10 @@ async def get_geo(era_key: str):
     border_file = geo_dir / f"borders_{era_key}.geojson"
     if not border_file.exists():
         raise HTTPException(404, f"No border data for era '{era_key}'")
-    return json.loads(border_file.read_text())
+    try:
+        return json.loads(border_file.read_text())
+    except (json.JSONDecodeError, IOError) as exc:
+        raise HTTPException(500, f"Failed to load border data: {exc}")
 
 
 # ------------------------------------------------------------------
@@ -359,9 +362,12 @@ async def region_knowledge(run_id: str, polity_name: str):
     state = await _load_or_404(run_id)
 
     year = state.current_year or state.era.year_start
-    raw_events = await query_historical_events(
-        year_start=year - 100, year_end=year + 5, region=polity_name,
-    )
+    try:
+        raw_events = await query_historical_events(
+            year_start=year - 100, year_end=year + 5, region=polity_name,
+        )
+    except Exception:
+        raw_events = []
 
     filtered = filter_historical_events(raw_events, state)
 

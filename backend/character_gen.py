@@ -12,7 +12,7 @@ import random
 import uuid
 from pathlib import Path
 from string import Template
-from typing import List, Tuple
+from typing import List
 
 from pydantic import ValidationError
 

@@ -22,7 +22,7 @@ class Era(BaseModel):
     description: str
     region: str
     years_per_turn: float = 0.25
-    lifespan_turns: List[int] = Field(default=[40, 60])
+    lifespan_turns: List[int] = Field(default_factory=lambda: [40, 60])
 
 
 class Location(BaseModel):

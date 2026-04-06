@@ -179,6 +179,8 @@ async def _npc_autonomous_action(npc: NPC, state: WorldState, nearby_npcs: List[
     try:
         npc_loc = next(l for l in state.locations if l.id == npc.location)
     except StopIteration:
+        if not state.locations:
+            return autonomous_action_default(npc.name).model_dump()
         npc_loc = state.locations[0]
 
     other_names = ", ".join(

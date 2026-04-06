@@ -540,6 +540,8 @@ async def get_pending_consequences(run_id: str, current_turn: int) -> List[dict]
 
 async def mark_consequence_fired(consequence_id: int) -> None:
     """Mark a consequence as fired after successful application."""
+    if not DB_PATH.exists():
+        return
     async with aiosqlite.connect(str(DB_PATH)) as db:
         await db.execute(
             "UPDATE consequence_queue SET fired = 1 WHERE id = ?",
@@ -550,6 +552,8 @@ async def mark_consequence_fired(consequence_id: int) -> None:
 
 async def mark_consequence_superseded(consequence_id: int) -> None:
     """Mark a consequence as superseded (world diverged, no longer valid)."""
+    if not DB_PATH.exists():
+        return
     async with aiosqlite.connect(str(DB_PATH)) as db:
         await db.execute(
             "UPDATE consequence_queue SET superseded = 1 WHERE id = ?",
@@ -566,6 +570,8 @@ async def supersede_downstream_consequences(
     Used when a player action contradicts a canonical event.
     Returns count of rows affected.
     """
+    if not DB_PATH.exists():
+        return 0
     async with aiosqlite.connect(str(DB_PATH)) as db:
         cursor = await db.execute(
             """
