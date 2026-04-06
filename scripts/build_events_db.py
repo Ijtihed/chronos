@@ -203,9 +203,10 @@ def _extract_year(binding: dict) -> int | None:
 async def _fetch_wikipedia_summary(title: str) -> str | None:
     """Fetch 2-3 sentence extract from Wikipedia REST API."""
     url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{title}"
+    headers = {"User-Agent": "CHRONOS-BuildScript/1.0 (historical-simulation-project)"}
     async with httpx.AsyncClient(timeout=15.0) as client:
         try:
-            resp = await client.get(url)
+            resp = await client.get(url, headers=headers)
             if resp.status_code == 200:
                 data = resp.json()
                 return data.get("extract", "")[:500]
@@ -297,7 +298,18 @@ async def _structure_events_with_llm(
             parsed = parsed["events"]
         if not isinstance(parsed, list):
             parsed = [parsed]
-        return parsed
+
+        validated = []
+        for item in parsed:
+            if not isinstance(item, dict):
+                continue
+            if isinstance(item.get("event"), list):
+                for sub in item["event"]:
+                    if isinstance(sub, dict):
+                        validated.append(sub)
+                continue
+            validated.append(item)
+        return validated
     except (json.JSONDecodeError, Exception) as e:
         logger.error("LLM structuring failed: %s", e)
         return []
@@ -382,6 +394,7 @@ async def build_era(era: str, year_start: int, year_end: int, region: str) -> di
 
         structured = await _structure_events_with_llm(batch)
 
+        raw_by_qid = {ev["qid"]: ev for ev in batch}
         for item in structured:
             try:
                 valid_types = {"war", "epidemic", "famine", "political",
@@ -398,22 +411,44 @@ async def build_era(era: str, year_start: int, year_end: int, region: str) -> di
                 if not isinstance(affects, list):
                     affects = []
 
+                qid = item.get("wikidata_qid", "")
+                event_text = item.get("event", "")
+
+                if not event_text or event_text == "Unknown event" or len(event_text) < 10:
+                    raw = raw_by_qid.get(qid, {})
+                    label = raw.get("label", "")
+                    desc = raw.get("description", "")
+                    wiki = raw.get("wiki_extract", "")
+                    event_text = wiki[:300] if wiki else f"{label}. {desc}".strip(". ")
+                    if not event_text or len(event_text) < 5:
+                        logger.debug("Skipping event with no usable description: %s", qid)
+                        continue
+
+                if not isinstance(event_text, str):
+                    event_text = str(event_text)[:300]
+
+                year_val = item.get("year")
+                if year_val is None:
+                    raw = raw_by_qid.get(qid, {})
+                    year_val = raw.get("year", year_start)
+
                 await insert_historical_event(
-                    year=int(item.get("year", year_start)),
+                    year=int(year_val),
                     region=item.get("region", region),
-                    event=item.get("event", item.get("label", "Unknown event")),
+                    event=event_text,
                     significance=sig,
                     event_type=ev_type,
                     affects=affects,
                     canonical=True,
-                    wikidata_qid=item.get("wikidata_qid"),
+                    wikidata_qid=qid,
                 )
                 inserted += 1
             except Exception as e:
-                logger.error("Failed to insert event: %s — %s", item, e)
+                logger.error("Failed to insert event: %s — %s",
+                             str(item)[:200], e)
 
-    # Coverage report
-    events = await query_historical_events(year_start, year_end, region)
+    # Coverage report (query without region filter to count all inserted events)
+    events = await query_historical_events(year_start, year_end)
     decades: dict[int, int] = {}
     type_counts: dict[str, int] = {}
     for ev in events:

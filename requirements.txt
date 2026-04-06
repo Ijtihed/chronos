@@ -5,5 +5,6 @@ pydantic
 python-dotenv
 aiosqlite
 chromadb
+ollama
 beautifulsoup4
 SPARQLWrapper
