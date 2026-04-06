@@ -81,33 +81,34 @@ class TestMarkerStateMidRun:
         _chat(FAKE_SKIP, FAKE_SKIP, FAKE_ACTION, FAKE_DEATH_SAFE, FAKE_NPC_POV)
 
         await client.post(f"/api/run/{rid}/turn", json={"player_input": "act"})
-        state = (await client.get(f"/api/run/{rid}")).json()
+        pv = (await client.get(f"/api/run/{rid}")).json()
 
-        assert "visited_locations" in state
-        assert len(state["visited_locations"]) >= 1
-        assert state["player"]["location"] in state["visited_locations"]
-
-    @pytest.mark.asyncio
-    @respx.mock
-    async def test_all_locations_have_coords_in_state(self, client):
-        _down()
-        rid = (await client.post("/api/run")).json()["run_id"]
-        state = (await client.get(f"/api/run/{rid}")).json()
-
-        for loc in state["locations"]:
-            assert "lat" in loc, f"{loc['id']} missing lat"
-            assert "lon" in loc, f"{loc['id']} missing lon"
+        assert "visited_locations" in pv
+        assert len(pv["visited_locations"]) >= 1
+        assert pv["player_location"] in pv["visited_locations"]
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_npcs_have_memory_field_for_marker_state(self, client):
+    async def test_current_location_has_coords_in_player_view(self, client):
         _down()
         rid = (await client.post("/api/run")).json()["run_id"]
-        state = (await client.get(f"/api/run/{rid}")).json()
+        pv = (await client.get(f"/api/run/{rid}")).json()
 
-        for npc in state["npcs"]:
-            assert "memory_of_player" in npc
-            assert "location" in npc
+        loc = pv["current_location"]
+        assert "lat" in loc, "current_location missing lat"
+        assert "lon" in loc, "current_location missing lon"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_npcs_here_have_no_memory_field(self, client):
+        """memory_of_player must never appear in the API response."""
+        _down()
+        rid = (await client.post("/api/run")).json()["run_id"]
+        pv = (await client.get(f"/api/run/{rid}")).json()
+
+        for npc in pv["npcs_here"]:
+            assert "memory_of_player" not in npc
+            assert "id" in npc
 
 
 class TestTravelUpdatesMarkers:
@@ -128,10 +129,10 @@ class TestTravelUpdatesMarkers:
             f"/api/run/{rid}/turn",
             json={"player_input": "travel to Ravenna"},
         )
-        state = (await client.get(f"/api/run/{rid}")).json()
+        pv = (await client.get(f"/api/run/{rid}")).json()
 
-        assert "ravenna" in state["visited_locations"]
-        assert state["player"]["location"] == "ravenna"
+        assert "ravenna" in pv["visited_locations"]
+        assert pv["player_location"] == "ravenna"
 
     @pytest.mark.asyncio
     @respx.mock
@@ -171,10 +172,10 @@ class TestTravelUpdatesMarkers:
             f"/api/run/{rid}/turn",
             json={"player_input": "travel to Ravenna"},
         )
-        turn_state = resp.json()["world_state"]
-        api_state = (await client.get(f"/api/run/{rid}")).json()
+        turn_pv = resp.json()["player_view"]
+        api_pv = (await client.get(f"/api/run/{rid}")).json()
 
-        assert turn_state["player"]["location"] == api_state["player"]["location"]
+        assert turn_pv["player_location"] == api_pv["player_location"]
 
 
 class TestObservationModeMarkers:
@@ -237,7 +238,7 @@ class TestErasureMarkersGone:
             npc.memory_of_player = 0.0
         await persistence.save_session(state)
 
-        api_state = (await client.get(f"/api/run/{rid}")).json()
-        assert api_state["run_status"] == "ended"
-        for npc in api_state["npcs"]:
-            assert npc["memory_of_player"] == 0.0
+        pv = (await client.get(f"/api/run/{rid}")).json()
+        assert pv["run_status"] == "ended"
+        for npc in pv["npcs_here"]:
+            assert "memory_of_player" not in npc

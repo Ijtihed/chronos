@@ -102,7 +102,7 @@ const ChronosMap = (function () {
     });
   }
 
-  function updateMarkers(worldState) {
+  function updateMarkers(pv) {
     if (!map) return;
 
     if (playerMarker) {
@@ -114,16 +114,15 @@ const ChronosMap = (function () {
     });
     npcMarkers = [];
 
-    var visitedLocs = worldState.visited_locations || [];
-    var locations = worldState.locations || [];
-    var runStatus = worldState.run_status;
+    var runStatus = pv.run_status;
+    var playerLoc = pv.current_location;
 
-    var playerLoc = null;
-    for (var i = 0; i < locations.length; i++) {
-      if (locations[i].id === worldState.player.location) {
-        playerLoc = locations[i];
-        break;
-      }
+    // Build location lookup from PlayerView
+    var locById = {};
+    if (playerLoc) locById[playerLoc.id] = playerLoc;
+    var knownLocs = pv.known_locations || [];
+    for (var k = 0; k < knownLocs.length; k++) {
+      locById[knownLocs[k].id] = knownLocs[k];
     }
 
     if (playerLoc && playerLoc.lat && playerLoc.lon) {
@@ -143,9 +142,9 @@ const ChronosMap = (function () {
       if (runStatus === "active") {
         playerMarker.bindTooltip(
           '<span style="font-family:IM Fell English,serif;font-size:13px;color:#c8b89a;">' +
-          worldState.player.name + '</span><br>' +
+          (pv.player_name || '') + '</span><br>' +
           '<span style="font-family:Special Elite,monospace;font-size:9px;color:#8a7040;text-transform:uppercase;letter-spacing:0.08em;">' +
-          worldState.player.role + '</span>',
+          (pv.player_role || '') + '</span>',
           {
             direction: "top",
             offset: [0, -10],
@@ -156,64 +155,68 @@ const ChronosMap = (function () {
       }
     }
 
-    var npcs = worldState.npcs || [];
-    for (var n = 0; n < npcs.length; n++) {
-      var npc = npcs[n];
-      var npcLoc = null;
-      for (var j = 0; j < locations.length; j++) {
-        if (locations[j].id === npc.location) {
-          npcLoc = locations[j];
+    if (runStatus === "ended") {
+      if (playerLoc && playerLoc.lat) {
+        map.setView([playerLoc.lat, playerLoc.lon], map.getZoom(), { animate: true, duration: 0.8 });
+      }
+      return;
+    }
+
+    // NPCs at current location (full detail)
+    var npcsHere = pv.npcs_here || [];
+    for (var n = 0; n < npcsHere.length; n++) {
+      var npc = npcsHere[n];
+      if (!playerLoc || !playerLoc.lat) continue;
+
+      var offset = (n * 0.003) % 0.01;
+      var m = L.marker([playerLoc.lat + offset, playerLoc.lon + offset], {
+        icon: makeIcon("marker-visited", 10),
+        zIndexOffset: 500,
+      }).addTo(map);
+
+      m.bindTooltip(
+        '<span style="font-family:IM Fell English,serif;font-size:13px;color:#c8b89a;letter-spacing:0.02em;">' +
+        npc.name + '</span><br>' +
+        '<span style="font-family:Special Elite,monospace;font-size:9px;color:#5a4e3a;text-transform:uppercase;letter-spacing:0.08em;">' +
+        (npc.role || npc.archetype || '') + '</span>',
+        { direction: "top", offset: [0, -8], opacity: 1, className: "npc-tooltip" }
+      );
+      (function (npcRef, marker) {
+        marker.on("click", function () { _showPerception(npcRef, marker); });
+      })(npc, m);
+
+      npcMarkers.push(m);
+    }
+
+    // NPCs at known (visited) locations — name + archetype only
+    var npcsKnown = pv.npcs_known || [];
+    for (var kn = 0; kn < npcsKnown.length; kn++) {
+      var knownNpc = npcsKnown[kn];
+      var knownLoc = null;
+      for (var lid in locById) {
+        if (locById[lid].name === knownNpc.last_known_location) {
+          knownLoc = locById[lid];
           break;
         }
       }
-      if (!npcLoc || !npcLoc.lat || !npcLoc.lon) continue;
+      if (!knownLoc || !knownLoc.lat) continue;
 
-      var visited = visitedLocs.indexOf(npc.location) !== -1;
-
-      if (runStatus === "ended") continue;
-
-      if (runStatus === "dead_observing" && npc.memory_of_player <= 0) {
-        continue;
-      }
-
-      // Only show NPCs the player has actually encountered (visited their location)
-      if (!visited) continue;
-
-      var markerClass = "marker-visited";
-      var markerSize = 10;
-
-      if (runStatus === "dead_observing") {
-        var mem = npc.memory_of_player || 0;
-        if (mem < 0.2) markerClass = "marker-faded";
-      }
-
-      var offset = (n * 0.003) % 0.01;
-      var m = L.marker([npcLoc.lat + offset, npcLoc.lon + offset], {
-        icon: makeIcon(markerClass, markerSize),
-        zIndexOffset: visited ? 500 : 100,
+      var markerClass = runStatus === "dead_observing" ? "marker-faded" : "marker-visited";
+      var kOffset = (kn * 0.003) % 0.01;
+      var km = L.marker([knownLoc.lat + kOffset, knownLoc.lon + kOffset], {
+        icon: makeIcon(markerClass, 8),
+        zIndexOffset: 300,
       }).addTo(map);
 
-      if (visited) {
-        m.bindTooltip(
-          '<span style="font-family:IM Fell English,serif;font-size:13px;color:#c8b89a;letter-spacing:0.02em;">' +
-          npc.name + '</span><br>' +
-          '<span style="font-family:Special Elite,monospace;font-size:9px;color:#5a4e3a;text-transform:uppercase;letter-spacing:0.08em;">' +
-          npc.role + '</span>',
-          {
-            direction: "top",
-            offset: [0, -8],
-            opacity: 1,
-            className: "npc-tooltip",
-          }
-        );
-        (function (npcRef, marker) {
-          marker.on("click", function () {
-            _showPerception(npcRef, marker);
-          });
-        })(npc, m);
-      }
+      km.bindTooltip(
+        '<span style="font-family:IM Fell English,serif;font-size:13px;color:#c8b89a;">' +
+        knownNpc.name + '</span><br>' +
+        '<span style="font-family:Special Elite,monospace;font-size:9px;color:#5a4e3a;text-transform:uppercase;letter-spacing:0.08em;">' +
+        (knownNpc.archetype || '') + '</span>',
+        { direction: "top", offset: [0, -8], opacity: 1, className: "npc-tooltip" }
+      );
 
-      npcMarkers.push(m);
+      npcMarkers.push(km);
     }
 
     if (playerLoc && playerLoc.lat) {
@@ -255,7 +258,7 @@ const ChronosMap = (function () {
     } catch (e) {}
   }
 
-  function show(worldState, eraKey, runId) {
+  function show(playerView, eraKey, runId) {
     var container = document.getElementById("map-container");
     if (!container) return;
 
@@ -271,8 +274,8 @@ const ChronosMap = (function () {
       loadBorders(eraKey);
     }
 
-    if (worldState) {
-      updateMarkers(worldState);
+    if (playerView) {
+      updateMarkers(playerView);
     }
   }
 

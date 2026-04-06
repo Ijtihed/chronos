@@ -113,7 +113,7 @@ class TestUnifiedTurnAction:
         _chat(FAKE_SKIP, FAKE_SKIP, FAKE_ACTION, FAKE_DEATH_SAFE, FAKE_NPC_POV)
         resp = await client.post(f"/api/run/{rid}/turn", json={"player_input": "forge alliance"})
         assert resp.status_code == 200
-        assert resp.json()["world_state"]["turn"] >= 1
+        assert resp.json()["player_view"]["turn"] >= 1
 
 
 class TestUnifiedTurnTravel:
@@ -125,7 +125,7 @@ class TestUnifiedTurnTravel:
         respx.get(OLLAMA_TAGS_URL).mock(return_value=httpx.Response(200, json={"models": []}))
         _chat(FAKE_SKIP, FAKE_SKIP, FAKE_TRAVEL, FAKE_SKIP, FAKE_SKIP, FAKE_NPC_POV)
         resp = await client.post(f"/api/run/{rid}/turn", json={"player_input": "go to Ravenna"})
-        assert resp.json()["world_state"]["player"]["location"] == "ravenna"
+        assert resp.json()["player_view"]["player_location"] == "ravenna"
 
     @pytest.mark.asyncio
     @respx.mock
@@ -147,7 +147,7 @@ class TestUnifiedTurnInaction:
         respx.get(OLLAMA_TAGS_URL).mock(return_value=httpx.Response(200, json={"models": []}))
         _chat(FAKE_SKIP, FAKE_SKIP, FAKE_INACTION, FAKE_SKIP, FAKE_DEATH_SAFE)
         resp = await client.post(f"/api/run/{rid}/turn", json={"player_input": "wait"})
-        assert resp.json()["world_state"]["turn"] >= 1
+        assert resp.json()["player_view"]["turn"] >= 1
 
 
 class TestDeathAndAging:

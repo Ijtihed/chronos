@@ -29,12 +29,17 @@ from backend.eras import ALL_ERAS, random_era
 from backend.llm import chat, load_prompt, ollama_ok
 from backend.npc_engine import generate_npc_pov
 from backend.persistence import (
+    append_turn_log,
+    build_narrative_output,
+    compute_state_diff,
     delete_session,
     init_db,
     list_sessions,
     load_session,
     save_session,
 )
+from backend.llm_schemas import leaks_raw_numbers, scrub_leaked_numbers
+from backend.player_knowledge import build_player_view
 from backend.world_engine import advance_world, player_skip_turn, simulate_turn
 from backend.world_state import (
     Event,
@@ -134,7 +139,7 @@ async def new_run(req: RunRequest = RunRequest()):
     return {
         "run_id": state.run_id,
         "era": era_key,
-        "world_state": state.model_dump(),
+        "player_view": build_player_view(state, state.run_id).model_dump(),
     }
 
 
@@ -146,7 +151,7 @@ async def get_runs():
 @app.get("/api/run/{run_id}")
 async def get_run_state(run_id: str):
     state = await _load_or_404(run_id)
-    return state.model_dump()
+    return build_player_view(state, run_id).model_dump()
 
 
 @app.delete("/api/run/{run_id}")
@@ -160,7 +165,7 @@ async def reset_run(run_id: str):
     state = create_initial_state()
     state.run_id = run_id
     await save_session(state)
-    return {"status": "reset", "world_state": state.model_dump()}
+    return {"status": "reset", "player_view": build_player_view(state, run_id).model_dump()}
 
 
 # ------------------------------------------------------------------
@@ -189,6 +194,8 @@ async def take_turn(run_id: str, req: TurnRequest):
     if not text:
         raise HTTPException(400, "Empty input")
 
+    state_before = state.model_dump()
+
     # --- Step 1: World simulates (NPCs act autonomously) ---
     state, ambient = await simulate_turn(state)
 
@@ -196,10 +203,10 @@ async def take_turn(run_id: str, req: TurnRequest):
     parsed = await parse_action(text, state)
 
     if parsed.get("is_travel") and parsed.get("destination"):
-        return await _handle_travel(state, parsed, ambient)
+        return await _handle_travel(state, parsed, ambient, text, state_before)
 
     if parsed.get("is_inaction"):
-        return await _handle_inaction(state, parsed, ambient)
+        return await _handle_inaction(state, parsed, ambient, text, state_before)
 
     # --- Step 3: Apply player action ---
     state = apply_action(state, parsed)
@@ -213,17 +220,29 @@ async def take_turn(run_id: str, req: TurnRequest):
     pov_results = await asyncio.gather(*pov_tasks, return_exceptions=True)
     npc_responses = _build_npc_responses(relevant, pov_results)
 
+    death_info = death_result if death_result["died"] else None
     if death_result["died"]:
         state = apply_death(state, death_result["cause"])
 
     await save_session(state)
 
+    pv = build_player_view(state, run_id)
+    narrative = build_narrative_output(ambient, parsed, npc_responses, death=death_info)
+    await append_turn_log(
+        run_id=run_id, turn_number=state.turn, player_input=text,
+        parsed_action=parsed, ambient_activity=ambient,
+        npc_responses=npc_responses,
+        state_changes=compute_state_diff(state_before, state.model_dump()),
+        narrative_output=narrative,
+        player_view_snapshot=pv.model_dump(),
+    )
+
     return {
         "ambient_activity": ambient,
         "parsed_action": parsed,
-        "world_state": state.model_dump(),
+        "player_view": pv.model_dump(),
         "npc_responses": npc_responses,
-        "death": death_result if death_result["died"] else None,
+        "death": death_info,
     }
 
 
@@ -260,6 +279,8 @@ async def npc_perception(run_id: str, npc_id: str):
 
     try:
         text = await chat(prompt)
+        if leaks_raw_numbers(text):
+            text = scrub_leaked_numbers(text)
     except Exception:
         text = f"You are not sure what to make of {npc.name}."
 
@@ -305,37 +326,67 @@ async def explain_context(run_id: str, req: ContextRequest):
 # Turn handlers
 # ------------------------------------------------------------------
 
-async def _handle_inaction(state: WorldState, parsed: dict, ambient: list) -> dict:
+async def _handle_inaction(
+    state: WorldState, parsed: dict, ambient: list,
+    player_input: str = "", state_before: dict = None,
+) -> dict:
     auto = await player_skip_turn(state)
     auto["era_description"] = parsed.get("era_description") or auto.get("era_description", "")
     state = apply_action(state, auto)
     death_result = await check_death(state, auto)
 
+    death_info = death_result if death_result["died"] else None
     if death_result["died"]:
         state = apply_death(state, death_result["cause"])
 
     await save_session(state)
 
+    pv = build_player_view(state, state.run_id)
+    narrative = build_narrative_output(ambient, auto, [], death=death_info)
+    if state_before is not None:
+        await append_turn_log(
+            run_id=state.run_id, turn_number=state.turn,
+            player_input=player_input, parsed_action=auto,
+            ambient_activity=ambient, npc_responses=[],
+            state_changes=compute_state_diff(state_before, state.model_dump()),
+            narrative_output=narrative,
+            player_view_snapshot=pv.model_dump(),
+        )
+
     return {
         "ambient_activity": ambient,
         "parsed_action": auto,
-        "world_state": state.model_dump(),
+        "player_view": pv.model_dump(),
         "npc_responses": [],
-        "death": death_result if death_result["died"] else None,
+        "death": death_info,
     }
 
 
-async def _handle_travel(state: WorldState, parsed: dict, ambient: list) -> dict:
+async def _handle_travel(
+    state: WorldState, parsed: dict, ambient: list,
+    player_input: str = "", state_before: dict = None,
+) -> dict:
     dest_id = parsed["destination"].lower().strip()
     player_loc = get_player_location(state)
 
     if dest_id not in player_loc.neighbors:
         state = apply_action(state, parsed)
         await save_session(state)
+        pv = build_player_view(state, state.run_id)
+        narrative = build_narrative_output(ambient, parsed, [])
+        if state_before is not None:
+            await append_turn_log(
+                run_id=state.run_id, turn_number=state.turn,
+                player_input=player_input, parsed_action=parsed,
+                ambient_activity=ambient, npc_responses=[],
+                state_changes=compute_state_diff(state_before, state.model_dump()),
+                narrative_output=narrative,
+                player_view_snapshot=pv.model_dump(),
+            )
         return {
             "ambient_activity": ambient,
             "parsed_action": parsed,
-            "world_state": state.model_dump(),
+            "player_view": pv.model_dump(),
             "npc_responses": [],
             "death": None,
         }
@@ -376,17 +427,33 @@ async def _handle_travel(state: WorldState, parsed: dict, ambient: list) -> dict
 
     await save_session(state)
 
+    pv = build_player_view(state, state.run_id)
+    travel_info = {"from": player_loc.name, "to": dest_name, "turns_spent": travel_turns}
+    narrative = build_narrative_output(
+        ambient, parsed, arrival_povs, travel=travel_info,
+    )
+    if state_before is not None:
+        await append_turn_log(
+            run_id=state.run_id, turn_number=state.turn,
+            player_input=player_input, parsed_action=parsed,
+            ambient_activity=ambient, npc_responses=arrival_povs,
+            state_changes=compute_state_diff(state_before, state.model_dump()),
+            narrative_output=narrative,
+            player_view_snapshot=pv.model_dump(),
+        )
+
     return {
         "ambient_activity": ambient,
         "parsed_action": parsed,
-        "world_state": state.model_dump(),
+        "player_view": pv.model_dump(),
         "npc_responses": arrival_povs,
-        "travel": {"from": player_loc.name, "to": dest_name, "turns_spent": travel_turns},
+        "travel": travel_info,
         "death": None,
     }
 
 
 async def _handle_observation(state: WorldState, text: str) -> dict:
+    state_before = state.model_dump()
     parsed = await parse_action(text, state)
     state = state.model_copy(deep=True)
 
@@ -402,15 +469,35 @@ async def _handle_observation(state: WorldState, text: str) -> dict:
                 erasure_text = await generate_erasure(state)
                 state.player.location = dest_id
                 await save_session(state)
-                return {"erasure": erasure_text, "world_state": state.model_dump()}
+                pv = build_player_view(state, state.run_id)
+                narrative = build_narrative_output([], parsed, [], erasure=erasure_text)
+                await append_turn_log(
+                    run_id=state.run_id, turn_number=state.turn,
+                    player_input=text, parsed_action=parsed,
+                    ambient_activity=[], npc_responses=[],
+                    state_changes=compute_state_diff(state_before, state.model_dump()),
+                    narrative_output=narrative,
+                    player_view_snapshot=pv.model_dump(),
+                )
+                return {"erasure": erasure_text, "player_view": pv.model_dump()}
             state.player.location = dest_id
             if dest_id not in state.visited_locations:
                 state.visited_locations.append(dest_id)
             await save_session(state)
+            pv = build_player_view(state, state.run_id)
+            narrative = build_narrative_output([], parsed, [])
+            await append_turn_log(
+                run_id=state.run_id, turn_number=state.turn,
+                player_input=text, parsed_action=parsed,
+                ambient_activity=[], npc_responses=[],
+                state_changes=compute_state_diff(state_before, state.model_dump()),
+                narrative_output=narrative,
+                player_view_snapshot=pv.model_dump(),
+            )
             return {
                 "ambient_activity": [],
                 "parsed_action": parsed,
-                "world_state": state.model_dump(),
+                "player_view": pv.model_dump(),
                 "npc_responses": [],
                 "death": None,
             }
@@ -420,13 +507,33 @@ async def _handle_observation(state: WorldState, text: str) -> dict:
     if state.run_status == "ended":
         erasure_text = await generate_erasure(state)
         await save_session(state)
-        return {"erasure": erasure_text, "world_state": state.model_dump()}
+        pv = build_player_view(state, state.run_id)
+        narrative = build_narrative_output([], parsed, [], erasure=erasure_text)
+        await append_turn_log(
+            run_id=state.run_id, turn_number=state.turn,
+            player_input=text, parsed_action=parsed,
+            ambient_activity=[], npc_responses=[],
+            state_changes=compute_state_diff(state_before, state.model_dump()),
+            narrative_output=narrative,
+            player_view_snapshot=pv.model_dump(),
+        )
+        return {"erasure": erasure_text, "player_view": pv.model_dump()}
 
     await save_session(state)
+    pv = build_player_view(state, state.run_id)
+    narrative = build_narrative_output([], parsed, [])
+    await append_turn_log(
+        run_id=state.run_id, turn_number=state.turn,
+        player_input=text, parsed_action=parsed,
+        ambient_activity=[], npc_responses=[],
+        state_changes=compute_state_diff(state_before, state.model_dump()),
+        narrative_output=narrative,
+        player_view_snapshot=pv.model_dump(),
+    )
     return {
         "ambient_activity": [],
         "parsed_action": parsed,
-        "world_state": state.model_dump(),
+        "player_view": pv.model_dump(),
         "npc_responses": [],
         "death": None,
     }

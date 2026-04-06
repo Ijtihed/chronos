@@ -6,3 +6,4 @@ python-dotenv
 aiosqlite
 chromadb
 beautifulsoup4
+SPARQLWrapper

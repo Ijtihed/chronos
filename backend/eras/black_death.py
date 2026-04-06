@@ -24,6 +24,12 @@ ERA = {
             "lat": 43.77,
             "lon": 11.25,
             "neighbors": {"siena": 2, "avignon": 5},
+            "trade_routes": ["siena", "avignon"],
+            "material_conditions": (
+                "Wool, credit, and workshop goods pile up unsold as laborers "
+                "die and overland routes thin to a trickle."
+            ),
+            "food_scarcity": "critical",
         },
         {
             "id": "siena",
@@ -37,6 +43,12 @@ ERA = {
             "lat": 43.32,
             "lon": 11.33,
             "neighbors": {"firenze": 2, "avignon": 4},
+            "trade_routes": ["firenze", "avignon"],
+            "material_conditions": (
+                "Cathedral yards and contado farms lose hands faster than grain "
+                "can be carted in from the hill towns."
+            ),
+            "food_scarcity": "critical",
         },
         {
             "id": "avignon",
@@ -50,6 +62,12 @@ ERA = {
             "lat": 43.95,
             "lon": 4.81,
             "neighbors": {"firenze": 5, "siena": 4, "marseille": 2},
+            "trade_routes": ["firenze", "siena", "marseille"],
+            "material_conditions": (
+                "Papal warehouses and Rhone barges still move wine and grain "
+                "while suburbs empty and prices spike with each new burial."
+            ),
+            "food_scarcity": "critical",
         },
         {
             "id": "marseille",
@@ -63,6 +81,12 @@ ERA = {
             "lat": 43.30,
             "lon": 5.37,
             "neighbors": {"avignon": 2},
+            "trade_routes": ["avignon"],
+            "material_conditions": (
+                "Quarantined docks and fleeing stevedores have throttled "
+                "Provencal grain and seaborne supplies alike."
+            ),
+            "food_scarcity": "critical",
         },
     ],
     "player_archetypes": [

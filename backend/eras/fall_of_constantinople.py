@@ -24,6 +24,12 @@ ERA = {
             "lat": 41.01,
             "lon": 28.98,
             "neighbors": {"galata": 1, "adrianople": 4},
+            "trade_routes": ["galata", "adrianople"],
+            "material_conditions": (
+                "Siege stores shrink daily while smugglers and blockade-runners "
+                "risk the walls for grain, salt fish, and fodder."
+            ),
+            "food_scarcity": "critical",
         },
         {
             "id": "galata",
@@ -37,6 +43,12 @@ ERA = {
             "lat": 41.03,
             "lon": 28.97,
             "neighbors": {"constantinople": 1},
+            "trade_routes": ["constantinople"],
+            "material_conditions": (
+                "Neutral Genoese warehouses still see grain, iron, and silver "
+                "from both empires for whoever pays the toll."
+            ),
+            "food_scarcity": "normal",
         },
         {
             "id": "adrianople",
@@ -51,6 +63,12 @@ ERA = {
             "lat": 41.68,
             "lon": 26.56,
             "neighbors": {"constantinople": 4},
+            "trade_routes": ["constantinople"],
+            "material_conditions": (
+                "Ottoman magazines and Balkan convoys stock the camp with "
+                "flour, livestock, and timber for the siege train."
+            ),
+            "food_scarcity": "abundant",
         },
     ],
     "player_archetypes": [

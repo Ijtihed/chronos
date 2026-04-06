@@ -45,11 +45,25 @@ Each record is a flat entry:
 - `canonical` — always `true` in the base DB; `false` for game-generated events that diverge from history
 
 ### Sources
-The Events DB is populated from two sources at build time:
-- **Wikipedia API** — era and region summary articles, major event lists, parsed and structured by an LLM build script
-- **Dedicated historical datasets** — conflict databases (e.g. UCDP), famine and epidemic records, political transition data where available in open formats
+The Events DB is populated from structured data sources at build time:
+- **Wikidata SPARQL** — primary source. Typed, structured entities (battles, sieges, wars, famines, epidemics, coups, treaties, natural disasters) queried by region and year range. Each event retains its Wikidata QID for traceability.
+- **Wikipedia REST API** — 2-3 sentence summaries fetched per event for the `event` description field.
+- **Local LLM (llama3.1)** — classifies raw Wikidata results into the flat schema (significance, type, affects array). Does not invent events.
+- **Dedicated historical datasets** — conflict databases (e.g. UCDP for post-1946), famine and epidemic records, political transition data where available. To be added as needed.
 
-The build script is a one-time agent that: fetches source material for each era, extracts discrete events, structures them into the flat schema, deduplicates, and writes to a SQLite table alongside the existing world state DB.
+The build script (`scripts/build_events_db.py`) runs once offline, not at game startup. It takes an era name, year range, and region as input. An `--all` flag runs all defined eras. Deduplication by Wikidata QID prevents duplicates across overlapping era windows.
+
+### Current coverage
+The build script defines ~43 era windows covering 0-2000 AD across Europe, Middle East, Central Asia, East Asia, South Asia, Africa, and the Americas. This is intentionally broader than the 5 playable starter eras — any future era config can draw from the pre-populated Events DB immediately.
+
+### Expansion needed
+The current era list is a starting point. Known gaps that should be filled as the game expands:
+- **Pre-Columbian Americas** — Aztec, Inca, Maya (Wikidata coverage exists but region mapping needs work)
+- **Southeast Asia** — Khmer Empire, Majapahit, Vietnam
+- **Sub-Saharan Africa beyond West Africa** — Great Zimbabwe, Swahili Coast, Ethiopian Empire
+- **Pacific / Oceania** — Polynesian expansion (limited structured data)
+- **Deeper coverage within existing regions** — many periods have sparse decades that need manual curation or additional data sources
+- **Seshat polity context enrichment** — the `polity_context` field exists but is not yet populated from Seshat data
 
 ### Coverage
 One Events DB covers all eras. Events are filtered at runtime by year range and region relevance to the active run. The DB does not need to be exhaustive — it needs to be dense enough that any era has at least 20–40 relevant events within a 50-year window of the run's start year.

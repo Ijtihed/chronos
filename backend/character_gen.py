@@ -7,14 +7,20 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import random
 import uuid
 from pathlib import Path
 from string import Template
 from typing import List, Tuple
 
+from pydantic import ValidationError
+
 from backend.llm import chat, load_prompt
+from backend.llm_schemas import CharacterGenResponse, character_gen_default
 from backend.world_state import Location, NPC, PlayerCharacter, WorldState, Era
+
+logger = logging.getLogger("chronos.character_gen")
 
 _TEMPLATE_PATH = Path(__file__).resolve().parent.parent / "prompts" / "character_gen.md"
 
@@ -47,7 +53,7 @@ async def generate_run(era_config: dict) -> WorldState:
         raw_template, era_config, selected, locations, player.role
     )
 
-    return WorldState(
+    state = WorldState(
         run_id=uuid.uuid4().hex[:12],
         run_status="active",
         era=era,
@@ -57,6 +63,15 @@ async def generate_run(era_config: dict) -> WorldState:
         locations=locations,
         visited_locations=[start_location.id],
     )
+
+    try:
+        from backend.hce import generate_ground_context, schedule_canonical_consequences
+        state.ground_context = await generate_ground_context(state)
+        await schedule_canonical_consequences(state)
+    except Exception as exc:
+        logger.warning("HCE ground context generation failed (non-fatal): %s", exc)
+
+    return state
 
 
 async def _generate_player(
@@ -78,14 +93,10 @@ async def _generate_player(
 
     try:
         raw = await chat(prompt, json_mode=True)
-        data = json.loads(raw)
-    except Exception:
-        data = {
-            "name": "Unknown Wanderer",
-            "description": f"A {archetype['role']} in {start_location.name}.",
-            "disposition": "anxious",
-            "relationship_to_player": "",
-        }
+        data = CharacterGenResponse.model_validate(json.loads(raw))
+    except (json.JSONDecodeError, ValidationError, Exception) as exc:
+        logger.warning("Player character gen validation failed: %s", exc)
+        data = character_gen_default(archetype["role"], start_location.name)
 
     lifespan = era_config.get("lifespan_turns", [40, 60])
     avg_age_at_start = 30
@@ -93,12 +104,12 @@ async def _generate_player(
 
     return PlayerCharacter(
         id="player",
-        name=data.get("name", "Unknown"),
+        name=data.name or "Unknown",
         role=archetype["role"],
         archetype=archetype["archetype"],
         location=start_location.id,
-        description=data.get("description", ""),
-        disposition=data.get("disposition", "anxious"),
+        description=data.description,
+        disposition=data.disposition or "anxious",
         birth_year=birth_year,
     )
 
@@ -143,30 +154,23 @@ async def _generate_single_npc(
 
     try:
         raw = await chat(prompt, json_mode=True)
-        data = json.loads(raw)
-    except Exception:
-        data = {
-            "name": f"NPC {index}",
-            "description": f"A {archetype['role']} in {location.name}.",
-            "disposition": "cautious",
-            "relationship_to_player": f"Aware of the {player_role} in town.",
-        }
+        data = CharacterGenResponse.model_validate(json.loads(raw))
+    except (json.JSONDecodeError, ValidationError, Exception) as exc:
+        logger.warning("NPC gen validation failed (index %d): %s", index, exc)
+        data = character_gen_default(archetype["role"], location.name, index=index)
 
     npc_id = f"npc_{archetype['archetype']}_{index}"
 
     return NPC(
         id=npc_id,
-        name=data.get("name", f"NPC {index}"),
+        name=data.name or f"NPC {index}",
         role=archetype["role"],
         archetype=archetype["archetype"],
         social_class=archetype.get("social_class", ""),
         location=location.id,
-        description=data.get("description", ""),
-        disposition=data.get("disposition", "cautious"),
-        relationship_to_player=data.get(
-            "relationship_to_player",
-            f"Aware of the {player_role}.",
-        ),
+        description=data.description,
+        disposition=data.disposition or "cautious",
+        relationship_to_player=data.relationship_to_player or f"Aware of the {player_role}.",
         memory_of_player=0.1,
         last_interaction_turn=0,
     )

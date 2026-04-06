@@ -5,17 +5,21 @@ Model tier: LOCAL — this is the highest-volume LLM call in the game.
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from string import Template
 
 from backend.hke.retrieve import retrieve_context
 from backend.llm import chat, load_prompt
+from backend.llm_schemas import leaks_raw_numbers, scrub_leaked_numbers
 from backend.world_state import (
     NPC,
     WorldState,
     build_story_summary,
     get_player_location,
 )
+
+logger = logging.getLogger("chronos.npc_engine")
 
 _TEMPLATE_PATH = Path(__file__).resolve().parent.parent / "prompts" / "npc_pov.md"
 
@@ -50,6 +54,10 @@ async def generate_npc_pov(
     )
 
     try:
-        return await chat(prompt)
+        text = await chat(prompt)
+        if leaks_raw_numbers(text):
+            logger.warning("NPC POV for %s leaked raw numbers, scrubbing", npc.name)
+            text = scrub_leaked_numbers(text)
+        return text
     except Exception as exc:
         return f"[{npc.name} is silent — Ollama error: {exc}]"

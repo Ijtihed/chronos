@@ -24,6 +24,12 @@ ERA = {
             "lat": 32.92,
             "lon": 35.07,
             "neighbors": {"tyre": 2, "jaffa": 3},
+            "trade_routes": ["tyre", "jaffa"],
+            "material_conditions": (
+                "Frankish and Italian shipping unloads grain, weapons, and "
+                "cloth while Crusader wharves still take priority over blockade."
+            ),
+            "food_scarcity": "normal",
         },
         {
             "id": "tyre",
@@ -38,6 +44,12 @@ ERA = {
             "lat": 33.27,
             "lon": 35.20,
             "neighbors": {"acre": 2},
+            "trade_routes": ["acre"],
+            "material_conditions": (
+                "The island fortress imports most provisions and timber by sea "
+                "while mainland convoys stay exposed to raiding."
+            ),
+            "food_scarcity": "normal",
         },
         {
             "id": "jaffa",
@@ -52,6 +64,12 @@ ERA = {
             "lat": 32.05,
             "lon": 34.75,
             "neighbors": {"acre": 3},
+            "trade_routes": ["acre"],
+            "material_conditions": (
+                "Scorched fields and marching armies have stripped the coastal "
+                "plain of reliable harvests and safe granaries."
+            ),
+            "food_scarcity": "scarce",
         },
     ],
     "player_archetypes": [

@@ -6,10 +6,14 @@ Model tier: LOCAL (Ollama) — frontier stub.
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 from string import Template
 
+from pydantic import ValidationError
+
 from backend.llm import chat, load_prompt
+from backend.llm_schemas import ActionParserResponse, action_parser_default
 from backend.world_state import (
     WorldState,
     build_story_summary,
@@ -17,6 +21,8 @@ from backend.world_state import (
     get_player_location,
     npcs_near_player,
 )
+
+logger = logging.getLogger("chronos.action_parser")
 
 _TEMPLATE_PATH = Path(__file__).resolve().parent.parent / "prompts" / "action_parser.md"
 
@@ -54,8 +60,10 @@ async def parse_action(player_input: str, state: WorldState) -> dict:
 
     try:
         raw = await chat(prompt, json_mode=True)
-        return json.loads(raw)
-    except json.JSONDecodeError as exc:
+        parsed = ActionParserResponse.model_validate(json.loads(raw))
+        return parsed.model_dump()
+    except (json.JSONDecodeError, ValidationError) as exc:
+        logger.warning("Action parser validation failed: %s", exc)
         return _fallback(player_input, state, str(exc))
     except Exception as exc:
         return _fallback(player_input, state, str(exc))

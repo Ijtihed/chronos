@@ -268,6 +268,83 @@
     }
 
     .hidden { display: none !important; }
+
+    /* Knowledge type classes — uncertainty as first-class narrative element */
+    .known {
+      color: #c8b89a;
+      opacity: 1;
+    }
+    .rumor {
+      color: #a89878;
+      font-style: italic;
+      opacity: 0.85;
+    }
+    .unknown {
+      display: none !important;
+    }
+
+    /* Word-by-word streaming reveal */
+    .word-stream span {
+      opacity: 0;
+      transition: opacity 0.12s ease;
+    }
+    .word-stream span.visible {
+      opacity: 1;
+    }
+
+    /* Staggered NPC response entrance */
+    .npc-block-stagger {
+      opacity: 0;
+      transform: translateY(6px);
+      transition: opacity 0.5s ease, transform 0.5s ease;
+    }
+    .npc-block-stagger.revealed {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* Streaming indicator */
+    .streaming-dots {
+      font-family: 'Special Elite', monospace;
+      font-size: 12px;
+      color: #3a3428;
+      letter-spacing: 0.3em;
+    }
+
+    /* Observation mode — muted visual state */
+    .observation-muted {
+      filter: contrast(0.85) brightness(0.9);
+    }
+    .observation-muted .font-body {
+      color: #8a7a64;
+    }
+
+    /* Erasure screen — timed sequence layers */
+    #erasure-dim-layer {
+      position: fixed;
+      inset: 0;
+      z-index: 10;
+      background: rgba(0,0,0,0);
+      transition: background 8s ease;
+      pointer-events: none;
+    }
+    #erasure-dim-layer.active {
+      background: rgba(0,0,0,0.85);
+    }
+    #erasure-content {
+      opacity: 0;
+      transition: opacity 2s ease;
+    }
+    #erasure-content.visible {
+      opacity: 1;
+    }
+    #erasure-restart {
+      opacity: 0;
+      transition: opacity 2s ease;
+    }
+    #erasure-restart.visible {
+      opacity: 1;
+    }
   </style>
 </head>
 
@@ -468,16 +545,15 @@
   <!-- ERASURE SCREEN                                    -->
   <!-- ================================================ -->
   <div id="screen-erasure" class="screen items-center justify-center w-screen h-screen">
-    <div class="fixed inset-0 z-0 bg-black/85"></div>
+    <div id="erasure-dim-layer"></div>
     <main class="relative z-20 w-[560px] flex flex-col items-center text-center space-y-8">
-      <p id="erasure-text" class="font-body text-[18px] leading-relaxed text-[#a89878] italic tracking-tight"></p>
-      <div class="pt-4">
+      <div id="erasure-content">
+        <p id="erasure-text" class="font-body text-[18px] leading-relaxed text-[#a89878] italic tracking-tight"></p>
+      </div>
+      <div id="erasure-restart" class="pt-4">
         <a id="btn-begin-again" class="font-system text-[11px] text-[#5a4e3a] tracking-[0.15em] ink-underline transition-colors duration-300 hover:text-tertiary-container cursor-pointer">begin again?</a>
       </div>
     </main>
-    <div class="fixed bottom-12 left-1/2 -translate-x-1/2 z-20 pointer-events-none opacity-20">
-      <span id="erasure-cycle" class="font-system text-[9px] text-on-secondary-container tracking-widest"></span>
-    </div>
   </div>
 
   <!-- ================================================ -->

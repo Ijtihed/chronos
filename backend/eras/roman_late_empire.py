@@ -23,6 +23,9 @@ ERA = {
             "lat": 44.06,
             "lon": 12.57,
             "neighbors": {"ravenna": 2, "mediolanum": 4},
+            "trade_routes": ["ravenna", "mediolanum"],
+            "material_conditions": "Grain arrives irregularly from the south. The harbor still functions but fewer ships dock.",
+            "food_scarcity": "scarce",
         },
         {
             "id": "ravenna",
@@ -35,6 +38,9 @@ ERA = {
             "lat": 44.42,
             "lon": 12.20,
             "neighbors": {"ariminum": 2, "mediolanum": 3},
+            "trade_routes": ["ariminum", "mediolanum"],
+            "material_conditions": "The imperial granaries are stocked but refugees strain resources.",
+            "food_scarcity": "normal",
         },
         {
             "id": "mediolanum",
@@ -48,6 +54,9 @@ ERA = {
             "lat": 45.46,
             "lon": 9.19,
             "neighbors": {"ariminum": 4, "ravenna": 3},
+            "trade_routes": ["ariminum", "ravenna"],
+            "material_conditions": "Trade from the north has slowed. The bishop's granary feeds the poor.",
+            "food_scarcity": "scarce",
         },
     ],
     "player_archetypes": [

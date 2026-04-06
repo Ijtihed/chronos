@@ -33,6 +33,10 @@ class Location(BaseModel):
     lat: float = 0.0
     lon: float = 0.0
     neighbors: Dict[str, int] = Field(default_factory=dict)
+    trade_routes: List[str] = Field(default_factory=list)
+    disrupted_routes: List[str] = Field(default_factory=list)
+    material_conditions: str = ""
+    food_scarcity: str = "normal"  # abundant | normal | scarce | critical
 
 
 class PlayerCharacter(BaseModel):
@@ -80,6 +84,7 @@ class WorldState(BaseModel):
     events: List[Event] = Field(default_factory=list)
     turn: int = 0
     visited_locations: List[str] = Field(default_factory=list)
+    ground_context: Optional[Dict] = None
 
 
 # ---------------------------------------------------------------------------
@@ -215,6 +220,9 @@ def create_initial_state() -> WorldState:
                 lat=44.06,
                 lon=12.57,
                 neighbors={"ravenna": 2, "mediolanum": 4},
+                trade_routes=["ravenna", "mediolanum"],
+                material_conditions="Grain still arrives from the south but shipments are irregular. The harbor functions but fewer ships dock each week.",
+                food_scarcity="scarce",
             ),
             Location(
                 id="ravenna",
@@ -230,6 +238,9 @@ def create_initial_state() -> WorldState:
                 lat=44.42,
                 lon=12.20,
                 neighbors={"ariminum": 2},
+                trade_routes=["ariminum"],
+                material_conditions="The imperial granaries are stocked but the court consumes more than it admits. Refugees strain resources.",
+                food_scarcity="normal",
             ),
             Location(
                 id="mediolanum",
@@ -244,6 +255,9 @@ def create_initial_state() -> WorldState:
                 lat=45.46,
                 lon=9.19,
                 neighbors={"ariminum": 4},
+                trade_routes=["ariminum"],
+                material_conditions="Trade from the north has slowed. The bishop's granary feeds the poor but supplies dwindle.",
+                food_scarcity="scarce",
             ),
         ],
         events=[],
@@ -315,7 +329,7 @@ def _apply_target_fallback(state: WorldState, action: dict) -> None:
             if action_type in ("speak", "trade", "petition"):
                 npc.disposition = _shift_positive(npc.disposition)
             elif action_type in ("threaten",):
-                npc.disposition = "hostile"
+                npc.disposition = _shift_negative(npc.disposition)
 
 
 def _update_npc_memory(state: WorldState, action: dict) -> None:
@@ -410,3 +424,64 @@ def _shift_positive(disposition: str) -> str:
 
 def _shift_negative(disposition: str) -> str:
     return _NEGATIVE_SHIFTS.get(disposition, disposition)
+
+
+def shift_disposition(disposition: str, direction: int) -> str:
+    """Apply a bounded ±1 step to a disposition string."""
+    if direction > 0:
+        return _shift_positive(disposition)
+    if direction < 0:
+        return _shift_negative(disposition)
+    return disposition
+
+
+# ---------------------------------------------------------------------------
+# NPCEffect application — bounded mutation from LLM output
+# ---------------------------------------------------------------------------
+
+_ALLOWED_NPC_EFFECT_FIELDS = frozenset({"disposition", "location"})
+
+import logging as _logging
+_effect_logger = _logging.getLogger("chronos.npc_effect")
+
+
+def apply_npc_effect(state: WorldState, effect) -> None:
+    """Apply a validated NPCEffect to the matching NPC in-place.
+
+    Only disposition and location can change. If anything else
+    changes, it's logged as a boundary violation and rolled back.
+    """
+    npc = None
+    for n in state.npcs:
+        if n.id == effect.npc_id:
+            npc = n
+            break
+    if npc is None:
+        return
+
+    snapshot_before = npc.model_dump()
+
+    if effect.disposition_shift is not None and effect.disposition_shift != 0:
+        npc.disposition = shift_disposition(npc.disposition, effect.disposition_shift)
+
+    if effect.location_change is not None:
+        valid_ids = {loc.id for loc in state.locations}
+        dest = effect.location_change.lower().strip()
+        if dest in valid_ids and dest != npc.location:
+            npc.location = dest
+
+    _check_bounded_mutation(npc, snapshot_before)
+
+
+def _check_bounded_mutation(npc: NPC, snapshot_before: dict) -> None:
+    """Assert only allowed fields changed. Log and rollback violations."""
+    snapshot_after = npc.model_dump()
+    for key in snapshot_before:
+        if key in _ALLOWED_NPC_EFFECT_FIELDS:
+            continue
+        if snapshot_before[key] != snapshot_after[key]:
+            _effect_logger.error(
+                "Boundary violation: NPC %s field '%s' changed from %r to %r — rolling back",
+                npc.id, key, snapshot_before[key], snapshot_after[key],
+            )
+            setattr(npc, key, snapshot_before[key])

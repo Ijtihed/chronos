@@ -11,16 +11,27 @@ Handles:
 from __future__ import annotations
 
 import json
+import logging
 import random
 from pathlib import Path
 from string import Template
 
+from pydantic import ValidationError
+
 from backend.llm import chat, load_prompt
+from backend.llm_schemas import (
+    DEATH_CHECK_SAFE,
+    DeathCheckResponse,
+    leaks_raw_numbers,
+    scrub_leaked_numbers,
+)
 from backend.world_state import (
     WorldState,
     build_story_summary,
     get_player_location,
 )
+
+logger = logging.getLogger("chronos.death_engine")
 
 _DEATH_CHECK_PATH = (
     Path(__file__).resolve().parent.parent / "prompts" / "death_check.md"
@@ -92,8 +103,12 @@ async def _llm_death_check(state: WorldState, action: dict) -> dict:
         story_so_far=build_story_summary(state),
     )
 
-    raw = await chat(prompt, json_mode=True)
-    return json.loads(raw)
+    try:
+        raw = await chat(prompt, json_mode=True)
+        return DeathCheckResponse.model_validate(json.loads(raw)).model_dump()
+    except (json.JSONDecodeError, ValidationError) as exc:
+        logger.warning("Death check validation failed: %s", exc)
+        return DEATH_CHECK_SAFE.model_dump()
 
 
 def apply_death(state: WorldState, cause: str) -> WorldState:
@@ -159,7 +174,11 @@ async def generate_erasure(state: WorldState) -> str:
     )
 
     try:
-        return await chat(prompt)
+        text = await chat(prompt)
+        if leaks_raw_numbers(text):
+            logger.warning("Erasure text leaked raw numbers, scrubbing")
+            text = scrub_leaked_numbers(text)
+        return text
     except Exception:
         return (
             f"No record remains of {state.player.name}. "

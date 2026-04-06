@@ -23,6 +23,12 @@ ERA = {
             "lat": 59.05,
             "lon": 10.22,
             "neighbors": {"hedeby": 3, "birka": 4},
+            "trade_routes": ["hedeby", "birka"],
+            "material_conditions": (
+                "Silver, furs, and Baltic goods move through timber warehouses "
+                "and busy seasonal markets."
+            ),
+            "food_scarcity": "normal",
         },
         {
             "id": "hedeby",
@@ -36,6 +42,12 @@ ERA = {
             "lat": 54.49,
             "lon": 9.57,
             "neighbors": {"kaupang": 3, "birka": 3, "jorvik": 5},
+            "trade_routes": ["kaupang", "birka", "jorvik"],
+            "material_conditions": (
+                "North Sea and Baltic trade meet here, with iron, cloth, and "
+                "slaves bartered inside the ramparts year-round."
+            ),
+            "food_scarcity": "abundant",
         },
         {
             "id": "birka",
@@ -49,6 +61,12 @@ ERA = {
             "lat": 59.34,
             "lon": 17.54,
             "neighbors": {"kaupang": 4, "hedeby": 3},
+            "trade_routes": ["kaupang", "hedeby"],
+            "material_conditions": (
+                "Eastern silver and river-borne goods from Rus routes supply "
+                "smithies, scales, and the king's toll collectors."
+            ),
+            "food_scarcity": "normal",
         },
         {
             "id": "jorvik",
@@ -62,6 +80,12 @@ ERA = {
             "lat": 53.96,
             "lon": -1.08,
             "neighbors": {"hedeby": 5},
+            "trade_routes": ["hedeby"],
+            "material_conditions": (
+                "English grain and Danelaw tribute feed Norse households while "
+                "metal and cloth still move along the old Roman roads."
+            ),
+            "food_scarcity": "normal",
         },
     ],
     "player_archetypes": [

@@ -175,7 +175,7 @@ async function startNewRun() {
     const runData = await runRes.json();
     runId = runData.run_id;
     eraKey = runData.era;
-    state = runData.world_state;
+    state = runData.player_view;
     saveRunToStorage();
 
     completeProgressBar();
@@ -197,34 +197,30 @@ function enterGame() {
   updateTopBar();
   setupInput();
 
-  // Try to restore saved narrative (includes intro + all turn blocks)
   const savedNarrative = runId ? localStorage.getItem("chronos_narrative_" + runId) : null;
   if (savedNarrative && turnsContainer) {
     turnsContainer.innerHTML = savedNarrative;
-    // Scroll to bottom
     const manuscript = $("#manuscript");
     if (manuscript) manuscript.scrollTop = manuscript.scrollHeight;
   } else {
-    // Fresh game — render intro
     if (turnsContainer) turnsContainer.innerHTML = "";
-    const loc = state.locations.find((l) => l.id === state.player.location);
-    const year = state.current_year || state.era.year_start;
+    const loc = state.current_location;
+    const year = state.current_year;
 
     let introHtml = `<div class="mb-12">`;
-    introHtml += `<div class="font-system text-[10px] tracking-[0.15em] text-tertiary-container mb-4">${esc(state.era.name)} — ${year} AD</div>`;
-    introHtml += `<p class="font-body text-[18px] leading-relaxed text-on-surface mb-4">${esc(state.era.description)}</p>`;
-    introHtml += `<p class="font-body text-[18px] leading-relaxed text-on-surface mb-4">You are <strong class="text-primary-fixed">${esc(state.player.name)}</strong>, ${esc(state.player.role.toLowerCase())}. ${esc(state.player.description)}</p>`;
+    introHtml += `<div class="font-system text-[10px] tracking-[0.15em] text-tertiary-container mb-4">${esc(state.era_name)} — ${year} AD</div>`;
+    introHtml += `<p class="font-body text-[18px] leading-relaxed text-on-surface known mb-4">${esc(state.era_description)}</p>`;
+    introHtml += `<p class="font-body text-[18px] leading-relaxed text-on-surface known mb-4">You are <strong class="text-primary-fixed">${esc(state.player_name)}</strong>, ${esc(state.player_role.toLowerCase())}. ${esc(state.player_description)}</p>`;
     if (loc) {
-      introHtml += `<p class="font-body text-[18px] leading-relaxed text-on-surface">${esc(loc.description)}</p>`;
+      introHtml += `<p class="font-body text-[18px] leading-relaxed text-on-surface known">${esc(loc.description)}</p>`;
     }
     introHtml += `</div>`;
     turnsContainer.innerHTML = introHtml;
     saveRunToStorage();
   }
 
-  // Restore death/observation state if needed
   if (state.run_status === "dead_observing") {
-    const deathEvent = (state.events || []).find(e => e.action_type === "death");
+    const deathEvent = (state.confirmed_events || []).find(e => e.knowledge_type === "witnessed" && e.description && e.description.includes("succumbs"));
     if (deathEvent) showDeathMarker(deathEvent.description);
     enterObservationMode();
   }
@@ -233,9 +229,8 @@ function enterGame() {
 function updateTopBar() {
   const info = $("#top-bar-info");
   if (!info || !state) return;
-  const loc = state.locations.find((l) => l.id === state.player.location);
-  const locName = loc ? loc.name : "";
-  const year = state.current_year || state.era.year_start;
+  const locName = state.current_location ? state.current_location.name : "";
+  const year = state.current_year;
   info.textContent = `${year} AD · ${locName}`;
 
   const deathInd = $("#death-indicator");
@@ -243,7 +238,7 @@ function updateTopBar() {
   if (state.run_status === "dead_observing" && deathInd) {
     deathInd.classList.remove("hidden");
     deathInd.classList.add("flex");
-    if (deathName) deathName.textContent = state.player.name;
+    if (deathName) deathName.textContent = `† ${state.player_name}`;
   }
 }
 
@@ -286,14 +281,14 @@ async function submitTurn(text) {
   if (input) {
     input.value = "";
     input.disabled = true;
-    input.placeholder = "The world is happening...";
+    input.placeholder = "· · ·";
     input.style.pointerEvents = "none";
     input.style.opacity = "0.3";
   }
   if (obsInput) {
     obsInput.value = "";
     obsInput.disabled = true;
-    obsInput.placeholder = "The world is happening...";
+    obsInput.placeholder = "· · ·";
     obsInput.style.pointerEvents = "none";
     obsInput.style.opacity = "0.3";
   }
@@ -305,7 +300,7 @@ async function submitTurn(text) {
   const block = document.createElement("div");
   block.className = "mb-8";
   block.innerHTML = `<p class="font-body italic text-[16px] text-on-secondary-container">${esc(text)}</p>` +
-    `<div class="turn-spinner"><div class="turn-spinner-ring"></div><span class="turn-spinner-text">The world is happening</span></div>`;
+    `<div class="turn-spinner"><div class="turn-spinner-ring"></div><span class="streaming-dots">· · ·</span></div>`;
   turnsContainer.appendChild(block);
   block.scrollIntoView({ behavior: "smooth" });
 
@@ -320,7 +315,7 @@ async function submitTurn(text) {
     });
     if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || `HTTP ${res.status}`);
     const data = await res.json();
-    state = data.world_state;
+    state = data.player_view;
 
     if (data.erasure) {
       block.remove();
@@ -330,7 +325,7 @@ async function submitTurn(text) {
       return;
     }
 
-    renderTurn(block, text, data);
+    await renderTurnStaggered(block, text, data);
     updateTopBar();
     saveRunToStorage();
 
@@ -365,16 +360,49 @@ async function submitTurn(text) {
   }
 }
 
-function renderTurn(el, playerText, data) {
-  const { parsed_action: pa, npc_responses, world_state: ws } = data;
+// -------------------------------------------------------------------
+// Word-by-word streaming animation
+// -------------------------------------------------------------------
+
+function streamWords(container, text, msPerWord) {
+  return new Promise((resolve) => {
+    const words = text.split(/\s+/).filter(Boolean);
+    if (!words.length) { resolve(); return; }
+    container.classList.add("word-stream");
+    const spans = words.map((w) => {
+      const s = document.createElement("span");
+      s.textContent = w + " ";
+      container.appendChild(s);
+      return s;
+    });
+    let i = 0;
+    function tick() {
+      if (i >= spans.length) { resolve(); return; }
+      spans[i].classList.add("visible");
+      i++;
+      const manuscript = $("#manuscript");
+      if (manuscript) manuscript.scrollTop = manuscript.scrollHeight;
+      setTimeout(tick, msPerWord);
+    }
+    tick();
+  });
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// -------------------------------------------------------------------
+// Staggered turn rendering
+// -------------------------------------------------------------------
+
+async function renderTurnStaggered(el, playerText, data) {
+  const { parsed_action: pa, npc_responses, player_view: pv } = data;
   const ambient = data.ambient_activity || [];
 
-  let h = `<div class="font-system text-[10px] tracking-[0.12em] text-[#2a2218] mb-4">${ws.current_year} AD</div>`;
+  let h = `<div class="font-system text-[10px] tracking-[0.12em] text-[#2a2218] mb-4">${pv.current_year} AD</div>`;
 
-  // Ambient world activity FIRST — what NPCs are doing around you
   if (ambient.length) {
     for (const a of ambient) {
-      h += `<p class="font-body text-[17px] leading-relaxed text-on-secondary-container mb-3">`;
+      h += `<p class="font-body text-[17px] leading-relaxed known mb-3">`;
       if (a.interacts_with) {
         h += `<span class="text-primary-container">${esc(a.npc_name)}</span> and <span class="text-primary-container">${esc(a.interacts_with)}</span> — `;
       } else {
@@ -384,32 +412,60 @@ function renderTurn(el, playerText, data) {
     }
   }
 
-  // Player's action — one thread among the world
   h += `<p class="font-body italic text-[16px] text-on-secondary-container mb-3 mt-4">${esc(playerText)}</p>`;
 
   if (pa.era_description) {
-    h += `<p class="font-body text-[18px] leading-relaxed text-on-surface mb-3">${esc(pa.era_description)}</p>`;
+    h += `<p class="font-body text-[18px] leading-relaxed known mb-3">${esc(pa.era_description)}</p>`;
   }
 
   if (data.travel) {
-    h += `<p class="font-body text-[17px] leading-relaxed text-on-secondary-container mb-3">${esc(
+    h += `<p class="font-body text-[17px] leading-relaxed known mb-3">${esc(
       `The journey from ${data.travel.from} to ${data.travel.to} takes ${data.travel.turns_spent} turns.`
     )}</p>`;
   }
 
-  // NPC reactions to the player (if any)
-  for (const r of npc_responses || []) {
-    h += `<div class="my-4 pl-4" style="border-left: 2px solid #2a2218;">`;
-    h += `<div class="font-system text-[9px] tracking-[0.1em] text-on-secondary-container mb-1">${esc(r.npc_name)}</div>`;
-    h += `<p class="font-body text-[17px] leading-relaxed text-on-surface">${esc(r.pov)}</p>`;
+  // Render rumors from PlayerView
+  const rumors = pv.rumors || [];
+  if (rumors.length) {
+    for (const r of rumors) {
+      h += `<p class="font-body text-[16px] leading-relaxed rumor mb-2">${esc(r.description)}</p>`;
+    }
+  }
+
+  // NPC placeholders for staggered reveal
+  const npcIds = [];
+  for (let i = 0; i < (npc_responses || []).length; i++) {
+    const id = `npc-stagger-${Date.now()}-${i}`;
+    npcIds.push(id);
+    h += `<div id="${id}" class="npc-block-stagger my-4 pl-4" style="border-left: 2px solid #2a2218;">`;
+    h += `<div class="font-system text-[9px] tracking-[0.1em] text-on-secondary-container mb-1">${esc(npc_responses[i].npc_name)}</div>`;
+    h += `<p class="font-body text-[17px] leading-relaxed known npc-pov-text"></p>`;
     h += `</div>`;
   }
 
-  // Separator
   h += `<div class="mt-6 mb-2"><svg width="100%" height="1"><line x1="0" y1="0" x2="100%" y2="0" stroke="#1e1b18" stroke-width="1" stroke-dasharray="2 3"/></svg></div>`;
 
   el.innerHTML = h;
   el.scrollIntoView({ behavior: "smooth" });
+
+  // Stagger NPC responses — one at a time with word streaming
+  for (let i = 0; i < npcIds.length; i++) {
+    const npcEl = document.getElementById(npcIds[i]);
+    if (!npcEl) continue;
+
+    if (i > 0) await sleep(600);
+
+    npcEl.classList.add("revealed");
+    const povTextEl = npcEl.querySelector(".npc-pov-text");
+    if (povTextEl && npc_responses[i].pov) {
+      await streamWords(povTextEl, npc_responses[i].pov, 35);
+    }
+  }
+}
+
+// Keep old renderTurn as fallback for saved narrative restoration
+function renderTurn(el, playerText, data) {
+  renderTurnStaggered(el, playerText, data);
 }
 
 function showDeathMarker(cause) {
@@ -418,7 +474,7 @@ function showDeathMarker(cause) {
   const quote = $("#death-marker-quote");
   if (marker) {
     marker.classList.remove("hidden");
-    if (title) title.textContent = state.player.name;
+    if (title) title.textContent = state.player_name;
     if (quote) quote.textContent = cause;
     marker.scrollIntoView({ behavior: "smooth" });
   }
@@ -427,16 +483,38 @@ function showDeathMarker(cause) {
 function enterObservationMode() {
   const bottomBar = $("#bottom-bar");
   const obsSection = $("#obs-input-section");
+  const manuscript = $("#manuscript");
   if (bottomBar) bottomBar.classList.add("hidden");
   if (obsSection) obsSection.classList.remove("hidden");
+  if (manuscript) manuscript.classList.add("observation-muted");
 }
 
 function showErasure(text) {
-  const erasureText = $("#erasure-text");
-  const erasureCycle = $("#erasure-cycle");
-  if (erasureText) erasureText.textContent = text;
-  if (erasureCycle) erasureCycle.textContent = `Run ${runId}`;
   showScreen("screen-erasure");
+
+  const dimLayer = $("#erasure-dim-layer");
+  const content = $("#erasure-content");
+  const erasureText = $("#erasure-text");
+  const restart = $("#erasure-restart");
+
+  if (content) content.classList.remove("visible");
+  if (restart) restart.classList.remove("visible");
+
+  // Phase 1: screen dims over 8 seconds
+  requestAnimationFrame(() => {
+    if (dimLayer) dimLayer.classList.add("active");
+  });
+
+  // Phase 2: 4 second pause, then chronicle fades in
+  setTimeout(() => {
+    if (erasureText) erasureText.textContent = text;
+    if (content) content.classList.add("visible");
+  }, 8000 + 4000);
+
+  // Phase 3: 4 more seconds, then "begin again?" appears
+  setTimeout(() => {
+    if (restart) restart.classList.add("visible");
+  }, 8000 + 4000 + 4000);
 }
 
 // -------------------------------------------------------------------
@@ -490,7 +568,7 @@ if (mapBtn) {
       if (manuscript) manuscript.style.display = "none";
       if (bottomBar) bottomBar.classList.add("hidden");
       if (mapText) mapText.textContent = "Manuscript";
-      if (typeof ChronosMap !== "undefined") ChronosMap.show(state, eraKey, runId);
+      if (typeof ChronosMap !== "undefined") ChronosMap.show(state, eraKey, runId, true);
     } else {
       mapContainer.classList.add("hidden");
       if (manuscript) manuscript.style.display = "";

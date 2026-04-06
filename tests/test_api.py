@@ -95,7 +95,7 @@ class TestRunManagement:
         assert resp.status_code == 200
         data = resp.json()
         assert "run_id" in data
-        assert data["world_state"]["run_status"] == "active"
+        assert data["player_view"]["run_status"] == "active"
 
     @pytest.mark.asyncio
     @respx.mock
@@ -140,7 +140,7 @@ class TestUnifiedTurn:
         assert resp.status_code == 200
         data = resp.json()
         assert "parsed_action" in data
-        assert "world_state" in data
+        assert "player_view" in data
         assert "npc_responses" in data
 
     @pytest.mark.asyncio
@@ -160,7 +160,7 @@ class TestUnifiedTurn:
         )
         assert resp.status_code == 200
         data = resp.json()
-        assert data["world_state"]["player"]["location"] == "ravenna"
+        assert data["player_view"]["player_location"] == "ravenna"
         assert "travel" in data
         assert data["travel"]["to"] == "Ravenna"
 
@@ -180,7 +180,7 @@ class TestUnifiedTurn:
             json={"player_input": "wait and see what happens"},
         )
         assert resp.status_code == 200
-        assert resp.json()["world_state"]["turn"] >= 1
+        assert resp.json()["player_view"]["turn"] >= 1
 
     @pytest.mark.asyncio
     @respx.mock
