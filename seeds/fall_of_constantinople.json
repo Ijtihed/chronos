@@ -150,7 +150,8 @@
     "significance": "civilizational",
     "type": "war",
     "affects": ["military", "population", "trade", "political_stability", "religion"],
-    "wikidata_qid": "Q105765"
+    "wikidata_qid": "Q105765",
+    "qid_note": "Q105765 covers both siege and fall — this entry is the siege phase"
   },
   {
     "year": 1453,
@@ -159,7 +160,8 @@
     "significance": "civilizational",
     "type": "war",
     "affects": ["military", "population", "trade", "political_stability", "religion", "culture"],
-    "wikidata_qid": "Q105765"
+    "wikidata_qid": null,
+    "qid_note": "Distinct from siege entry — null QID to avoid dedup with Q105765"
   },
   {
     "year": 1453,

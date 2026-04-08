@@ -109,7 +109,20 @@ EVENT_TYPE_CLASSES: dict[str, list[str]] = {
 # coordinate filtering on the Wikidata endpoint.
 REGION_COUNTRY_QIDS: dict[str, list[str]] = {
     "Roman Empire":       ["Q2277", "Q2669072"],       # Roman Empire, Western Roman Empire
-    "Byzantine Empire":   ["Q12544", "Q12560", "Q4948", "Q29999", "Q37806", "Q30", "Q215", "Q211", "Q219"],  # Byzantine, Ottoman, Venice, Genoa, Hungary, Greece, Slovenia, Serbia, Bulgaria
+    "Byzantine Empire":   [
+        "Q12544",   # Byzantine Empire
+        "Q12560",   # Ottoman Empire
+        "Q4948",    # Republic of Venice
+        "Q174306",  # Republic of Genoa
+        "Q171150",  # Kingdom of Hungary
+        "Q41",      # Greece (modern — catches events tagged with modern entity)
+        "Q219",     # Bulgaria (modern — catches events tagged with modern entity)
+        "Q403",     # Serbia (modern)
+        "Q878319",  # Serbian Despotate
+        "Q420759",  # Second Bulgarian Empire
+        "Q178897",  # Latin Empire
+        "Q389004",  # Principality of Wallachia
+    ],
     "Ottoman Empire":     ["Q12560", "Q12544", "Q37806", "Q215", "Q219"],
     "Scandinavia":        ["Q34", "Q35", "Q33", "Q756617"],  # Sweden, Denmark, Norway, Viking settlement
     "Levant":             ["Q7462", "Q170895", "Q12560", "Q12544"],  # Crusader states, Kingdom of Jerusalem, Ottoman, Byzantine
@@ -251,29 +264,37 @@ _RETRY_DELAYS = [5, 15, 30]
 _CACHE_DIR = _PROJECT_ROOT / "cache"
 
 
+_MAX_ATTEMPTS = 1 + len(_RETRY_DELAYS)  # 1 initial + 3 retries = 4
+
+
 async def _query_sparql(query: str) -> list[dict]:
-    """Execute a SPARQL query with retry logic for rate limiting."""
+    """Execute a SPARQL query with retry logic for rate limiting.
+
+    Makes up to 4 attempts (1 initial + 3 retries with 5s/15s/30s backoff).
+    Returns [] on exhausted retries — never blocks indefinitely.
+    """
     headers = {
         "Accept": "application/sparql-results+json",
         "User-Agent": "CHRONOS-BuildScript/1.0 (historical-simulation-project)",
     }
+    delays = [0] + _RETRY_DELAYS
     last_error = None
-    for attempt, delay in enumerate([0] + _RETRY_DELAYS):
+
+    for attempt_num in range(_MAX_ATTEMPTS):
+        delay = delays[attempt_num]
         if delay:
-            logger.info("  Retrying in %ds (attempt %d/%d)...", delay, attempt + 1, len(_RETRY_DELAYS))
+            logger.info("  Retry %d/%d in %ds...", attempt_num, len(_RETRY_DELAYS), delay)
             await asyncio.sleep(delay)
         try:
-            async with httpx.AsyncClient(timeout=60.0) as client:
+            timeout = 30.0 if attempt_num > 0 else 60.0
+            async with httpx.AsyncClient(timeout=timeout) as client:
                 resp = await client.get(
                     WIKIDATA_SPARQL_URL,
                     params={"query": query},
                     headers=headers,
                 )
-                if resp.status_code == 429:
-                    last_error = f"429 Too Many Requests"
-                    continue
-                if resp.status_code == 502:
-                    last_error = f"502 Bad Gateway"
+                if resp.status_code in (429, 502, 503):
+                    last_error = f"{resp.status_code} {resp.reason_phrase}"
                     continue
                 resp.raise_for_status()
                 data = resp.json()
@@ -286,7 +307,11 @@ async def _query_sparql(query: str) -> list[dict]:
                 last_error = str(e)
                 continue
             raise
-    logger.error("  SPARQL query failed after %d retries: %s", len(_RETRY_DELAYS), last_error)
+        except Exception as e:
+            last_error = str(e)
+            continue
+
+    logger.warning("  SPARQL query failed after %d retries: %s — skipping", len(_RETRY_DELAYS), last_error)
     return []
 
 
@@ -391,11 +416,13 @@ async def _get_wikipedia_title_for_qid(qid: str) -> str | None:
 
 _STRUCTURE_PROMPT_TEMPLATE = """You are a historical data classifier for a simulation game.
 
+The target era is: {era_region}, {year_start}-{year_end} AD.
+
 Given these raw historical events, classify each one into the structured schema below.
 For each event, return a JSON object with these fields:
-- "year": integer
-- "region": string (broad region name like "Anatolia", "Northern France", "Italia")
-- "event": string (1-2 sentence factual description)
+- "year": integer (from the source data — do not guess)
+- "region": string (broad region name like "Anatolia", "Byzantine Empire", "Balkans", "Mediterranean")
+- "event": string (1-2 sentence factual description — plain, specific, no interpretation)
 - "significance": one of "local", "regional", "civilizational"
 - "type": one of "war", "epidemic", "famine", "political", "religious", "economic", "natural_disaster", "cultural"
 - "affects": array of domain strings from: "trade", "population", "religion", "political_stability", "military", "agriculture", "culture", "infrastructure"
@@ -403,8 +430,11 @@ For each event, return a JSON object with these fields:
 
 Rules:
 - Do NOT invent events. Only classify the events provided.
+- REJECT events geographically irrelevant to the target era region. If a Scottish battle or Japanese earthquake appears, set that entry to null — do not include it in the output.
 - Use the source_type hint but override it if the event clearly belongs to a different type.
-- "civilizational" = affects multiple regions or has lasting historical impact. "regional" = affects a broad area. "local" = affects one city or settlement.
+- Significance: "civilizational" = affects multiple empires or changes the course of history. "regional" = affects a kingdom or large area. "local" = affects one city or settlement only.
+- Affects: be CONSERVATIVE. Only list domains genuinely impacted. A battle affects "military". It does NOT automatically affect "trade", "population", "religion" unless the source explicitly says so.
+- If you cannot confidently determine the year, region, or type from the source data, return null for that event rather than guessing.
 - Return a JSON array of objects. Nothing else.
 
 Events to classify:
@@ -414,6 +444,9 @@ Events to classify:
 
 async def _structure_events_with_llm(
     raw_events: list[dict[str, Any]],
+    era_region: str = "",
+    year_start: int = 0,
+    year_end: int = 0,
 ) -> list[dict[str, Any]]:
     """Pass a batch of raw events to the local LLM for structuring."""
     if not raw_events:
@@ -433,7 +466,10 @@ async def _structure_events_with_llm(
         })
 
     prompt = _STRUCTURE_PROMPT_TEMPLATE.format(
-        events_json=json.dumps(events_for_prompt, indent=2)
+        era_region=era_region or "unknown region",
+        year_start=year_start,
+        year_end=year_end,
+        events_json=json.dumps(events_for_prompt, indent=2),
     )
 
     try:
@@ -446,6 +482,8 @@ async def _structure_events_with_llm(
 
         validated = []
         for item in parsed:
+            if item is None:
+                continue
             if not isinstance(item, dict):
                 continue
             if isinstance(item.get("event"), list):
@@ -605,7 +643,7 @@ async def build_era(era: str, year_start: int, year_end: int, region: str) -> di
         logger.info("Structuring batch %d-%d (%d events)...",
                      i + 1, min(i + batch_size, len(new_events)), len(batch))
 
-        structured = await _structure_events_with_llm(batch)
+        structured = await _structure_events_with_llm(batch, era_region=region, year_start=year_start, year_end=year_end)
 
         raw_by_qid = {ev["qid"]: ev for ev in batch}
         for item in structured:
