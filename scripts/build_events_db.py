@@ -78,12 +78,13 @@ EVENT_TYPE_CLASSES: dict[str, list[str]] = {
         "Q6256",      # country (for state formation events)
     ],
     "religious": [
-        "Q15893266",  # ecumenical council
+        "Q15893266",  # ecumenical council (variant)
+        "Q51645",     # ecumenical council (Council of Florence is this class)
         "Q80117",     # schism
         "Q1047113",   # religious persecution
         "Q3966183",   # religious war
         "Q1128637",   # synod
-        "Q189533",    # council (general, catches Florence etc.)
+        "Q189533",    # council (general)
     ],
     "economic": [
         "Q11032",     # trade route
@@ -411,6 +412,155 @@ async def _get_wikipedia_title_for_qid(qid: str) -> str | None:
 
 
 # ---------------------------------------------------------------------------
+# Wikipedia year page parser
+# ---------------------------------------------------------------------------
+
+import re as _re
+
+
+def _strip_wiki_markup(text: str) -> str:
+    """Strip wiki markup to plain text. Lossy but fast."""
+    text = _re.sub(r"\[\[(?:[^|\]]*\|)?([^\]]*)\]\]", r"\1", text)  # [[link|display]] → display
+    text = _re.sub(r"\{\{[^}]*\}\}", "", text)  # remove templates
+    text = _re.sub(r"<ref[^>]*>.*?</ref>", "", text, flags=_re.DOTALL)  # remove refs
+    text = _re.sub(r"<ref[^/]*/>", "", text)  # remove self-closing refs
+    text = _re.sub(r"<[^>]+>", "", text)  # remove remaining HTML tags
+    text = _re.sub(r"'{2,}", "", text)  # remove bold/italic markers
+    text = _re.sub(r"\s+", " ", text).strip()
+    return text
+
+
+def _parse_events_section(wikitext: str) -> list[str]:
+    """Extract event lines from a Wikipedia year page.
+
+    Handles two formats:
+    1. Classic: ==Events== section with bullet points (*)
+    2. Modern: Geographic sections (==Europe==, ==Asia==, etc.) with prose paragraphs
+    """
+    lines = wikitext.split("\n")
+    events = []
+
+    # Try classic format first: ==Events== with bullet points
+    in_events = False
+    for line in lines:
+        stripped = line.strip()
+        if _re.match(r"^==\s*Events\s*==", stripped):
+            in_events = True
+            continue
+        if in_events and _re.match(r"^==\s*[^=]", stripped):
+            break
+        if not in_events:
+            continue
+        if _re.match(r"^===", stripped):
+            continue
+        if stripped.startswith("*"):
+            clean = _strip_wiki_markup(stripped.lstrip("* "))
+            if len(clean) > 15:
+                events.append(clean)
+
+    if events:
+        return events
+
+    # Fallback: modern format with geographic sections and prose
+    skip_sections = {"births", "deaths", "references", "notes", "see also",
+                     "external links", "further reading", "bibliography"}
+    in_content = False
+    current_section = ""
+
+    for line in lines:
+        stripped = line.strip()
+        h2_match = _re.match(r"^==\s*([^=]+?)\s*==\s*$", stripped)
+        if h2_match:
+            current_section = h2_match.group(1).lower().strip()
+            in_content = current_section not in skip_sections
+            continue
+        if _re.match(r"^===", stripped):
+            continue
+        if not in_content:
+            continue
+        if stripped.startswith("{{") or stripped.startswith("|") or stripped.startswith("[[File:"):
+            continue
+        if not stripped or len(stripped) < 20:
+            continue
+
+        clean = _strip_wiki_markup(stripped)
+        if len(clean) > 30:
+            sentences = _re.split(r"(?<=[.!?])\s+", clean)
+            for sent in sentences:
+                sent = sent.strip()
+                if len(sent) > 30:
+                    events.append(sent)
+
+    return events
+
+
+async def _fetch_wikipedia_year_page(year: int) -> list[str]:
+    """Fetch and parse events from a Wikipedia year page. Returns plain-text event lines."""
+    cache_path = _CACHE_DIR / f"wikipedia_year_{year}.json"
+    cached = _load_cache(cache_path)
+    if cached is not None:
+        logger.info("  Using cached Wikipedia year page for %d (%d events)", year, len(cached))
+        return cached
+
+    url = "https://en.wikipedia.org/w/api.php"
+    params = {
+        "action": "parse",
+        "page": str(year),
+        "prop": "wikitext",
+        "format": "json",
+    }
+    headers = {"User-Agent": "CHRONOS-BuildScript/1.0 (historical-simulation-project)"}
+
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            resp = await client.get(url, params=params, headers=headers)
+            if resp.status_code != 200:
+                logger.warning("  Wikipedia year page %d returned %d", year, resp.status_code)
+                return []
+            data = resp.json()
+            wikitext = data.get("parse", {}).get("wikitext", {}).get("*", "")
+            if not wikitext:
+                logger.warning("  Wikipedia year page %d has no wikitext", year)
+                return []
+    except Exception as e:
+        logger.warning("  Failed to fetch Wikipedia year page %d: %s", year, e)
+        return []
+
+    events = _parse_events_section(wikitext)
+    logger.info("  Parsed %d events from Wikipedia year page %d", len(events), year)
+    _save_cache(cache_path, events)
+    return events
+
+
+async def fetch_wikipedia_year_events(
+    year_start: int, year_end: int, region: str,
+) -> list[dict]:
+    """Fetch events from Wikipedia year pages for a year range.
+
+    Returns raw event dicts ready for LLM structuring.
+    """
+    all_events: list[dict] = []
+
+    for year in range(year_start, year_end + 1):
+        event_lines = await _fetch_wikipedia_year_page(year)
+        for line in event_lines:
+            all_events.append({
+                "qid": f"wiki_year_{year}_{hash(line) % 100000}",
+                "label": line[:100],
+                "description": line,
+                "year": year,
+                "location": "",
+                "country": "",
+                "source_type": "wikipedia_year_page",
+                "wiki_extract": line,
+            })
+        await asyncio.sleep(1.0)
+
+    logger.info("Total events from Wikipedia year pages: %d", len(all_events))
+    return all_events
+
+
+# ---------------------------------------------------------------------------
 # LLM structuring
 # ---------------------------------------------------------------------------
 
@@ -603,6 +753,12 @@ async def build_era(era: str, year_start: int, year_end: int, region: str) -> di
 
             win_start += _WINDOW_SIZE
 
+    # Wikipedia year pages — non-war texture events
+    logger.info("Fetching Wikipedia year pages for %d-%d...", year_start, year_end)
+    wiki_year_events = await fetch_wikipedia_year_events(year_start, year_end, region)
+    all_raw_events.extend(wiki_year_events)
+    logger.info("Added %d events from Wikipedia year pages", len(wiki_year_events))
+
     # Deduplicate by QID
     seen_qids: set[str] = set()
     unique_events: list[dict] = []
@@ -651,12 +807,26 @@ async def build_era(era: str, year_start: int, year_end: int, region: str) -> di
                 valid_types = {"war", "epidemic", "famine", "political",
                                "religious", "economic", "natural_disaster", "cultural"}
                 valid_sig = {"local", "regional", "civilizational"}
-                ev_type = item.get("type", "cultural")
+                ev_type = item.get("type", "")
                 if ev_type not in valid_types:
-                    ev_type = "cultural"
+                    logger.debug("Skipping event with invalid type '%s': %s",
+                                 ev_type, item.get("event", "?")[:60])
+                    continue
                 sig = item.get("significance", "regional")
                 if sig not in valid_sig:
                     sig = "regional"
+
+                item_region = (item.get("region") or "").lower()
+                irrelevant_regions = {
+                    "china", "japan", "korea", "mongolia", "india",
+                    "africa", "south america", "north america", "central america",
+                    "southeast asia", "east asia", "pacific", "australia",
+                    "mesoamerica", "caribbean",
+                }
+                if any(irr in item_region for irr in irrelevant_regions):
+                    logger.debug("Skipping geographically irrelevant event: %s (%s)",
+                                 item.get("event", "?")[:60], item_region)
+                    continue
 
                 affects = item.get("affects", [])
                 if not isinstance(affects, list):
@@ -790,7 +960,22 @@ async def dry_run_era(era: str, year_start: int, year_end: int, region: str) -> 
             type_counts[event_type] = 0
         print()
 
-    # Coverage report
+    # Wikipedia year pages
+    print("--- Wikipedia year pages ---")
+    wiki_total = 0
+    for year in range(year_start, year_end + 1):
+        events = await _fetch_wikipedia_year_page(year)
+        wiki_total += len(events)
+        for ev_text in events:
+            decade = (year // 10) * 10
+            decade_counts[decade] = decade_counts.get(decade, 0) + 1
+        await asyncio.sleep(1.0)
+    print(f"Results: {wiki_total} raw event lines from {year_end - year_start + 1} year pages")
+    total_results += wiki_total
+    type_counts["wikipedia_year_pages"] = wiki_total
+    print()
+
+    # Seed events
     if seed_file.exists():
         with open(seed_file) as f:
             seeds = json.load(f)
@@ -800,7 +985,7 @@ async def dry_run_era(era: str, year_start: int, year_end: int, region: str) -> 
             total_results += 1
 
     print("=== COVERAGE REPORT ===")
-    print(f"Total events (Wikidata + seeds): {total_results}")
+    print(f"Total events (Wikidata + Wikipedia + seeds): {total_results}")
     print(f"Events by type: {type_counts}")
     print(f"Events per decade:")
     for decade in sorted(decade_counts.keys()):

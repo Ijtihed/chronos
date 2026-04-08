@@ -69,7 +69,7 @@
     "significance": "civilizational",
     "type": "religious",
     "affects": ["religion", "political_stability"],
-    "wikidata_qid": "Q184810"
+    "wikidata_qid": "Q321032"
   },
   {
     "year": 1440,
@@ -179,6 +179,123 @@
     "significance": "regional",
     "type": "economic",
     "affects": ["population", "trade", "infrastructure"],
+    "wikidata_qid": null
+  },
+  {
+    "year": 1409,
+    "region": "Byzantine Empire",
+    "event": "Plague returns to Constantinople — a recurrence kills thousands in the crowded quarters near the harbor. The city has no physicians left who remember the great pestilence.",
+    "significance": "local",
+    "type": "epidemic",
+    "affects": ["population"],
+    "wikidata_qid": null
+  },
+  {
+    "year": 1435,
+    "region": "Byzantine Empire",
+    "event": "Sickness spreads through the Ottoman army camps outside Thessalonica. Soldiers desert. The disease reaches Constantinople's refugee quarters within weeks.",
+    "significance": "regional",
+    "type": "epidemic",
+    "affects": ["population", "military"],
+    "wikidata_qid": null
+  },
+  {
+    "year": 1450,
+    "region": "Byzantine Empire",
+    "event": "A fever sweeps through Constantinople's remaining population. With fewer than 40,000 people in a city built for half a million, the sick have no one to tend them.",
+    "significance": "local",
+    "type": "epidemic",
+    "affects": ["population"],
+    "wikidata_qid": null
+  },
+  {
+    "year": 1420,
+    "region": "Byzantine Empire",
+    "event": "Grain shipments from the Black Sea slow to a trickle. Constantinople's markets have less food each month. Bread prices have doubled since last year.",
+    "significance": "local",
+    "type": "famine",
+    "affects": ["trade", "population"],
+    "wikidata_qid": null
+  },
+  {
+    "year": 1452,
+    "region": "Byzantine Empire",
+    "event": "Rumeli Hisarı cuts the Black Sea grain route. Constantinople faces starvation. The price of wheat is now ten times what it was five years ago.",
+    "significance": "local",
+    "type": "famine",
+    "affects": ["trade", "population", "agriculture"],
+    "wikidata_qid": null
+  },
+  {
+    "year": 1416,
+    "region": "Mediterranean",
+    "event": "Venice and the Ottoman Empire sign a commercial treaty. Venetian merchants gain trading privileges in Ottoman ports — but the arrangement comes at the expense of Byzantine trade.",
+    "significance": "regional",
+    "type": "economic",
+    "affects": ["trade", "political_stability"],
+    "wikidata_qid": null
+  },
+  {
+    "year": 1432,
+    "region": "Mediterranean",
+    "event": "Ottoman tariffs on Venetian goods passing through the Dardanelles increase sharply. Venetian merchants in Constantinople complain that trade is being strangled.",
+    "significance": "regional",
+    "type": "economic",
+    "affects": ["trade"],
+    "wikidata_qid": null
+  },
+  {
+    "year": 1450,
+    "region": "Byzantine Empire",
+    "event": "The Venetian bailo in Constantinople reports to the Senate that the city's commerce is effectively dead. Most trade now bypasses the Byzantine capital entirely.",
+    "significance": "local",
+    "type": "economic",
+    "affects": ["trade", "population"],
+    "wikidata_qid": null
+  },
+  {
+    "year": 1440,
+    "region": "Byzantine Empire",
+    "event": "The union with Rome announced after Florence is rejected by Constantinople's population. Monks preach against it in the streets. The phrase 'better the Sultan's turban than the Cardinal's hat' spreads.",
+    "significance": "local",
+    "type": "religious",
+    "affects": ["religion", "political_stability"],
+    "wikidata_qid": null
+  },
+  {
+    "year": 1445,
+    "region": "Byzantine Empire",
+    "event": "Anti-unionist monks refuse to celebrate mass with priests who accepted the Florence decree. Churches in Constantinople are divided — some recognize Rome, others do not.",
+    "significance": "local",
+    "type": "religious",
+    "affects": ["religion"],
+    "wikidata_qid": null
+  },
+  {
+    "year": 1452,
+    "region": "Byzantine Empire",
+    "event": "Cardinal Isidore arrives in Constantinople to celebrate a unification mass in the Hagia Sophia. Half the city's clergy refuse to attend. The population is bitter.",
+    "significance": "local",
+    "type": "religious",
+    "affects": ["religion", "political_stability"],
+    "wikidata_qid": null
+  },
+  {
+    "year": 1425,
+    "region": "Byzantine Empire",
+    "event": "Entire neighborhoods inside Constantinople's walls stand empty. Farmers graze cattle where houses once stood. The great city has become a collection of villages separated by fields and ruins.",
+    "significance": "local",
+    "type": "economic",
+    "affects": ["population", "infrastructure"],
+    "wikidata_qid": null
+  },
+  {
+    "year": 1447,
+    "region": "Byzantine Empire",
+    "event": "Emperor Constantine XI appeals to Western powers for aid. The responses are polite, noncommittal, and empty. No army is coming.",
+    "significance": "local",
+    "type": "political",
+    "affects": ["political_stability", "military"],
     "wikidata_qid": null
   }
 ]
