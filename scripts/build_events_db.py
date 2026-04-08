@@ -780,16 +780,19 @@ async def build_era(era: str, year_start: int, year_end: int, region: str) -> di
     logger.info("New events to process: %d (skipped %d existing)",
                 len(new_events), len(unique_events) - len(new_events))
 
-    # Fetch Wikipedia extracts for enrichment
-    logger.info("Fetching Wikipedia summaries...")
-    for ev in new_events:
+    # Fetch Wikipedia extracts for enrichment (Wikidata events only, not Wikipedia year page events)
+    wikidata_events = [ev for ev in new_events if not ev["qid"].startswith("wiki_year_")]
+    wiki_page_events = [ev for ev in new_events if ev["qid"].startswith("wiki_year_")]
+    logger.info("Fetching Wikipedia summaries for %d Wikidata events (skipping %d Wikipedia year page events)...",
+                len(wikidata_events), len(wiki_page_events))
+    for ev in wikidata_events:
         wiki_title = await _get_wikipedia_title_for_qid(ev["qid"])
         if wiki_title:
             extract = await _fetch_wikipedia_summary(wiki_title)
             ev["wiki_extract"] = extract or ""
         else:
             ev["wiki_extract"] = ""
-        await asyncio.sleep(0.1)  # rate limiting
+        await asyncio.sleep(0.1)
 
     # Process in batches of 10 through LLM
     inserted = 0
@@ -817,14 +820,23 @@ async def build_era(era: str, year_start: int, year_end: int, region: str) -> di
                     sig = "regional"
 
                 item_region = (item.get("region") or "").lower()
-                irrelevant_regions = {
-                    "china", "japan", "korea", "mongolia", "india",
-                    "africa", "south america", "north america", "central america",
-                    "southeast asia", "east asia", "pacific", "australia",
-                    "mesoamerica", "caribbean",
+                event_text_lower = (item.get("event") or "").lower()
+
+                relevant_region_keywords = {
+                    "byzantine", "ottoman", "constantinople", "anatolia",
+                    "balkans", "balkan", "mediterranean", "serbia", "serbian",
+                    "bulgaria", "bulgarian", "hungary", "hungarian", "venice",
+                    "venetian", "genoa", "genoese", "wallachia", "wallachian",
+                    "moldavia", "moldavian", "albania", "albanian", "epirus",
+                    "morea", "peloponnese", "thessalonica", "thessaloniki",
+                    "adrianople", "gallipoli", "bosphorus", "dardanelles",
+                    "black sea", "aegean", "levant", "crusade", "varna",
+                    "kosovo", "nicopolis", "achaea", "athens",
                 }
-                if any(irr in item_region for irr in irrelevant_regions):
-                    logger.debug("Skipping geographically irrelevant event: %s (%s)",
+                text_relevant = any(kw in event_text_lower for kw in relevant_region_keywords)
+
+                if not text_relevant:
+                    logger.debug("Skipping non-relevant event: %s (region: %s)",
                                  item.get("event", "?")[:60], item_region)
                     continue
 
