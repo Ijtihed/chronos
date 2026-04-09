@@ -1,0 +1,182 @@
+[
+  {
+    "year": 1144,
+    "region": "Levant",
+    "event": "Fall of Edessa to Zengi — the first Crusader state falls. The County of Edessa is destroyed. Shockwaves reach Europe and trigger the Second Crusade.",
+    "significance": "civilizational",
+    "type": "war",
+    "affects": ["military", "political_stability", "religion"],
+    "wikidata_qid": "Q913470"
+  },
+  {
+    "year": 1148,
+    "region": "Levant",
+    "event": "The Second Crusade fails at Damascus. The crusaders besiege the city for four days, then retreat in humiliation. Muslim confidence grows.",
+    "significance": "regional",
+    "type": "war",
+    "affects": ["military", "political_stability"],
+    "wikidata_qid": "Q160936"
+  },
+  {
+    "year": 1187,
+    "region": "Levant",
+    "event": "Battle of Hattin — Saladin destroys the Crusader field army near the Sea of Galilee. Jerusalem falls within three months. The Crusader States are reduced to a coastal strip.",
+    "significance": "civilizational",
+    "type": "war",
+    "affects": ["military", "political_stability", "religion", "population"],
+    "wikidata_qid": "Q170382"
+  },
+  {
+    "year": 1189,
+    "region": "Levant",
+    "event": "The Third Crusade begins. Richard the Lionheart of England, Philip II of France, and Frederick Barbarossa of Germany march east to reclaim Jerusalem.",
+    "significance": "civilizational",
+    "type": "war",
+    "affects": ["military", "religion"],
+    "wikidata_qid": "Q189073"
+  },
+  {
+    "year": 1191,
+    "region": "Levant",
+    "event": "Siege of Acre — Richard the Lionheart takes the city after a brutal two-year siege. Acre becomes the new Crusader capital, replacing fallen Jerusalem.",
+    "significance": "regional",
+    "type": "war",
+    "affects": ["military", "trade", "political_stability"],
+    "wikidata_qid": "Q622668"
+  },
+  {
+    "year": 1192,
+    "region": "Levant",
+    "event": "Treaty of Jaffa — Richard and Saladin agree a three-year truce. Christians may visit Jerusalem as pilgrims but cannot hold or fortify it.",
+    "significance": "regional",
+    "type": "political",
+    "affects": ["political_stability", "religion"],
+    "wikidata_qid": null
+  },
+  {
+    "year": 1204,
+    "region": "Mediterranean",
+    "event": "The Fourth Crusade sacks Constantinople instead of liberating Jerusalem. Venetian manipulation diverts the crusade. Christendom is scandalized.",
+    "significance": "civilizational",
+    "type": "war",
+    "affects": ["military", "trade", "religion", "political_stability"],
+    "wikidata_qid": "Q160236"
+  },
+  {
+    "year": 1229,
+    "region": "Levant",
+    "event": "Treaty of Jaffa — Holy Roman Emperor Frederick II negotiates Jerusalem's return through diplomacy with Sultan al-Kamil. No blood is shed. The pope is furious.",
+    "significance": "civilizational",
+    "type": "political",
+    "affects": ["political_stability", "religion"],
+    "wikidata_qid": null
+  },
+  {
+    "year": 1244,
+    "region": "Levant",
+    "event": "Khwarezmian mercenaries storm Jerusalem and sack the city. Jerusalem falls for the last time. It will not be under Christian control again.",
+    "significance": "civilizational",
+    "type": "war",
+    "affects": ["military", "religion", "population"],
+    "wikidata_qid": "Q2628213"
+  },
+  {
+    "year": 1250,
+    "region": "Egypt",
+    "event": "Battle of Mansurah and capture of King Louis IX. The Seventh Crusade collapses in the Nile Delta. France pays an enormous ransom.",
+    "significance": "regional",
+    "type": "war",
+    "affects": ["military", "trade"],
+    "wikidata_qid": "Q519395"
+  },
+  {
+    "year": 1150,
+    "region": "Levant",
+    "event": "Venetian and Genoese merchants compete fiercely for control of Acre's harbor. Trade in spices, silk, and sugar flows west to Europe at enormous profit.",
+    "significance": "regional",
+    "type": "economic",
+    "affects": ["trade"],
+    "wikidata_qid": null
+  },
+  {
+    "year": 1200,
+    "region": "Levant",
+    "event": "Acre is the richest port in the eastern Mediterranean. Merchants from Pisa, Genoa, and Venice maintain separate walled quarters within the city.",
+    "significance": "local",
+    "type": "economic",
+    "affects": ["trade"],
+    "wikidata_qid": null
+  },
+  {
+    "year": 1230,
+    "region": "Levant",
+    "event": "Sugar production in the Crusader States reaches its peak. Crusader lords grow wealthy from the cane fields around Tyre and the Jordan Valley.",
+    "significance": "local",
+    "type": "economic",
+    "affects": ["trade", "agriculture"],
+    "wikidata_qid": null
+  },
+  {
+    "year": 1190,
+    "region": "Levant",
+    "event": "Saladin permits Christian pilgrims to visit the Holy Sepulchre in Jerusalem after the conquest. The city is Muslim-held but pilgrimage continues.",
+    "significance": "local",
+    "type": "religious",
+    "affects": ["religion"],
+    "wikidata_qid": null
+  },
+  {
+    "year": 1215,
+    "region": "Mediterranean",
+    "event": "The Fourth Lateran Council calls for a new crusade. Pope Innocent III demands that Christian rulers stop fighting each other and focus on the Holy Land.",
+    "significance": "regional",
+    "type": "religious",
+    "affects": ["religion", "political_stability"],
+    "wikidata_qid": null
+  },
+  {
+    "year": 1219,
+    "region": "Egypt",
+    "event": "Francis of Assisi crosses enemy lines during the Fifth Crusade to preach to Sultan al-Kamil. The sultan listens politely and sends him home unharmed.",
+    "significance": "local",
+    "type": "religious",
+    "affects": ["religion"],
+    "wikidata_qid": null
+  },
+  {
+    "year": 1190,
+    "region": "Levant",
+    "event": "Food is desperately scarce in Acre during the siege. Soldiers boil leather for broth. A loaf of bread costs a gold piece. Horses are slaughtered for meat.",
+    "significance": "local",
+    "type": "famine",
+    "affects": ["population", "military"],
+    "wikidata_qid": null
+  },
+  {
+    "year": 1200,
+    "region": "Levant",
+    "event": "Dysentery and fever sweep through the crusader camps outside Acre. More men die of disease than of Saracen swords. The water is foul.",
+    "significance": "local",
+    "type": "epidemic",
+    "affects": ["population", "military"],
+    "wikidata_qid": null
+  },
+  {
+    "year": 1220,
+    "region": "Levant",
+    "event": "The Italian merchant quarters in Acre erupt into open street fighting. Venetians and Genoese kill each other over warehouse rights and harbor access.",
+    "significance": "local",
+    "type": "political",
+    "affects": ["trade", "political_stability"],
+    "wikidata_qid": null
+  },
+  {
+    "year": 1240,
+    "region": "Levant",
+    "event": "Drought in the Levant ruins crops across the coastal plain. The Crusader States depend increasingly on grain shipped from Sicily and Cyprus.",
+    "significance": "regional",
+    "type": "famine",
+    "affects": ["agriculture", "trade", "population"],
+    "wikidata_qid": null
+  }
+]
