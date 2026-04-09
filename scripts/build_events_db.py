@@ -109,7 +109,15 @@ EVENT_TYPE_CLASSES: dict[str, list[str]] = {
 # Used to filter SPARQL results by P17 (country). Much faster than
 # coordinate filtering on the Wikidata endpoint.
 REGION_COUNTRY_QIDS: dict[str, list[str]] = {
-    "Roman Empire":       ["Q2277", "Q2669072"],       # Roman Empire, Western Roman Empire
+    "Roman Empire":       [
+        "Q2277",      # Roman Empire
+        "Q2669072",   # Western Roman Empire (alt)
+        "Q42834",     # Western Roman Empire
+        "Q126936",    # Visigothic Kingdom
+        "Q10416611",  # Vandal Kingdom
+        "Q10295972",  # Hunnic Empire
+        "Q12544",     # Byzantine/Eastern Roman Empire
+    ],
     "Byzantine Empire":   [
         "Q12544",   # Byzantine Empire
         "Q12560",   # Ottoman Empire
@@ -795,19 +803,54 @@ async def build_era(era: str, year_start: int, year_end: int, region: str) -> di
         await asyncio.sleep(0.1)
 
     # Pre-filter Wikipedia year page events by text relevance (before LLM)
-    _RELEVANT_KEYWORDS = {
-        "byzantine", "ottoman", "constantinople", "anatolia",
-        "balkans", "balkan", "mediterranean", "serbia", "serbian",
-        "bulgaria", "bulgarian", "hungary", "hungarian", "venice",
-        "venetian", "genoa", "genoese", "wallachia", "wallachian",
-        "moldavia", "moldavian", "albania", "albanian", "epirus",
-        "morea", "peloponnese", "thessalonica", "thessaloniki",
-        "adrianople", "gallipoli", "bosphorus", "dardanelles",
-        "black sea", "aegean", "levant", "crusade", "varna",
-        "kosovo", "nicopolis", "achaea", "athens", "murad",
-        "mehmed", "bayezid", "sultan", "palaiologos", "palaeologus",
-        "hunyadi", "skanderbeg", "despot", "patriarch",
+    _REGION_KEYWORDS: dict[str, set[str]] = {
+        "Byzantine Empire": {
+            "byzantine", "ottoman", "constantinople", "anatolia",
+            "balkans", "balkan", "mediterranean", "serbia", "serbian",
+            "bulgaria", "bulgarian", "hungary", "hungarian", "venice",
+            "venetian", "genoa", "genoese", "wallachia", "wallachian",
+            "moldavia", "moldavian", "albania", "albanian", "epirus",
+            "morea", "peloponnese", "thessalonica", "thessaloniki",
+            "adrianople", "gallipoli", "bosphorus", "dardanelles",
+            "black sea", "aegean", "levant", "crusade", "varna",
+            "kosovo", "nicopolis", "achaea", "athens", "murad",
+            "mehmed", "bayezid", "sultan", "palaiologos", "palaeologus",
+            "hunyadi", "skanderbeg", "despot", "patriarch",
+        },
+        "Roman Empire": {
+            "roman", "rome", "visigoth", "ostrogoth", "vandal",
+            "hun", "attila", "alaric", "stilicho", "honorius",
+            "aetius", "gaiseric", "odoacer", "ravenna", "italia",
+            "gaul", "pannonia", "africa", "carthage", "augustine",
+            "hippo", "emperor", "legion", "consul", "prefect",
+            "diocese", "barbarian", "foederati", "magister militum",
+            "ariminum", "mediolanum", "aquileia", "rhine",
+        },
+        "Scandinavia": {
+            "viking", "norse", "danish", "dane", "norway", "norwegian",
+            "swedish", "swede", "iceland", "jorvik", "york",
+            "danelaw", "kaupang", "hedeby", "birka", "lindisfarne",
+            "raid", "longship", "jarl", "thing", "rune",
+            "saga", "skald", "odin", "thor", "freya",
+        },
+        "Levant": {
+            "crusade", "crusader", "jerusalem", "acre", "antioch",
+            "saladin", "saracen", "templar", "hospitaller", "tyre",
+            "jaffa", "sultan", "mamluk", "ayyubid", "frankish",
+            "outremer", "latin kingdom", "holy land", "pilgrimage",
+            "levant", "syria", "damascus", "egypt", "cairo",
+        },
+        "Europe": {
+            "plague", "black death", "pestilence", "flagellant",
+            "florence", "siena", "avignon", "pope", "papal",
+            "famine", "boccaccio", "petrarch", "jewish",
+            "pogrom", "quarantine", "death", "mortality",
+            "lombard", "genoa", "venice", "marseille",
+        },
     }
+    _RELEVANT_KEYWORDS = _REGION_KEYWORDS.get(region, set())
+    if not _RELEVANT_KEYWORDS:
+        _RELEVANT_KEYWORDS = {region.lower(), era.lower().replace("_", " ")}
     pre_filtered = []
     for ev in new_events:
         if ev["qid"].startswith("wiki_year_"):
@@ -852,18 +895,7 @@ async def build_era(era: str, year_start: int, year_end: int, region: str) -> di
                 item_region = (item.get("region") or "").lower()
                 event_text_lower = (item.get("event") or "").lower()
 
-                relevant_region_keywords = {
-                    "byzantine", "ottoman", "constantinople", "anatolia",
-                    "balkans", "balkan", "mediterranean", "serbia", "serbian",
-                    "bulgaria", "bulgarian", "hungary", "hungarian", "venice",
-                    "venetian", "genoa", "genoese", "wallachia", "wallachian",
-                    "moldavia", "moldavian", "albania", "albanian", "epirus",
-                    "morea", "peloponnese", "thessalonica", "thessaloniki",
-                    "adrianople", "gallipoli", "bosphorus", "dardanelles",
-                    "black sea", "aegean", "levant", "crusade", "varna",
-                    "kosovo", "nicopolis", "achaea", "athens",
-                }
-                text_relevant = any(kw in event_text_lower for kw in relevant_region_keywords)
+                text_relevant = any(kw in event_text_lower for kw in _RELEVANT_KEYWORDS) if _RELEVANT_KEYWORDS else True
 
                 if not text_relevant:
                     logger.debug("Skipping non-relevant event: %s (region: %s)",

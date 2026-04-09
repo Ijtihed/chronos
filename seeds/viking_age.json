@@ -1,0 +1,182 @@
+[
+  {
+    "year": 793,
+    "region": "Britannia",
+    "event": "Lindisfarne raid — Norse warriors attack the holy island monastery off the Northumbrian coast. The Viking Age begins.",
+    "significance": "civilizational",
+    "type": "war",
+    "affects": ["military", "religion", "trade"],
+    "wikidata_qid": "Q754672"
+  },
+  {
+    "year": 845,
+    "region": "Francia",
+    "event": "Ragnar Lodbrok's forces sack Paris. The Franks pay 7,000 pounds of silver in danegeld to make them leave.",
+    "significance": "regional",
+    "type": "war",
+    "affects": ["military", "trade"],
+    "wikidata_qid": "Q1416623"
+  },
+  {
+    "year": 865,
+    "region": "Britannia",
+    "event": "The Great Heathen Army invades England. Danish warriors under Ivar the Boneless conquer Northumbria, East Anglia, and Mercia.",
+    "significance": "regional",
+    "type": "war",
+    "affects": ["military", "population", "political_stability"],
+    "wikidata_qid": "Q1061029"
+  },
+  {
+    "year": 878,
+    "region": "Britannia",
+    "event": "Battle of Edington — Alfred of Wessex defeats Guthrum's Danes. England is split: Wessex survives in the south, the Danelaw forms in the north.",
+    "significance": "regional",
+    "type": "war",
+    "affects": ["military", "political_stability"],
+    "wikidata_qid": "Q1409133"
+  },
+  {
+    "year": 911,
+    "region": "Francia",
+    "event": "Treaty of Saint-Clair-sur-Epte — Rollo the Viking is granted Normandy by the Frankish king Charles the Simple in exchange for defending the coast.",
+    "significance": "regional",
+    "type": "political",
+    "affects": ["political_stability", "population"],
+    "wikidata_qid": "Q671729"
+  },
+  {
+    "year": 954,
+    "region": "Britannia",
+    "event": "Erik Bloodaxe, last Viking king of Jorvik, is killed at Stainmore. Norse political rule in England ends.",
+    "significance": "regional",
+    "type": "political",
+    "affects": ["political_stability", "military"],
+    "wikidata_qid": null
+  },
+  {
+    "year": 860,
+    "region": "North Atlantic",
+    "event": "Norse sailors reach Iceland. Within a decade permanent settlement begins — farmers and outlaws seeking land the jarls cannot control.",
+    "significance": "regional",
+    "type": "cultural",
+    "affects": ["population", "trade"],
+    "wikidata_qid": null
+  },
+  {
+    "year": 874,
+    "region": "North Atlantic",
+    "event": "Ingólfr Arnarson founds Reykjavík — the first permanent Norse settlement in Iceland. Others follow, claiming land along the coast.",
+    "significance": "local",
+    "type": "political",
+    "affects": ["population"],
+    "wikidata_qid": null
+  },
+  {
+    "year": 982,
+    "region": "North Atlantic",
+    "event": "Erik the Red discovers Greenland after being exiled from Iceland for killing his neighbor. He names it Greenland to attract settlers.",
+    "significance": "civilizational",
+    "type": "cultural",
+    "affects": ["population", "trade"],
+    "wikidata_qid": null
+  },
+  {
+    "year": 800,
+    "region": "Scandinavia",
+    "event": "Hedeby grows into the largest trading town in Scandinavia. Merchants from as far as Baghdad trade silver, furs, and slaves at its wharves.",
+    "significance": "regional",
+    "type": "economic",
+    "affects": ["trade"],
+    "wikidata_qid": null
+  },
+  {
+    "year": 850,
+    "region": "Scandinavia",
+    "event": "Birka's trade network reaches its peak. Arab silver flows north through the Volga route. Prices for furs and amber are high.",
+    "significance": "regional",
+    "type": "economic",
+    "affects": ["trade"],
+    "wikidata_qid": null
+  },
+  {
+    "year": 900,
+    "region": "Scandinavia",
+    "event": "Kaupang's harbor is busy with merchant ships from Denmark, Frisia, and the Baltic. A market town thrives on coastal trade.",
+    "significance": "local",
+    "type": "economic",
+    "affects": ["trade"],
+    "wikidata_qid": null
+  },
+  {
+    "year": 960,
+    "region": "Scandinavia",
+    "event": "Silver supplies from the East begin to dry up as the Abbasid Caliphate weakens. Trade patterns in the Norse world shift westward.",
+    "significance": "regional",
+    "type": "economic",
+    "affects": ["trade"],
+    "wikidata_qid": null
+  },
+  {
+    "year": 826,
+    "region": "Scandinavia",
+    "event": "Ansgar, the first Christian missionary to Scandinavia, arrives in Denmark. He builds a small church in Hedeby. Most Danes ignore him.",
+    "significance": "regional",
+    "type": "religious",
+    "affects": ["religion"],
+    "wikidata_qid": null
+  },
+  {
+    "year": 960,
+    "region": "Scandinavia",
+    "event": "Harald Bluetooth converts to Christianity and begins forcing baptism on the Danes. The old gods are under threat. Not everyone submits willingly.",
+    "significance": "regional",
+    "type": "religious",
+    "affects": ["religion", "political_stability"],
+    "wikidata_qid": null
+  },
+  {
+    "year": 1000,
+    "region": "North Atlantic",
+    "event": "Iceland adopts Christianity by law at the Althing. The decision is pragmatic — to avoid civil war. The old ways persist in private.",
+    "significance": "civilizational",
+    "type": "religious",
+    "affects": ["religion"],
+    "wikidata_qid": null
+  },
+  {
+    "year": 870,
+    "region": "Scandinavia",
+    "event": "A harsh winter kills livestock across southern Norway. Families who cannot feed themselves take to the sea — some raid, some trade, some settle.",
+    "significance": "local",
+    "type": "famine",
+    "affects": ["population", "agriculture"],
+    "wikidata_qid": null
+  },
+  {
+    "year": 890,
+    "region": "Scandinavia",
+    "event": "Sickness sweeps through the crowded quarters of Hedeby. Traders bring disease along with goods from the south.",
+    "significance": "local",
+    "type": "epidemic",
+    "affects": ["population"],
+    "wikidata_qid": null
+  },
+  {
+    "year": 850,
+    "region": "Scandinavia",
+    "event": "A blood feud between two families in Kaupang escalates after a killing at the market. The local Thing fails to resolve it. Three men are outlawed.",
+    "significance": "local",
+    "type": "political",
+    "affects": ["political_stability"],
+    "wikidata_qid": null
+  },
+  {
+    "year": 930,
+    "region": "North Atlantic",
+    "event": "A volcanic eruption in Iceland buries farmland in ash. Settlers on the eastern coast face starvation. Some abandon their farms.",
+    "significance": "local",
+    "type": "natural_disaster",
+    "affects": ["agriculture", "population"],
+    "wikidata_qid": null
+  }
+]

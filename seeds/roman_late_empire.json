@@ -1,0 +1,191 @@
+[
+  {
+    "year": 378,
+    "region": "Balkans",
+    "event": "Battle of Adrianople — Emperor Valens killed by the Visigoths. The Roman army's worst defeat in centuries. The empire will never fully recover.",
+    "significance": "civilizational",
+    "type": "war",
+    "affects": ["military", "political_stability"],
+    "wikidata_qid": "Q153847"
+  },
+  {
+    "year": 395,
+    "region": "Roman Empire",
+    "event": "Death of Theodosius I — the Roman Empire permanently splits into Eastern and Western halves. The West begins its final decline.",
+    "significance": "civilizational",
+    "type": "political",
+    "affects": ["political_stability", "military"],
+    "wikidata_qid": "Q8413"
+  },
+  {
+    "year": 402,
+    "region": "Italia",
+    "event": "Battle of Pollentia — Stilicho defeats Alaric's Visigoths in northern Italia, temporarily saving the Western Empire.",
+    "significance": "regional",
+    "type": "war",
+    "affects": ["military"],
+    "wikidata_qid": "Q697637"
+  },
+  {
+    "year": 406,
+    "region": "Gaul",
+    "event": "Crossing of the Rhine — Vandals, Alans, and Suebi flood into Gaul on the last day of the year. The Rhine frontier collapses permanently.",
+    "significance": "civilizational",
+    "type": "war",
+    "affects": ["military", "population", "political_stability"],
+    "wikidata_qid": "Q477048"
+  },
+  {
+    "year": 408,
+    "region": "Italia",
+    "event": "Execution of Stilicho — Emperor Honorius murders his best general on suspicion of treason. Thousands of barbarian soldiers in Roman service defect to Alaric.",
+    "significance": "civilizational",
+    "type": "political",
+    "affects": ["military", "political_stability"],
+    "wikidata_qid": null
+  },
+  {
+    "year": 410,
+    "region": "Italia",
+    "event": "Sack of Rome — Alaric's Visigoths sack Rome for three days. First time the city has fallen in 800 years. Shockwaves across the empire.",
+    "significance": "civilizational",
+    "type": "war",
+    "affects": ["military", "population", "trade", "political_stability", "religion"],
+    "wikidata_qid": "Q18569"
+  },
+  {
+    "year": 410,
+    "region": "Britannia",
+    "event": "Emperor Honorius tells the cities of Britain to look to their own defense. Rome abandons the province. The legions will not return.",
+    "significance": "civilizational",
+    "type": "political",
+    "affects": ["military", "political_stability"],
+    "wikidata_qid": null
+  },
+  {
+    "year": 418,
+    "region": "Gaul",
+    "event": "Visigoths settled in Aquitaine by the Roman government — given land in exchange for military service. A barbarian kingdom now exists inside the empire.",
+    "significance": "regional",
+    "type": "political",
+    "affects": ["political_stability", "population"],
+    "wikidata_qid": null
+  },
+  {
+    "year": 429,
+    "region": "North Africa",
+    "event": "Vandals cross the Strait of Gibraltar to North Africa under King Gaiseric. Rome's grain supply is now under direct threat.",
+    "significance": "regional",
+    "type": "war",
+    "affects": ["military", "trade", "agriculture"],
+    "wikidata_qid": null
+  },
+  {
+    "year": 439,
+    "region": "North Africa",
+    "event": "Vandals capture Carthage — Rome loses its primary grain source. The Western Empire's food supply is now controlled by a hostile power.",
+    "significance": "civilizational",
+    "type": "war",
+    "affects": ["trade", "agriculture", "population"],
+    "wikidata_qid": "Q1640511"
+  },
+  {
+    "year": 451,
+    "region": "Gaul",
+    "event": "Battle of the Catalaunian Plains — Romans under Aetius and Visigoths together defeat Attila the Hun. The last great Roman military victory.",
+    "significance": "civilizational",
+    "type": "war",
+    "affects": ["military", "political_stability"],
+    "wikidata_qid": "Q188267"
+  },
+  {
+    "year": 452,
+    "region": "Italia",
+    "event": "Attila invades Italia — destroys Aquileia, threatens Rome itself. Pope Leo I negotiates his withdrawal. The north is devastated.",
+    "significance": "regional",
+    "type": "war",
+    "affects": ["military", "population", "infrastructure"],
+    "wikidata_qid": null
+  },
+  {
+    "year": 455,
+    "region": "Italia",
+    "event": "Sack of Rome by the Vandals — worse than Alaric's sack in 410. Gaiseric's forces strip the city systematically for fourteen days.",
+    "significance": "civilizational",
+    "type": "war",
+    "affects": ["military", "population", "trade", "culture"],
+    "wikidata_qid": "Q18570"
+  },
+  {
+    "year": 476,
+    "region": "Italia",
+    "event": "Fall of the Western Roman Empire — the Germanic chieftain Odoacer deposes the last Western Emperor, Romulus Augustulus. The empire is over.",
+    "significance": "civilizational",
+    "type": "political",
+    "affects": ["political_stability", "military", "culture"],
+    "wikidata_qid": "Q207690"
+  },
+  {
+    "year": 400,
+    "region": "Italia",
+    "event": "Grain shipments from Africa grow irregular. Prices in Italian markets rise as supply becomes uncertain. Merchants hoard what they can.",
+    "significance": "regional",
+    "type": "economic",
+    "affects": ["trade", "agriculture"],
+    "wikidata_qid": null
+  },
+  {
+    "year": 410,
+    "region": "Italia",
+    "event": "After the sack of Rome, famine grips the city. Refugees flood north toward Ravenna and Ariminum, straining local food supplies.",
+    "significance": "local",
+    "type": "famine",
+    "affects": ["population", "trade"],
+    "wikidata_qid": null
+  },
+  {
+    "year": 420,
+    "region": "Italia",
+    "event": "Trade along the Via Flaminia slows as barbarian raids make overland travel dangerous. Merchants in Ariminum report fewer ships arriving each month.",
+    "significance": "local",
+    "type": "economic",
+    "affects": ["trade"],
+    "wikidata_qid": null
+  },
+  {
+    "year": 440,
+    "region": "Italia",
+    "event": "With Carthage in Vandal hands, the African grain supply to Italia is cut off. Bread prices triple. The poor go hungry.",
+    "significance": "regional",
+    "type": "famine",
+    "affects": ["trade", "population", "agriculture"],
+    "wikidata_qid": null
+  },
+  {
+    "year": 412,
+    "region": "North Africa",
+    "event": "Augustine of Hippo begins writing The City of God in response to pagans who blame the sack of Rome on the Christian god replacing the old ones.",
+    "significance": "civilizational",
+    "type": "religious",
+    "affects": ["religion", "culture"],
+    "wikidata_qid": null
+  },
+  {
+    "year": 430,
+    "region": "North Africa",
+    "event": "Augustine dies as the Vandals besiege Hippo Regius. His writings will define Western Christianity for a thousand years.",
+    "significance": "civilizational",
+    "type": "religious",
+    "affects": ["religion", "culture"],
+    "wikidata_qid": null
+  },
+  {
+    "year": 400,
+    "region": "Italia",
+    "event": "Plague recurs in the crowded quarters of Ravenna as the imperial court relocates there. Sickness follows wherever the refugees gather.",
+    "significance": "local",
+    "type": "epidemic",
+    "affects": ["population"],
+    "wikidata_qid": null
+  }
+]

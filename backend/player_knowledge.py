@@ -121,6 +121,17 @@ _REGION_TO_LOCATION_HINTS: Dict[str, List[str]] = {
     "achaea": ["constantinople"],
     "morea": ["constantinople"],
     "thessalonica": ["constantinople"],
+    "roman": ["ravenna", "ariminum", "mediolanum"],
+    "gaul": ["mediolanum", "ariminum"],
+    "pannonia": ["ariminum"],
+    "africa": ["ravenna", "ariminum"],
+    "north africa": ["ravenna", "ariminum"],
+    "visigoth": ["ariminum", "mediolanum"],
+    "vandal": ["ravenna"],
+    "hun": ["ariminum", "mediolanum"],
+    "ravenna": ["ravenna"],
+    "ariminum": ["ariminum"],
+    "mediolanum": ["mediolanum"],
 }
 
 
