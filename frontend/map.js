@@ -17,6 +17,7 @@ const ChronosMap = (function () {
   let currentEraKey = null;
   let currentRunId = null;
   let perceptionCache = {};
+  let regionCache = {};
 
   function init() {
     if (initialized) return;
@@ -29,7 +30,7 @@ const ChronosMap = (function () {
       maxBoundsViscosity: 1.0,
     });
 
-    map.getContainer().style.background = "#0e0e0e";
+    map.getContainer().style.background = "#000000";
     initialized = true;
 
     var zoomIn = document.getElementById("map-zoom-in");
@@ -45,9 +46,9 @@ const ChronosMap = (function () {
       const data = await resp.json();
       coastlineLayer = L.geoJSON(data, {
         style: {
-          color: "#2a2620",
+          color: "#27272a",
           weight: 1,
-          opacity: 0.6,
+          opacity: 0.5,
           fill: false,
         },
       }).addTo(map);
@@ -70,11 +71,11 @@ const ChronosMap = (function () {
         style: function (feature) {
           const name = feature.properties && feature.properties.NAME;
           return {
-            color: name ? "#504838" : "#1e1c18",
+            color: name ? "#3f3f46" : "#18181b",
             weight: name ? 1.2 : 0.5,
-            opacity: name ? 0.7 : 0.3,
-            fillColor: name ? "#1a1816" : "#0e0e0e",
-            fillOpacity: name ? 0.15 : 0.05,
+            opacity: name ? 0.6 : 0.25,
+            fillColor: name ? "#18181b" : "#000000",
+            fillOpacity: name ? 0.12 : 0.04,
           };
         },
         onEachFeature: function (feature, layer) {
@@ -85,6 +86,9 @@ const ChronosMap = (function () {
               direction: "center",
               permanent: false,
               opacity: 0.8,
+            });
+            layer.on("click", function () {
+              _showRegionKnowledge(name);
             });
           }
         },
@@ -141,9 +145,9 @@ const ChronosMap = (function () {
 
       if (runStatus === "active") {
         playerMarker.bindTooltip(
-          '<span style="font-family:IM Fell English,serif;font-size:13px;color:#c8b89a;">' +
+          '<span style="font-size:11px;color:#d4d4d8;">' +
           (pv.player_name || '') + '</span><br>' +
-          '<span style="font-family:Special Elite,monospace;font-size:9px;color:#8a7040;text-transform:uppercase;letter-spacing:0.08em;">' +
+          '<span style="font-size:9px;color:#a1a1aa;text-transform:uppercase;letter-spacing:0.1em;">' +
           (pv.player_role || '') + '</span>',
           {
             direction: "top",
@@ -175,9 +179,9 @@ const ChronosMap = (function () {
       }).addTo(map);
 
       m.bindTooltip(
-        '<span style="font-family:IM Fell English,serif;font-size:13px;color:#c8b89a;letter-spacing:0.02em;">' +
+        '<span style="font-size:11px;color:#d4d4d8;">' +
         npc.name + '</span><br>' +
-        '<span style="font-family:Special Elite,monospace;font-size:9px;color:#5a4e3a;text-transform:uppercase;letter-spacing:0.08em;">' +
+        '<span style="font-size:9px;color:#71717a;text-transform:uppercase;letter-spacing:0.1em;">' +
         (npc.role || npc.archetype || '') + '</span>',
         { direction: "top", offset: [0, -8], opacity: 1, className: "npc-tooltip" }
       );
@@ -209,9 +213,9 @@ const ChronosMap = (function () {
       }).addTo(map);
 
       km.bindTooltip(
-        '<span style="font-family:IM Fell English,serif;font-size:13px;color:#c8b89a;">' +
+        '<span style="font-size:11px;color:#d4d4d8;">' +
         knownNpc.name + '</span><br>' +
-        '<span style="font-family:Special Elite,monospace;font-size:9px;color:#5a4e3a;text-transform:uppercase;letter-spacing:0.08em;">' +
+        '<span style="font-size:9px;color:#71717a;text-transform:uppercase;letter-spacing:0.1em;">' +
         (knownNpc.archetype || '') + '</span>',
         { direction: "top", offset: [0, -8], opacity: 1, className: "npc-tooltip" }
       );
@@ -233,7 +237,7 @@ const ChronosMap = (function () {
     if (perceptionCache[cacheKey]) {
       marker.unbindPopup();
       marker.bindPopup(
-        '<div style="font-family:IM Fell English,serif;font-size:14px;color:#c8b89a;max-width:280px;line-height:1.6;padding:4px;">' +
+        '<div style="font-size:12px;color:#d4d4d8;max-width:280px;line-height:1.7;padding:4px;">' +
         perceptionCache[cacheKey] + '</div>',
         { className: "perception-popup", closeButton: false, maxWidth: 300 }
       ).openPopup();
@@ -241,7 +245,7 @@ const ChronosMap = (function () {
     }
     marker.unbindPopup();
     marker.bindPopup(
-      '<div style="font-family:Special Elite,monospace;font-size:10px;color:#5a4e3a;padding:4px;">thinking...</div>',
+      '<div style="font-size:10px;color:rgba(255,255,255,0.25);text-transform:uppercase;letter-spacing:0.1em;padding:4px;">thinking\u2026</div>',
       { className: "perception-popup", closeButton: false }
     ).openPopup();
     try {
@@ -251,11 +255,112 @@ const ChronosMap = (function () {
       perceptionCache[cacheKey] = data.perception;
       marker.unbindPopup();
       marker.bindPopup(
-        '<div style="font-family:IM Fell English,serif;font-size:14px;color:#c8b89a;max-width:280px;line-height:1.6;padding:4px;">' +
+        '<div style="font-size:12px;color:#d4d4d8;max-width:280px;line-height:1.7;padding:4px;">' +
         data.perception + '</div>',
         { className: "perception-popup", closeButton: false, maxWidth: 300 }
       ).openPopup();
     } catch (e) {}
+  }
+
+  function _esc(s) {
+    if (!s) return "";
+    var d = document.createElement("div");
+    d.textContent = s;
+    return d.innerHTML;
+  }
+
+  function _showRegionPanel(data) {
+    var panel = document.getElementById("region-panel");
+    var overlay = document.getElementById("region-overlay");
+    var title = document.getElementById("region-panel-title");
+    var body = document.getElementById("region-panel-body");
+    if (!panel || !body) return;
+
+    title.textContent = data.polity_name;
+
+    var h = "";
+
+    if (data.known_facts && data.known_facts.length) {
+      h += '<div class="region-section-label">Known</div>';
+      for (var i = 0; i < data.known_facts.length; i++) {
+        h += '<p class="region-fact">' + _esc(data.known_facts[i]) + '</p>';
+      }
+    }
+
+    if (data.rumors && data.rumors.length) {
+      h += '<div class="region-section-label">Rumors</div>';
+      for (var j = 0; j < data.rumors.length; j++) {
+        h += '<p class="region-rumor">' + _esc(data.rumors[j]) + '</p>';
+      }
+    }
+
+    if (!data.known_facts.length && !data.rumors.length) {
+      h += '<p class="region-fact" style="color:rgba(255,255,255,0.2);font-style:italic;">You know nothing of this place.</p>';
+    }
+
+    if (data.character_note) {
+      h += '<div class="region-note">' + _esc(data.character_note) + '</div>';
+    }
+
+    body.innerHTML = h;
+    panel.classList.remove("hidden");
+    if (overlay) overlay.classList.remove("hidden");
+  }
+
+  function _closeRegionPanel() {
+    var panel = document.getElementById("region-panel");
+    var overlay = document.getElementById("region-overlay");
+    if (panel) panel.classList.add("hidden");
+    if (overlay) overlay.classList.add("hidden");
+  }
+
+  (function _initRegionPanelClose() {
+    var panel = document.getElementById("region-panel");
+    var overlay = document.getElementById("region-overlay");
+    if (panel) {
+      var closeBtn = panel.querySelector(".region-close");
+      if (closeBtn) closeBtn.addEventListener("click", _closeRegionPanel);
+    }
+    if (overlay) overlay.addEventListener("click", _closeRegionPanel);
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape") _closeRegionPanel();
+    });
+  })();
+
+  async function _showRegionKnowledge(polityName) {
+    if (!currentRunId) return;
+
+    var cacheKey = polityName + "_" + (Date.now() / 60000 | 0);
+    if (regionCache[cacheKey]) {
+      _showRegionPanel(regionCache[cacheKey]);
+      return;
+    }
+
+    _showRegionPanel({
+      polity_name: polityName,
+      known_facts: [],
+      rumors: [],
+      character_note: "",
+      _loading: true,
+    });
+
+    var body = document.getElementById("region-panel-body");
+    if (body) body.innerHTML = '<span class="region-loading">Recalling what you know\u2026</span>';
+
+    try {
+      var res = await fetch("/api/run/" + currentRunId + "/region/" + encodeURIComponent(polityName));
+      if (!res.ok) throw new Error();
+      var data = await res.json();
+      regionCache[cacheKey] = data;
+      _showRegionPanel(data);
+    } catch (e) {
+      _showRegionPanel({
+        polity_name: polityName,
+        known_facts: [],
+        rumors: [],
+        character_note: "You search your memory but recall nothing of this place.",
+      });
+    }
   }
 
   function show(playerView, eraKey, runId) {
@@ -267,6 +372,7 @@ const ChronosMap = (function () {
     isVisible = true;
     if (runId) currentRunId = runId;
     perceptionCache = {};
+    regionCache = {};
     map.invalidateSize();
 
     loadCoastlines();

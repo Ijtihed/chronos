@@ -168,6 +168,7 @@ The **map is authoritative** for place: player marker, NPC markers, and **histor
 - **Ground Context Generator** -- at run initialization, generates a GroundContext object (era_feel, what_your_character_knows, local_rumors, material_conditions) from the Events DB + RAG corpus. Injected into world state and NPC prompts.
 - **Region knowledge endpoint** -- GET /api/run/{id}/region/{polity_name} returns character-filtered knowledge (known facts + rumors) for any region the player clicks on the map. Generated on demand via local LLM, cached per region per turn.
 - **Event markers on map** -- significant events (sieges, plagues, armies) appear as visual markers on the Leaflet map, filtered by character awareness. Sources: HCE Events DB (canonical) + world engine (gameplay events).
+- **Event markers on map (deferred)** -- Map markers for historical and game events filtered through the Knowledge Matrix. Only events the character plausibly knows about. Styled by type (war/epidemic/famine/political/religious) and significance. Rumored events shown dimmer. Requires a new GET /api/run/{id}/map-events backend endpoint. Deferred from Phase 2.5 — build after region knowledge and loading screen are stable.
 - **Knowledge awareness model** -- determines what a character knows about a region based on: distance, archetype/social class, trade routes, NPC-sourced info, and era common knowledge.
 - **Historical divergence tracking** -- game-generated events marked canonical: false in the Events DB. When player actions contradict canonical history, subsequent canonical events flagged as superseded.
 - **Build-time agent** -- scripts/build_events_db.py populates the Events DB per era from Wikipedia + structured sources via local LLM.
@@ -286,6 +287,8 @@ The diffusion model provider and whether generation is local or via API is an op
 - The faction emergence system is robust: enough character relationships exist that de facto factions feel real and discoverable
 - Run length and pacing feel intentional — a run has a natural arc regardless of how the player acts
 - The memory decay curve is tuned: runs end at the right moment, not too fast, not dragging
+- NPC interaction logging — every NPC-to-NPC interaction logs what information was exchanged, not just that an interaction occurred. This is the raw material for the Information Provenance Graph. Must be captured from the start of Phase 5, not retrofitted.
+- Information Provenance Graph — replaces archetype/geography filtering as the primary mechanism for what characters know. Built on top of the NPC social graph. Each significant event has a transmission record. Ground context generation traverses the graph rather than querying the Events DB directly.
 
 ### Success criteria
 

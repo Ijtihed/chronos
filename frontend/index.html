@@ -5,535 +5,344 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CHRONOS</title>
 
-  <link href="https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&family=Special+Elite&display=swap" rel="stylesheet">
-  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 
-  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
   <script>
     tailwind.config = {
       darkMode: "class",
       theme: {
         extend: {
-          colors: {
-            "tertiary":               "#e2c28b",
-            "surface":                "#0e0c09",
-            "surface-dim":            "#151310",
-            "surface-container":      "#2a2218",
-            "surface-container-low":  "#1e1b18",
-            "surface-container-lowest":"#100e0b",
-            "surface-container-high": "#2c2a26",
-            "on-surface":             "#c8b89a",
-            "on-secondary-container": "#7a6a54",
-            "tertiary-container":     "#8a7040",
-            "primary":                "#d5c5a6",
-            "primary-fixed":          "#f2e1c1",
-            "primary-container":      "#807258",
-            "outline-variant":        "#4d463a",
-            "dead-tint":              "#5a2e2e",
-          },
           fontFamily: {
-            "serif-display": ['"IM Fell English"', "serif"],
-            "body":          ['"IM Fell English"', "serif"],
-            "system":        ['"Special Elite"', "monospace"],
-          },
-          borderRadius: {
-            "DEFAULT": "2px",
-            "lg": "2px",
-            "xl": "2px",
-            "full": "9999px",
+            mono: ['"JetBrains Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Consolas', 'monospace'],
           },
         },
       },
     };
   </script>
 
-  <style>
-    body {
-      background-color: #0e0c09;
-      margin: 0;
-      overflow: hidden;
-      font-family: 'IM Fell English', serif;
-    }
-
-    .manuscript-scroll::-webkit-scrollbar { width: 3px; }
-    .manuscript-scroll::-webkit-scrollbar-track { background: transparent; }
-    .manuscript-scroll::-webkit-scrollbar-thumb { background: #2a2218; }
-
-    .ink-underline:hover {
-      text-decoration: underline;
-      text-decoration-thickness: 1px;
-      text-underline-offset: 4px;
-    }
-
-    .material-symbols-outlined {
-      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
-      display: inline-block;
-      line-height: 1;
-      text-transform: none;
-      letter-spacing: normal;
-      word-wrap: normal;
-      white-space: nowrap;
-      direction: ltr;
-    }
-
-    .screen { display: none; }
-    .screen.active { display: flex; }
-
-    @keyframes fadeIn {
-      from { opacity: 0; }
-      to   { opacity: 1; }
-    }
-    .fade-in { animation: fadeIn 0.6s ease forwards; }
-
-    @keyframes pulseDot {
-      0%, 100% { opacity: 0.15; }
-      50%      { opacity: 0.7; }
-    }
-    .dots-pulse span:nth-child(1) { animation: pulseDot 2s ease-in-out 0s infinite; }
-    .dots-pulse span:nth-child(2) { animation: pulseDot 2s ease-in-out 0.4s infinite; }
-    .dots-pulse span:nth-child(3) { animation: pulseDot 2s ease-in-out 0.8s infinite; }
-
-    #hamburger-panel {
-      transform: translateX(100%);
-      transition: transform 0.3s ease;
-    }
-    #hamburger-panel.open { transform: translateX(0); }
-
-    .leaflet-container { background: #0e0c09 !important; }
-
-    .marker-player {
-      background: #c8a050;
-      border: 2px solid #e0c878;
-      border-radius: 50%;
-      box-shadow: 0 0 8px rgba(200,160,80,0.5);
-    }
-    .marker-visited {
-      background: #7a9070;
-      border: 2px solid #90a888;
-      border-radius: 50%;
-    }
-    .marker-unvisited {
-      background: #3a3428;
-      border: 1px solid #504838;
-      border-radius: 50%;
-      opacity: 0.6;
-    }
-    .marker-faded {
-      background: #1e1c18;
-      border: 1px solid #2a2620;
-      border-radius: 50%;
-      opacity: 0.3;
-    }
-    .perception-popup .leaflet-popup-content-wrapper {
-      background: #1a1816 !important;
-      border: 1px solid #2a2218 !important;
-      border-radius: 2px !important;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.5) !important;
-    }
-    .perception-popup .leaflet-popup-tip {
-      background: #1a1816 !important;
-      border: none !important;
-    }
-
-    .npc-tooltip {
-      background: #1a1816 !important;
-      color: #c8b89a !important;
-      border: 1px solid #2a2218 !important;
-      border-radius: 2px !important;
-      padding: 6px 10px !important;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.5) !important;
-      line-height: 1.4 !important;
-    }
-    .npc-tooltip .leaflet-tooltip-arrow { display: none; }
-
-    .polity-tooltip {
-      background: #1a1816 !important;
-      color: #c8b89a !important;
-      border: 1px solid #2a2218 !important;
-      border-radius: 2px !important;
-      font-family: 'Special Elite', monospace !important;
-      font-size: 10px !important;
-      letter-spacing: 0.05em;
-      padding: 4px 8px !important;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.5) !important;
-    }
-    .polity-tooltip .leaflet-tooltip-arrow { display: none; }
-
-    .leaflet-control-zoom { display: none !important; }
-
-    .player-input-field:focus { border-color: #8a7040 !important; }
-
-    .input-dead {
-      color: #5a2e2e !important;
-      border-color: rgba(90,46,46,0.3) !important;
-    }
-    .input-dead::placeholder {
-      color: #5a2e2e !important;
-      opacity: 0.5;
-    }
-
-    @keyframes spinSlow {
-      from { transform: rotate(0deg); }
-      to { transform: rotate(360deg); }
-    }
-    .turn-spinner {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      margin-top: 8px;
-    }
-    .turn-spinner-ring {
-      width: 14px;
-      height: 14px;
-      border: 1.5px solid #2a2218;
-      border-top-color: #5a4e3a;
-      border-radius: 50%;
-      animation: spinSlow 1.5s linear infinite;
-    }
-    .turn-spinner-text {
-      font-family: 'Special Elite', monospace;
-      font-size: 10px;
-      color: #3a3428;
-      letter-spacing: 0.1em;
-    }
-
-    #word-tooltip {
-      position: fixed;
-      z-index: 9999;
-      background: #1a1816;
-      border: 1px solid #2a2218;
-      border-radius: 2px;
-      padding: 8px 12px;
-      max-width: 300px;
-      font-family: 'IM Fell English', serif;
-      font-size: 14px;
-      line-height: 1.5;
-      color: #c8b89a;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
-      pointer-events: none;
-      display: none;
-    }
-    #word-tooltip .def-word {
-      font-weight: bold;
-      color: #e2c28b;
-      margin-bottom: 2px;
-    }
-    #word-tooltip .def-pos {
-      font-style: italic;
-      color: #7a6a54;
-      font-size: 12px;
-    }
-    #word-tooltip .def-meaning {
-      color: #a89878;
-      margin-top: 4px;
-    }
-
-    #context-btn {
-      position: fixed;
-      z-index: 9999;
-      background: #1a1816;
-      border: 1px solid #2a2218;
-      border-radius: 2px;
-      padding: 4px 10px;
-      font-family: 'Special Elite', monospace;
-      font-size: 10px;
-      letter-spacing: 0.05em;
-      color: #8a7040;
-      cursor: pointer;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
-      display: none;
-    }
-    #context-btn:hover { color: #c8b89a; }
-
-    #context-panel {
-      position: fixed;
-      z-index: 9999;
-      background: #1a1816;
-      border: 1px solid #2a2218;
-      border-radius: 2px;
-      padding: 10px 14px;
-      max-width: 360px;
-      font-family: 'IM Fell English', serif;
-      font-size: 14px;
-      line-height: 1.6;
-      color: #c8b89a;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
-      display: none;
-    }
-    #context-panel .ctx-loading {
-      font-family: 'Special Elite', monospace;
-      font-size: 10px;
-      color: #5a4e3a;
-    }
-
-    .hidden { display: none !important; }
-
-    /* Knowledge type classes — uncertainty as first-class narrative element */
-    .known {
-      color: #c8b89a;
-      opacity: 1;
-    }
-    .rumor {
-      color: #a89878;
-      font-style: italic;
-      opacity: 0.85;
-    }
-    .unknown {
-      display: none !important;
-    }
-
-    /* Word-by-word streaming reveal */
-    .word-stream span {
-      opacity: 0;
-      transition: opacity 0.12s ease;
-    }
-    .word-stream span.visible {
-      opacity: 1;
-    }
-
-    /* Staggered NPC response entrance */
-    .npc-block-stagger {
-      opacity: 0;
-      transform: translateY(6px);
-      transition: opacity 0.5s ease, transform 0.5s ease;
-    }
-    .npc-block-stagger.revealed {
-      opacity: 1;
-      transform: translateY(0);
-    }
-
-    /* Streaming indicator */
-    .streaming-dots {
-      font-family: 'Special Elite', monospace;
-      font-size: 12px;
-      color: #3a3428;
-      letter-spacing: 0.3em;
-    }
-
-    /* Observation mode — muted visual state */
-    .observation-muted {
-      filter: contrast(0.85) brightness(0.9);
-    }
-    .observation-muted .font-body {
-      color: #8a7a64;
-    }
-
-    /* Erasure screen — timed sequence layers */
-    #erasure-dim-layer {
-      position: fixed;
-      inset: 0;
-      z-index: 10;
-      background: rgba(0,0,0,0);
-      transition: background 8s ease;
-      pointer-events: none;
-    }
-    #erasure-dim-layer.active {
-      background: rgba(0,0,0,0.85);
-    }
-    #erasure-content {
-      opacity: 0;
-      transition: opacity 2s ease;
-    }
-    #erasure-content.visible {
-      opacity: 1;
-    }
-    #erasure-restart {
-      opacity: 0;
-      transition: opacity 2s ease;
-    }
-    #erasure-restart.visible {
-      opacity: 1;
-    }
-  </style>
+  <link rel="stylesheet" href="styles.css">
 </head>
 
-<body class="bg-surface text-on-surface selection:bg-tertiary-container selection:text-on-tertiary-container">
+<body class="bg-black text-white font-mono">
 
-  <!-- ================================================ -->
-  <!-- START SCREEN                                      -->
-  <!-- ================================================ -->
-  <div id="screen-start" class="screen active items-center justify-center w-screen h-screen fade-in">
-    <main class="w-[560px] flex flex-col items-center text-center">
-      <header class="mb-12">
-        <h1 class="font-serif-display leading-none flex items-baseline justify-center tracking-widest">
-          <span class="text-[88px] text-tertiary-container leading-none">C</span><span class="text-[64px] text-on-surface leading-none -ml-1">HRONOS</span>
-        </h1>
-        <div class="mt-4 w-full flex justify-center">
-          <svg width="420" height="2" viewBox="0 0 420 2" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M1 1C50.5 0.5 100 1.5 150 1C200 0.5 250 1.5 300 1C350 0.5 400 1.5 419 1" stroke="#2a2218" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="1 2"/>
-          </svg>
-        </div>
-      </header>
-      <nav class="flex flex-col gap-8 items-center">
-        <a id="btn-begin" class="font-serif-display text-[22px] text-on-surface ink-underline transition-colors cursor-pointer active:text-primary-fixed">Begin</a>
-        <!-- Confirm overwrite when active run exists -->
+  <!-- Noise overlay (persistent across all screens) -->
+  <div class="noise-overlay"></div>
+
+  <!-- ════════════════════════════════════════════════════════════════ -->
+  <!-- SCREEN: START                                                   -->
+  <!-- ════════════════════════════════════════════════════════════════ -->
+  <div id="screen-start" class="screen active items-center justify-center w-screen h-screen">
+    <div class="grid-bg"></div>
+
+    <main class="relative z-10 flex flex-col items-center text-center">
+      <h1 class="text-[clamp(48px,10vw,68px)] font-bold tracking-[0.25em] text-white leading-none">
+        CHRONOS
+      </h1>
+      <div class="w-24 h-px bg-white/10 mt-6 mb-20"></div>
+
+      <nav class="flex flex-col items-center gap-6">
+        <button id="btn-begin"
+          class="px-8 py-2.5 text-xs font-medium uppercase tracking-[0.2em] text-white/70 hover:text-white border border-white/10 hover:border-white/20 rounded-md transition-all duration-200 cursor-pointer">
+          Begin
+        </button>
+
         <div id="begin-confirm" class="hidden flex flex-col items-center gap-3">
-          <p class="font-system text-[11px] text-on-secondary-container tracking-tighter">This will end your current run.</p>
-          <div class="flex items-center gap-4 font-body text-[18px] text-tertiary-container">
-            <span id="btn-begin-yes" class="cursor-pointer ink-underline hover:text-primary-fixed transition-colors">Yes</span>
-            <span class="text-surface-container select-none">&middot;</span>
-            <span id="btn-begin-no" class="cursor-pointer ink-underline hover:text-primary-fixed transition-colors">No</span>
+          <p class="text-[10px] text-white/30 uppercase tracking-wider">This will end your current run</p>
+          <div class="flex items-center gap-6 text-xs">
+            <button id="btn-begin-yes"
+              class="text-white/50 hover:text-white transition-colors cursor-pointer uppercase tracking-widest">Yes</button>
+            <span class="text-white/10 select-none">&middot;</span>
+            <button id="btn-begin-no"
+              class="text-white/50 hover:text-white transition-colors cursor-pointer uppercase tracking-widest">No</button>
           </div>
         </div>
-        <a id="btn-continue" class="hidden font-serif-display text-[18px] text-on-secondary-container ink-underline transition-colors cursor-pointer active:text-primary-fixed">Continue</a>
+
+        <button id="btn-continue"
+          class="hidden text-[11px] font-normal uppercase tracking-[0.15em] text-white/25 hover:text-white/50 transition-colors duration-200 cursor-pointer">
+          Continue
+        </button>
       </nav>
     </main>
   </div>
 
-  <!-- ================================================ -->
-  <!-- LOADING SCREEN                                    -->
-  <!-- ================================================ -->
+  <!-- ════════════════════════════════════════════════════════════════ -->
+  <!-- SCREEN: LOADING                                                 -->
+  <!-- ════════════════════════════════════════════════════════════════ -->
   <div id="screen-loading" class="screen flex-col items-center w-screen h-screen">
-    <header class="w-full h-[48px] flex items-center px-8 shrink-0 bg-surface" style="border-bottom: 1px solid rgba(200,184,154,0.1)">
-      <div class="text-sm font-bold text-on-surface font-system tracking-[0.2em]">Chronos</div>
+
+    <header class="w-full h-10 flex items-center px-6 shrink-0 border-b border-white/5">
+      <span class="text-[10px] font-semibold uppercase tracking-[0.2em] text-white/40">Chronos</span>
     </header>
 
-    <main class="w-[560px] flex flex-col space-y-10 pt-28 pb-24 flex-1 manuscript-scroll overflow-y-auto">
-      <!-- Era identity — shown instantly from hardcoded data -->
-      <section class="space-y-3">
-        <div class="font-system text-[11px] tracking-[0.15em] text-tertiary-container" id="loading-era-label"></div>
-        <p class="font-body italic text-[18px] leading-relaxed text-on-surface" id="loading-era-desc"></p>
+    <main class="w-full max-w-2xl mx-auto flex flex-col space-y-10 pt-16 pb-24 flex-1 custom-scroll overflow-y-auto px-6">
+
+      <!-- Era identity -->
+      <section class="space-y-3 stagger-item" style="--i:0;">
+        <div class="text-[10px] uppercase tracking-[0.15em] text-white/25 font-medium" id="loading-era-label">Late Roman Empire &mdash; 410 AD</div>
+        <p class="text-sm leading-relaxed text-white/60" id="loading-era-desc">The Western Empire fractures. Provincial defenses crumble as Rome's authority dissolves into regional strongmen, barbarian federates, and the slow weight of administrative collapse.</p>
       </section>
 
-      <!-- Historical events the character would know -->
+      <!-- Historical events -->
       <section class="space-y-4 pt-2">
-        <div class="font-system text-[10px] tracking-[0.15em] text-on-secondary-container">What came before</div>
-        <div id="loading-events" class="space-y-4"></div>
+        <div class="text-[10px] uppercase tracking-[0.15em] text-white/25 font-medium stagger-item" style="--i:1;">What came before</div>
+        <div id="loading-events" class="space-y-3">
+          <div class="border border-white/5 rounded-lg p-4 bg-white/[0.015] stagger-item" style="--i:2;">
+            <p class="text-sm leading-relaxed text-white/45">Alaric and the Visigoths sack Rome in 410 AD &mdash; the first time in eight hundred years the city falls to a foreign enemy.</p>
+          </div>
+          <div class="border border-white/5 rounded-lg p-4 bg-white/[0.015] stagger-item" style="--i:3;">
+            <p class="text-sm leading-relaxed text-white/45">Honorius, emperor in name, rules from Ravenna behind marshes while the provinces are left to fend for themselves.</p>
+          </div>
+          <div class="border border-white/5 rounded-lg p-4 bg-white/[0.015] stagger-item" style="--i:4;">
+            <p class="text-sm leading-relaxed text-white/45">Britain is abandoned. The last legions withdraw across the Channel, leaving the island to its own defenses.</p>
+          </div>
+        </div>
       </section>
 
-      <!-- Voices of the era — real historical quotes -->
+      <!-- Voices of the era -->
       <section class="space-y-5 pt-2">
-        <div class="font-system text-[10px] tracking-[0.15em] text-on-secondary-container">Voices of the age</div>
-        <div id="loading-voices" class="space-y-6"></div>
+        <div class="text-[10px] uppercase tracking-[0.15em] text-white/25 font-medium stagger-item" style="--i:5;">Voices of the age</div>
+        <div id="loading-voices" class="space-y-6">
+          <blockquote class="pl-4 border-l-2 border-white/8 stagger-item" style="--i:6;">
+            <p class="text-sm italic leading-relaxed text-white/50">&ldquo;If Rome can perish, what can be safe?&rdquo;</p>
+            <cite class="block mt-2 text-[10px] text-white/20 not-italic uppercase tracking-wider">&mdash; Jerome, Letter 127, c. 412 AD</cite>
+          </blockquote>
+          <blockquote class="pl-4 border-l-2 border-white/8 stagger-item" style="--i:7;">
+            <p class="text-sm italic leading-relaxed text-white/50">&ldquo;The city which had taken the whole world was itself taken.&rdquo;</p>
+            <cite class="block mt-2 text-[10px] text-white/20 not-italic uppercase tracking-wider">&mdash; Jerome, Commentary on Ezekiel</cite>
+          </blockquote>
+        </div>
       </section>
 
-      <!-- Character — hidden, fades in when API returns -->
-      <section id="loading-char-section" class="hidden space-y-3 pt-4 transition-opacity duration-700" style="border-top: 1px solid rgba(42,34,24,0.3);">
-        <div class="font-system text-[11px] tracking-[0.15em] text-on-secondary-container" id="loading-char-label"></div>
-        <p class="font-body text-[18px] leading-relaxed text-on-surface" id="loading-char-desc"></p>
+      <!-- Character reveal (hidden until generation completes) -->
+      <section id="loading-char-section" class="space-y-3 pt-6 border-t border-white/5 stagger-item" style="--i:8;">
+        <div class="text-[10px] uppercase tracking-[0.15em] text-white/25 font-medium" id="loading-char-label">Your life begins</div>
+        <p class="text-sm leading-relaxed text-white/60" id="loading-char-desc">You are <span class="text-white/80 font-medium">Flavius Marcellus</span>, a minor provincial administrator in the diocese of northern Italia. The local garrison has not been paid in three months. Refugees from the sack crowd the roads south. Your superiors in Ravenna do not answer letters.</p>
       </section>
 
       <!-- Progress bar -->
       <div class="pt-8 w-full">
-        <div class="w-full h-[2px] bg-surface-container">
-          <div id="loading-bar-fill" class="h-full bg-tertiary-container" style="width: 0%;"></div>
+        <div class="w-full h-[2px] bg-white/[0.04] rounded-full overflow-hidden">
+          <div id="loading-bar-fill" class="h-full bg-emerald-500/50 rounded-full transition-all duration-300" style="width: 0%;"></div>
         </div>
       </div>
     </main>
-
-    <div class="w-full h-[4px] bg-surface-container shrink-0"></div>
   </div>
 
-  <!-- ================================================ -->
-  <!-- TRANSITION SCREEN (brief black before game)       -->
-  <!-- ================================================ -->
-  <div id="screen-transition" class="screen items-center justify-center w-screen h-screen bg-surface">
-    <p class="font-system text-[11px] text-on-secondary-container tracking-[0.15em]">Loading...</p>
+  <!-- ════════════════════════════════════════════════════════════════ -->
+  <!-- SCREEN: TRANSITION (brief pause before game)                    -->
+  <!-- ════════════════════════════════════════════════════════════════ -->
+  <div id="screen-transition" class="screen items-center justify-center w-screen h-screen bg-black">
+    <div class="dots-pulse flex gap-1.5">
+      <span class="w-1 h-1 rounded-full bg-white/40"></span>
+      <span class="w-1 h-1 rounded-full bg-white/40"></span>
+      <span class="w-1 h-1 rounded-full bg-white/40"></span>
+    </div>
   </div>
 
-  <!-- ================================================ -->
-  <!-- GAME SCREEN  (Active + Observation)               -->
-  <!-- ================================================ -->
+  <!-- ════════════════════════════════════════════════════════════════ -->
+  <!-- SCREEN: GAME (Active + Observation)                             -->
+  <!-- ════════════════════════════════════════════════════════════════ -->
   <div id="screen-game" class="screen flex-col w-screen h-screen">
 
-    <!-- Top Bar — z-300 so it stays above the map overlay -->
-    <header id="top-bar" class="fixed top-0 w-full h-[48px] bg-surface flex items-center px-5 z-[300]" style="border-bottom: 1px solid rgba(200,184,154,0.1)">
+    <!-- Top Bar -->
+    <header id="top-bar"
+      class="fixed top-0 w-full h-10 bg-black/90 backdrop-blur-sm flex items-center px-5 z-[300] border-b border-white/5">
       <div class="flex-1 flex items-center min-w-0">
-        <span id="top-bar-info" class="font-system text-[11px] tracking-tight text-[#5a4e3a] truncate"></span>
+        <span id="top-bar-info" class="text-[10px] uppercase tracking-wide text-white/25 truncate">411 AD &middot; Mediolanum</span>
       </div>
-      <div id="death-indicator" class="hidden font-system text-[11px] text-dead-tint tracking-widest items-center gap-2 mx-4 shrink-0">
-        <span class="material-symbols-outlined text-[14px]">skull</span>
-        <span id="death-indicator-name"></span>
+      <div id="death-indicator" class="hidden items-center gap-2 mx-4 shrink-0">
+        <span class="status-dot status-dot-critical status-dot-sm"></span>
+        <span id="death-indicator-name" class="text-[10px] text-red-400/60 uppercase tracking-widest font-medium"></span>
       </div>
-      <button id="btn-hamburger" class="shrink-0 ml-4 p-2 cursor-pointer">
+      <button id="btn-hamburger" class="shrink-0 ml-4 p-2 cursor-pointer group">
         <div id="hamburger-icon" class="flex flex-col gap-[4px]">
-          <div class="w-5 h-[1.5px] bg-[#5a4e3a]"></div>
-          <div class="w-5 h-[1.5px] bg-[#5a4e3a]"></div>
-          <div class="w-5 h-[1.5px] bg-[#5a4e3a]"></div>
+          <div class="w-4 h-[1.5px] bg-white/20 group-hover:bg-white/40 transition-colors"></div>
+          <div class="w-4 h-[1.5px] bg-white/20 group-hover:bg-white/40 transition-colors"></div>
+          <div class="w-4 h-[1.5px] bg-white/20 group-hover:bg-white/40 transition-colors"></div>
         </div>
-        <span id="hamburger-close-icon" class="hidden material-symbols-outlined text-[20px] text-[#5a4e3a]">close</span>
+        <span id="hamburger-close-icon" class="hidden text-white/30 hover:text-white/60 text-sm">&#x2715;</span>
       </button>
     </header>
 
-    <!-- Scroll-to-bottom button (hidden until you scroll up) -->
-    <button id="btn-scroll-bottom" class="hidden fixed top-[56px] right-4 z-[250] w-7 h-7 flex items-center justify-center bg-[#1a1816] text-on-secondary-container hover:text-on-surface cursor-pointer" style="border: 1px solid #2a2218; border-radius: 2px;">
-      <span class="material-symbols-outlined text-[14px]">keyboard_double_arrow_down</span>
+    <!-- Scroll-to-bottom button -->
+    <button id="btn-scroll-bottom"
+      class="hidden fixed top-12 right-4 z-[250] w-7 h-7 flex items-center justify-center bg-black/80 backdrop-blur-sm text-white/25 hover:text-white/50 cursor-pointer border border-white/10 rounded-md transition-colors">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+        <path d="M6 2v8M3 7l3 3 3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
     </button>
 
     <!-- Manuscript Column -->
-    <main id="manuscript" class="manuscript-scroll overflow-y-auto mt-[48px] mb-[64px]" style="height: calc(100vh - 112px);">
-      <div class="max-w-[560px] mx-auto py-12 px-4" id="manuscript-inner">
+    <main id="manuscript" class="custom-scroll overflow-y-auto mt-10 mb-14" style="height: calc(100vh - 96px);">
+      <div class="max-w-2xl mx-auto py-12 px-6" id="manuscript-inner">
 
-        <!-- Turn blocks rendered here -->
-        <div id="turns-container" class="space-y-0"></div>
+        <div id="turns-container" class="space-y-0">
 
-        <!-- Death Marker (observation mode) — appears AFTER the last turn -->
-        <div id="death-marker" class="hidden flex justify-center my-12">
-          <div class="p-8 text-center max-w-sm" style="border: 1px solid rgba(90,46,46,0.2); background: #151310;">
-            <p class="font-system text-[10px] text-dead-tint tracking-widest mb-4">Final record</p>
-            <h1 id="death-marker-title" class="font-body text-3xl text-on-surface mb-2"></h1>
-            <p id="death-marker-quote" class="font-body italic text-on-secondary-container"></p>
+          <!-- Intro block -->
+          <div class="mb-10">
+            <div class="text-[10px] uppercase tracking-[0.15em] text-white/15 mb-4 font-medium">Late Roman Empire &mdash; 410 AD</div>
+            <p class="text-sm leading-loose text-white/60 mb-4">The Western Empire fractures. Provincial defenses crumble as Rome&rsquo;s authority dissolves into regional strongmen, barbarian federates, and the slow weight of administrative collapse.</p>
+            <p class="text-sm leading-loose text-white/60 mb-4">You are <span class="text-white/80 font-medium">Flavius Marcellus</span>, minor provincial administrator in the diocese of northern Italia. The local garrison has not been paid in three months. Refugees from the sack crowd the roads south.</p>
+            <p class="text-sm leading-loose text-white/60">Mediolanum sits at the crossroads of the Alpine passes. Once an imperial capital, now it is a city holding its breath. The walls are sound but the granaries are half-empty.</p>
+          </div>
+
+          <!-- Turn 1 (older — dimmed) -->
+          <div class="turn-block mb-8" style="--turn-opacity: 0.5;">
+            <div class="text-[10px] uppercase tracking-[0.15em] text-white/15 mb-4 font-medium">410 AD</div>
+
+            <div class="space-y-2 mb-4">
+              <p class="text-sm leading-relaxed text-white/40">
+                <span class="text-white/50 font-medium">Gaius</span> &mdash; tends to his forge on the eastern road, ignoring the commotion near the walls.
+              </p>
+            </div>
+
+            <p class="text-sm italic text-white/20 mb-4 pl-3 border-l border-white/5">Speak with the garrison commander about the supply lines</p>
+
+            <p class="text-sm leading-loose text-white/50 mb-3">The garrison is in poor spirits. The commander, a Briton who has served Rome for thirty years, greets you without looking up from his maps. The room smells of tallow and cold stone.</p>
+
+            <p class="text-sm leading-relaxed italic text-amber-300/30 mb-4">Traders from the south say the Visigoths are moving west. The roads may not be safe much longer.</p>
+
+            <div class="pl-4 border-l-2 border-white/8 my-4">
+              <div class="text-[9px] uppercase tracking-[0.15em] text-white/20 mb-1.5 font-medium">Commander Lucius</div>
+              <p class="text-sm leading-relaxed text-white/40">Supply wagons haven&rsquo;t come in eleven days. I&rsquo;ve sent riders, but&mdash;well. If you hear anything on the road, I&rsquo;d take it as a kindness.</p>
+            </div>
+
+            <div class="mt-6 mb-2"><div class="w-full h-px bg-white/[0.03]"></div></div>
+          </div>
+
+          <!-- Turn 2 (recent — full opacity) -->
+          <div class="turn-block mb-8" style="--turn-opacity: 1;">
+            <div class="text-[10px] uppercase tracking-[0.15em] text-white/15 mb-4 font-medium">411 AD</div>
+
+            <div class="space-y-2 mb-4">
+              <p class="text-sm leading-relaxed text-white/50">
+                <span class="text-white/60 font-medium">Helena</span> and <span class="text-white/60 font-medium">Marcus</span> &mdash; argue loudly near the market square about hoarded grain.
+              </p>
+              <p class="text-sm leading-relaxed text-white/50">
+                <span class="text-white/60 font-medium">Gaius</span> &mdash; boards up his forge and loads a cart heading east.
+              </p>
+            </div>
+
+            <p class="text-sm italic text-white/20 mb-4 pl-3 border-l border-white/5">Go to the forum. Try to buy passage south.</p>
+
+            <p class="text-sm leading-loose text-white/70 mb-3">The forum is half-empty. Most merchants have packed their carts and left in the night. A tax collector sits behind his table, pretending nothing has changed. A handful of citizens cluster near the notice boards, reading edicts no one believes anymore.</p>
+
+            <p class="text-sm leading-relaxed italic text-amber-300/40 mb-4">Someone claims the emperor in Ravenna has fled. Others say he&rsquo;s negotiating with the Goths. Nobody knows.</p>
+
+            <div class="space-y-4 my-4">
+              <div class="pl-4 border-l-2 border-white/10">
+                <div class="text-[9px] uppercase tracking-[0.15em] text-white/25 mb-1.5 font-medium">Tax Collector Decimus</div>
+                <p class="text-sm leading-relaxed text-white/55">Passage south? You and every other fool in this city. The boats are gone. I&rsquo;d suggest praying, but I don&rsquo;t think the gods are taking appointments.</p>
+              </div>
+              <div class="pl-4 border-l-2 border-white/10">
+                <div class="text-[9px] uppercase tracking-[0.15em] text-white/25 mb-1.5 font-medium">Helena</div>
+                <p class="text-sm leading-relaxed text-white/55">Don&rsquo;t listen to Decimus. My cousin sailed yesterday from the eastern harbor. It costs, though. More than it should.</p>
+              </div>
+            </div>
+
+            <div class="mt-6 mb-2"><div class="w-full h-px bg-white/[0.03]"></div></div>
+          </div>
+
+        </div>
+
+        <!-- Death Marker (observation mode) -->
+        <div id="death-marker" class="hidden flex justify-center my-16">
+          <div class="p-8 text-center max-w-sm border border-red-500/15 bg-red-950/10 rounded-lg">
+            <div class="flex items-center justify-center gap-2 mb-4">
+              <span class="status-dot status-dot-critical status-dot-sm"></span>
+              <span class="text-[10px] text-red-400/50 uppercase tracking-widest font-medium">Final record</span>
+            </div>
+            <h1 id="death-marker-title" class="text-2xl font-semibold text-white/70 mb-3"></h1>
+            <p id="death-marker-quote" class="text-sm text-white/30 italic leading-relaxed"></p>
           </div>
         </div>
 
-        <!-- Observation Input (in-manuscript, for dead mode) -->
+        <!-- Observation Input (in-manuscript, post-death) -->
         <div id="obs-input-section" class="hidden mt-16 mb-24">
           <div class="relative">
-            <input id="obs-input" type="text" placeholder="Travel only..." class="w-full bg-surface-container-lowest py-3 px-4 font-system text-[12px] text-dead-tint tracking-widest placeholder:text-dead-tint placeholder:opacity-50 focus:outline-none" style="border: 1px solid rgba(90,46,46,0.2); border-radius: 2px;">
+            <input id="obs-input" type="text" placeholder="Travel only..."
+              class="w-full bg-black/40 py-3 px-4 text-[11px] text-red-400/50 uppercase tracking-widest placeholder:text-red-400/20 focus:outline-none border border-red-500/10 rounded-md">
           </div>
           <div class="flex justify-between mt-2 px-1">
-            <span class="font-system text-[9px] text-on-secondary-container">Ghost state: travel only</span>
-            <span class="font-system text-[9px] text-on-secondary-container">Observing...</span>
+            <span class="text-[9px] text-white/15 uppercase tracking-wider">Ghost state: travel only</span>
+            <div class="flex items-center gap-1.5">
+              <span class="status-dot status-dot-critical" style="width:4px;height:4px;"></span>
+              <span class="text-[9px] text-white/15 uppercase tracking-wider">Observing</span>
+            </div>
           </div>
         </div>
 
       </div>
     </main>
 
-    <!-- Bottom Bar: Input (active mode only, hidden during observation + map) -->
-    <footer id="bottom-bar" class="fixed bottom-0 w-full h-[64px] bg-surface z-[100] flex justify-center items-center px-4" style="border-top: 1px solid rgba(200,184,154,0.1)">
-      <div class="max-w-[560px] w-full">
-        <div class="relative group">
-          <input id="player-input" type="text" autocomplete="off" placeholder="..." class="w-full bg-transparent py-2 px-4 font-system text-[12px] text-on-surface placeholder-[#4a3e2e] focus:ring-0 focus:outline-none transition-colors player-input-field" style="border: 1px solid rgba(42,34,24,0.5); border-radius: 2px;">
-          <div class="absolute right-3 top-1/2 -translate-y-1/2 opacity-20 group-focus-within:opacity-100 transition-opacity">
-            <span class="material-symbols-outlined text-[16px] text-tertiary-container">edit_note</span>
+    <!-- Bottom Input Bar -->
+    <footer id="bottom-bar"
+      class="fixed bottom-0 w-full h-14 bg-black/90 backdrop-blur-sm z-[100] flex justify-center items-center px-4 border-t border-white/5">
+      <div class="max-w-2xl w-full flex items-center gap-2">
+        <div class="relative group flex-1">
+          <input id="player-input" type="text" autocomplete="off" placeholder="..."
+            class="w-full bg-transparent py-2.5 px-4 text-xs text-white/70 placeholder-white/10 focus:ring-0 focus:outline-none transition-colors player-input-field rounded-md"
+            style="border: 1px solid rgba(255,255,255,0.06);">
+          <div class="absolute right-3 top-1/2 -translate-y-1/2 opacity-0 group-focus-within:opacity-100 transition-opacity duration-200">
+            <span class="text-[9px] text-white/15 uppercase tracking-widest">Enter</span>
+          </div>
+        </div>
+        <!-- Time-skip control -->
+        <div class="relative shrink-0">
+          <button id="btn-skip" title="Skip time"
+            class="skip-btn w-8 h-8 flex items-center justify-center rounded-md border border-white/6 text-white/20 hover:text-white/50 hover:border-white/15 transition-all duration-200 cursor-pointer">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d="M2 2.5v9l5-4.5-5-4.5z" fill="currentColor"/>
+              <path d="M7 2.5v9l5-4.5-5-4.5z" fill="currentColor"/>
+            </svg>
+          </button>
+          <div id="skip-popup" class="skip-popup hidden">
+            <div class="text-[9px] uppercase tracking-[0.12em] text-white/20 mb-2 px-1">Skip forward</div>
+            <button class="skip-option" data-ticks="1">1 turn</button>
+            <button class="skip-option" data-ticks="5">5 turns</button>
+            <button class="skip-option" data-ticks="10">10 turns</button>
+            <button class="skip-option" data-ticks="30">1 month</button>
           </div>
         </div>
       </div>
     </footer>
 
-    <!-- Hamburger Overlay — z-340, above map -->
-    <div id="hamburger-overlay" class="hidden fixed inset-0 bg-black/45 z-[340]"></div>
+    <!-- Hamburger Overlay -->
+    <div id="hamburger-overlay" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-[340]"></div>
 
-    <!-- Hamburger Panel — z-350, above everything -->
-    <div id="hamburger-panel" class="fixed right-0 top-0 w-[280px] h-full bg-[#13100c] z-[350] flex flex-col" style="border-left: 1px solid #2a2218;">
-      <!-- Close X — pinned to match the hamburger icon's exact position -->
-      <div class="h-[48px] flex items-center justify-end px-4 shrink-0">
-        <button id="btn-panel-close" class="ml-4 p-2 cursor-pointer">
-          <span class="material-symbols-outlined text-[20px] text-[#5a4e3a] hover:text-on-surface">close</span>
+    <!-- Hamburger Panel -->
+    <div id="hamburger-panel"
+      class="fixed right-0 top-0 w-72 h-full bg-black/95 backdrop-blur-md z-[350] flex flex-col border-l border-white/5">
+      <div class="h-10 flex items-center justify-end px-5 shrink-0">
+        <button id="btn-panel-close" class="p-2 cursor-pointer text-white/25 hover:text-white/50 transition-colors">
+          <span class="text-sm">&#x2715;</span>
         </button>
       </div>
-      <div class="px-10 mt-6 space-y-10">
+      <div class="px-8 mt-8 space-y-8">
         <div id="btn-map-hamburger" class="group cursor-pointer">
-          <span id="map-btn-text" class="font-body text-[20px] text-on-surface ink-underline">Map</span>
+          <span id="map-btn-text"
+            class="text-sm text-white/50 hover:text-white transition-colors uppercase tracking-widest">Map</span>
         </div>
-        <div class="space-y-6">
+        <div class="space-y-4">
           <div id="btn-new-run" class="group cursor-pointer">
-            <span class="font-body text-[20px] text-on-surface ink-underline">New Run</span>
+            <span class="text-sm text-white/50 hover:text-white transition-colors uppercase tracking-widest">New Run</span>
           </div>
           <div id="new-run-confirm" class="hidden pl-2 space-y-3">
-            <p class="font-system text-[11px] text-on-secondary-container tracking-tighter">Abandon this life?</p>
-            <div class="flex items-center gap-4 font-body text-[18px] text-tertiary-container">
-              <span id="btn-new-run-yes" class="cursor-pointer ink-underline hover:text-primary-fixed transition-colors">Yes</span>
-              <span class="text-surface-container select-none">&middot;</span>
-              <span id="btn-new-run-no" class="cursor-pointer ink-underline hover:text-primary-fixed transition-colors">No</span>
+            <p class="text-[10px] text-white/25 uppercase tracking-wider">Abandon this life?</p>
+            <div class="flex items-center gap-4 text-xs">
+              <button id="btn-new-run-yes"
+                class="text-white/40 hover:text-white transition-colors cursor-pointer uppercase tracking-widest">Yes</button>
+              <span class="text-white/10 select-none">&middot;</span>
+              <button id="btn-new-run-no"
+                class="text-white/40 hover:text-white transition-colors cursor-pointer uppercase tracking-widest">No</button>
             </div>
           </div>
         </div>
       </div>
-      <div class="mt-auto p-10">
-        <p class="font-system text-[10px] text-[#2a2218] tracking-widest leading-relaxed">
+      <div class="mt-auto p-8">
+        <p class="text-[9px] text-white/[0.07] uppercase tracking-widest leading-relaxed">
           Chronos Simulation<br>v0.4.12-Alpha
         </p>
       </div>
@@ -541,39 +350,70 @@
 
   </div>
 
-  <!-- ================================================ -->
-  <!-- ERASURE SCREEN                                    -->
-  <!-- ================================================ -->
-  <div id="screen-erasure" class="screen items-center justify-center w-screen h-screen">
+  <!-- ════════════════════════════════════════════════════════════════ -->
+  <!-- SCREEN: ERASURE                                                 -->
+  <!-- ════════════════════════════════════════════════════════════════ -->
+  <div id="screen-erasure" class="screen items-center justify-center w-screen h-screen bg-black">
     <div id="erasure-dim-layer"></div>
-    <main class="relative z-20 w-[560px] flex flex-col items-center text-center space-y-8">
-      <div id="erasure-content">
-        <p id="erasure-text" class="font-body text-[18px] leading-relaxed text-[#a89878] italic tracking-tight"></p>
+    <main class="relative z-20 max-w-lg flex flex-col items-center text-center space-y-10 px-8">
+      <div id="erasure-content" class="visible">
+        <p id="erasure-text" class="text-sm leading-loose text-white/30 italic">Flavius Marcellus died in the spring of 412, on the road south of Mediolanum. He was buried without ceremony. Within a season, the tax collector Decimus had forgotten his name. Within a year, the garrison commander who once shared his maps could no longer place the face. The city moved on. The empire moved on. The last person who remembered him &mdash; Helena, who had once offered him passage on her cousin&rsquo;s boat &mdash; died of fever the following winter, and with her went the final trace.</p>
       </div>
-      <div id="erasure-restart" class="pt-4">
-        <a id="btn-begin-again" class="font-system text-[11px] text-[#5a4e3a] tracking-[0.15em] ink-underline transition-colors duration-300 hover:text-tertiary-container cursor-pointer">begin again?</a>
+      <div id="erasure-restart" class="visible pt-6">
+        <a id="btn-begin-again"
+          class="text-[10px] text-white/10 uppercase tracking-[0.2em] hover:text-white/25 transition-colors duration-700 cursor-pointer">begin again?</a>
       </div>
     </main>
   </div>
 
-  <!-- ================================================ -->
-  <!-- MAP OVERLAY — below top bar, above manuscript     -->
-  <!-- ================================================ -->
-  <div id="map-container" class="hidden fixed top-[48px] left-0 right-0 bottom-0 z-[200] bg-surface">
+  <!-- ════════════════════════════════════════════════════════════════ -->
+  <!-- MAP OVERLAY                                                     -->
+  <!-- ════════════════════════════════════════════════════════════════ -->
+  <div id="map-container" class="hidden fixed top-10 left-0 right-0 bottom-0 z-[200] bg-black">
     <div id="map" class="w-full h-full"></div>
-    <!-- Custom zoom controls — above all Leaflet layers -->
     <div class="fixed bottom-6 right-6 z-[999] flex flex-col gap-2">
-      <button id="map-zoom-in" class="w-8 h-8 flex items-center justify-center bg-[#1a1816] text-on-secondary-container hover:text-on-surface cursor-pointer font-system text-[16px] leading-none" style="border: 1px solid #2a2218; border-radius: 2px;">+</button>
-      <button id="map-zoom-out" class="w-8 h-8 flex items-center justify-center bg-[#1a1816] text-on-secondary-container hover:text-on-surface cursor-pointer font-system text-[16px] leading-none" style="border: 1px solid #2a2218; border-radius: 2px;">&minus;</button>
+      <button id="map-zoom-in"
+        class="w-7 h-7 flex items-center justify-center bg-black/80 backdrop-blur-sm text-white/30 hover:text-white/60 cursor-pointer text-sm border border-white/10 rounded-md transition-colors">+</button>
+      <button id="map-zoom-out"
+        class="w-7 h-7 flex items-center justify-center bg-black/80 backdrop-blur-sm text-white/30 hover:text-white/60 cursor-pointer text-sm border border-white/10 rounded-md transition-colors">&minus;</button>
     </div>
   </div>
 
+  <!-- ════════════════════════════════════════════════════════════════ -->
+  <!-- FLOATING ELEMENTS                                               -->
+  <!-- ════════════════════════════════════════════════════════════════ -->
   <div id="word-tooltip"></div>
   <div id="context-btn">Context</div>
   <div id="context-panel"></div>
 
+  <!-- Region knowledge panel (map click) -->
+  <div id="region-overlay" class="hidden"></div>
+  <div id="region-panel" class="hidden">
+    <button class="region-close">&#x2715;</button>
+    <div class="region-header" id="region-panel-title"></div>
+    <div id="region-panel-body"></div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════════ -->
+  <!-- SCRIPTS                                                         -->
+  <!-- ════════════════════════════════════════════════════════════════ -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="map.js"></script>
   <script src="app.js"></script>
+
+  <!-- Design review: hash-based screen navigation -->
+  <script>
+    (function() {
+      function showScreenFromHash() {
+        var h = location.hash.slice(1);
+        if (!h) return;
+        document.querySelectorAll('.screen').forEach(function(s) { s.classList.remove('active'); });
+        var target = document.getElementById('screen-' + h);
+        if (target) target.classList.add('active');
+      }
+      window.addEventListener('hashchange', showScreenFromHash);
+      showScreenFromHash();
+    })();
+  </script>
 </body>
 </html>

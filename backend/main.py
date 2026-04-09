@@ -131,13 +131,48 @@ async def preview_run(req: RunRequest = RunRequest()):
         era_key, era_config = req.era, ALL_ERAS[req.era]
     else:
         era_key, era_config = random_era()
+
+    loading_events = []
+    try:
+        year = era_config["year_start"]
+        raw_events = await query_historical_events(
+            year_start=year - 55,
+            year_end=year + 5,
+        )
+        civ = [e for e in raw_events if e["significance"] == "civilizational"]
+        reg = [e for e in raw_events if e["significance"] == "regional"]
+        recent_first = sorted(civ + reg, key=lambda e: e["year"], reverse=True)
+        seen_text = set()
+        seen_years = {}
+        deduped = []
+        for e in recent_first:
+            txt_key = e["event"][:60]
+            if txt_key in seen_text:
+                continue
+            seen_text.add(txt_key)
+            yr = e["year"]
+            if seen_years.get(yr, 0) >= 1:
+                continue
+            seen_years[yr] = seen_years.get(yr, 0) + 1
+            deduped.append(e)
+        selected = deduped[:6]
+        selected.sort(key=lambda e: e["year"])
+        loading_events = [
+            f"{e['year']} AD \u2014 {e['event']}" for e in selected
+        ]
+    except Exception:
+        pass
+
+    if not loading_events:
+        loading_events = era_config.get("loading_events", [])
+
     return {
         "era_key": era_key,
         "era_name": era_config["name"],
         "year_start": era_config["year_start"],
         "description": era_config["description"],
         "region": era_config["region"],
-        "loading_events": era_config.get("loading_events", []),
+        "loading_events": loading_events,
         "loading_voices": era_config.get("loading_voices", []),
     }
 

@@ -1,0 +1,850 @@
+/*
+ * ═══════════════════════════════════════════════════════════════════════
+ * CHRONOS — Design System
+ * ═══════════════════════════════════════════════════════════════════════
+ *
+ * Visual language extracted from The World Unscripted (TWU) and adapted
+ * for CHRONOS's historical simulation. Same darkness, same weight,
+ * same cinematic presence — different game.
+ *
+ * Source: https://github.com/J0YY/the-world-unscripted
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * COLOR SYSTEM (TWU-extracted)
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * Background hierarchy:
+ *   Base:       #000000              Page bg, deepest layer
+ *   Surface:    #0a0a0a              Panel/section backgrounds
+ *   Elevated:   #111111 / #171717    Cards, elevated panels
+ *
+ *   TWU uses layered black opacity: bg-black/60, bg-black/80,
+ *   bg-black/90, bg-black/95 with backdrop-blur for depth.
+ *
+ * Text hierarchy (white at decreasing opacity):
+ *   Primary:    text-white           #ffffff   (titles, emphasis)
+ *   Bright:     text-white/90                  (active content)
+ *   Secondary:  text-white/70        ~#b3b3b3  (body text)
+ *   Muted:      text-white/40        ~#666666  (labels, metadata)
+ *   Disabled:   text-white/20        ~#333333  (faint, decorative)
+ *   Faint:      text-white/10                  (barely visible)
+ *
+ * Borders (TWU standard: border-white/{opacity}):
+ *   Subtle:     border-white/5       rgba(255,255,255,0.05)
+ *   Default:    border-white/10      rgba(255,255,255,0.10)
+ *   Strong:     border-white/20      rgba(255,255,255,0.20)
+ *
+ * Status/Semantic (TWU green-amber-red vocabulary):
+ *   Confirmed:  emerald-500  #10b981  (active, verified, good)
+ *   Warning:    amber-500    #eab308  (uncertain, caution)
+ *   Critical:   red-500      #ef4444  (death, danger, failure)
+ *   Info:       blue-500     #3b82f6  (neutral information)
+ *
+ * CHRONOS-specific semantic colors:
+ *   Known:      text-zinc-300  #d4d4d8   — confirmed information
+ *   Rumor:      text-amber-300/40, italic — unverified narrative
+ *   Death:      text-red-400, bg-red-950/10, border-red-500/20
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * TYPOGRAPHY SYSTEM (TWU-extracted)
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * Font stack:
+ *   Primary: 'JetBrains Mono', ui-monospace, monospace
+ *     (Equivalent to TWU's Geist Mono — geometric, modern monospace)
+ *
+ * TWU's entire UI uses monospace as default body font. The UI reads
+ * as an intelligence terminal / ops console. CHRONOS follows this.
+ *
+ * Size scale (TWU-extracted, applied to CHRONOS):
+ *   9px   text-[9px]   — NPC name labels, micro metadata
+ *   10px  text-[10px]  — Section labels, timestamps, status text
+ *   11px  text-[11px]  — Stamps, mini controls, confirmation text
+ *   12px  text-xs      — DOMINANT — buttons, nav, tabs, UI chrome
+ *   14px  text-sm      — Body/paragraph text, narrative, NPC speech
+ *   16px  text-base    — Emphasized narrative, character descriptions
+ *   18px  text-lg      — Section titles, loading screen descriptions
+ *   20px  text-xl      — Page titles
+ *   24px  text-2xl     — Major headings, death marker name
+ *   48px  text-5xl     — Cinematic turn counter
+ *   60px  text-6xl     — Hero title (CHRONOS)
+ *
+ * Weight rules (TWU-extracted):
+ *   300 light     — Decorative, atmosphere text
+ *   400 normal    — Body text, descriptions
+ *   500 medium    — Buttons, labels, active indicators
+ *   600 semibold  — Section headers, card titles
+ *   700 bold      — Headings, critical values, title
+ *
+ * Letter-spacing (TWU signature):
+ *   tracking-tight     — Compact inline labels
+ *   tracking-wide      — Button text
+ *   tracking-wider     — Section headers
+ *   tracking-widest    — SIGNATURE STYLE: all nav, captions, labels
+ *   tracking-[0.15em]  — Standard label tracking
+ *   tracking-[0.25em]  — Title/hero tracking
+ *
+ * Uppercase pattern:
+ *   Applied to virtually all non-body text: navigation, section headers,
+ *   button labels, badges, turn markers, year stamps, NPC name labels,
+ *   status indicators, version text. Body/narrative text is normal case.
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * CARD / COMPONENT SYSTEM (TWU-extracted)
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * Standard card:
+ *   border border-white/10 rounded-lg bg-zinc-950/80 p-4
+ *
+ * Floating panel:
+ *   bg-black/60 border-white/5 backdrop-blur-md rounded-lg p-4
+ *
+ * Button primary (TWU):
+ *   bg-white text-zinc-950 hover:bg-zinc-200 rounded-md px-3 py-2
+ *   text-sm font-medium transition
+ *
+ * Button secondary (TWU):
+ *   bg-zinc-900 text-white hover:bg-zinc-800 border border-white/10
+ *   rounded-md
+ *
+ * Badge:
+ *   rounded-full bg-zinc-800 px-2 py-0.5 text-xs text-zinc-400
+ *
+ * Confidence badges (TWU):
+ *   High: bg-emerald-500/20 text-emerald-200
+ *   Med:  bg-amber-500/20 text-amber-200
+ *   Low:  bg-red-500/20 text-red-200
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * ANIMATION SYSTEM (TWU Framer Motion → CSS equivalents)
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * Content reveal (BriefingFeed pattern):
+ *   Container: stagger children at 60ms intervals, 100ms initial delay
+ *   Item: opacity 0→1, translateY 14→0, blur 4px→0, 550ms ease-out
+ *
+ * NPC block stagger:
+ *   600ms gap between blocks
+ *   Each: opacity 0→1, translateY 6→0, 500ms ease
+ *
+ * Loading dots (pulsing):
+ *   opacity [0.2, 1, 0.2], duration 1.6s infinite, 150ms stagger
+ *
+ * Screen transitions:
+ *   Fade in: 600ms ease
+ *   Slow fade (control room): 2500ms
+ *   Landing→Game: 900ms
+ *
+ * After-action entrance (TWU):
+ *   opacity 0→1, y 30→0, 600ms ease-out
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * LAYOUT PATTERNS (TWU-extracted)
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * Fixed header + scrollable content + fixed footer:
+ *   Header: fixed top-0, h-10, border-b border-white/5
+ *   Content: mt-10 mb-14, overflow-y-auto
+ *   Footer: fixed bottom-0, h-14, border-t border-white/5
+ *
+ * Content column: max-w-2xl mx-auto (672px)
+ *
+ * Full-screen overlay: fixed inset-0, z-[200], bg-black
+ *
+ * Panel slide-in: fixed right-0 top-0, w-72,
+ *   transform translateX(100%) → translateX(0)
+ *
+ * Z-index stack:
+ *   0    — Noise/grid overlays
+ *   10   — Map elements
+ *   100  — Bottom bar
+ *   200  — Map overlay
+ *   250  — Scroll button
+ *   300  — Top bar
+ *   340  — Hamburger overlay
+ *   350  — Hamburger panel
+ *   9999 — Tooltips
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * STATUS INDICATORS (TWU-extracted)
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * Pulsing dot:
+ *   w-1.5 h-1.5 rounded-full, animate with scale + opacity
+ *   Active:   bg-emerald-500
+ *   Warning:  bg-amber-500
+ *   Critical: bg-red-500
+ *
+ * TWU hotspot pulse: scale 1→1.22, opacity 0.45→0.95, 2s infinite
+ *
+ * ═══════════════════════════════════════════════════════════════════════
+ */
+
+
+/* ── Base ────────────────────────────────────────────────────────────── */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: #000000;
+  color: #fafafa;
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow: hidden;
+}
+
+::selection {
+  background: rgba(16, 185, 129, 0.2);
+  color: #ffffff;
+}
+
+
+/* ── Noise Overlay ───────────────────────────────────────────────────── */
+
+.noise-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+}
+
+
+/* ── Grid Background (Start screen only) ─────────────────────────────── */
+
+.grid-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(to right, rgba(255,255,255,0.02) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255,255,255,0.02) 1px, transparent 1px);
+  background-size: 60px 60px;
+}
+
+
+/* ── Screen Management ───────────────────────────────────────────────── */
+
+.screen {
+  display: none;
+  position: relative;
+}
+
+.screen.active {
+  display: flex;
+}
+
+
+/* ── Keyframe Animations ─────────────────────────────────────────────── */
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0px);
+  }
+}
+
+@keyframes fadeInSlide {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulseDot {
+  0%, 100% { opacity: 0.2; }
+  50%      { opacity: 1; }
+}
+
+@keyframes spinSlow {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+@keyframes statusPulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.45;
+  }
+  50% {
+    transform: scale(1.25);
+    opacity: 0.95;
+  }
+}
+
+@keyframes screenReveal {
+  from {
+    opacity: 0;
+    transform: scale(1.01);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+
+/* ── Animation Utility Classes ───────────────────────────────────────── */
+
+.fade-in {
+  animation: fadeIn 0.6s ease forwards;
+}
+
+.fade-in-up {
+  opacity: 0;
+  animation: fadeInUp 0.55s ease-out forwards;
+}
+
+.fade-in-slide {
+  opacity: 0;
+  animation: fadeInSlide 0.5s ease forwards;
+}
+
+.screen-reveal {
+  animation: screenReveal 0.4s ease-out forwards;
+}
+
+.stagger-item {
+  opacity: 0;
+  animation: fadeInUp 0.55s ease-out forwards;
+  animation-delay: calc(var(--i, 0) * 60ms + 100ms);
+}
+
+
+/* ── Scrollbar ───────────────────────────────────────────────────────── */
+
+.custom-scroll::-webkit-scrollbar {
+  width: 3px;
+}
+
+.custom-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 2px;
+}
+
+.custom-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+
+/* ── Loading Dots ────────────────────────────────────────────────────── */
+
+.dots-pulse span:nth-child(1) { animation: pulseDot 1.6s ease-in-out 0s infinite; }
+.dots-pulse span:nth-child(2) { animation: pulseDot 1.6s ease-in-out 0.15s infinite; }
+.dots-pulse span:nth-child(3) { animation: pulseDot 1.6s ease-in-out 0.3s infinite; }
+
+
+/* ── Turn Spinner (during processing) ────────────────────────────────── */
+
+.turn-spinner {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.turn-spinner-ring {
+  width: 14px;
+  height: 14px;
+  border: 1.5px solid rgba(255, 255, 255, 0.06);
+  border-top-color: rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  animation: spinSlow 1.5s linear infinite;
+}
+
+.streaming-dots {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.15);
+  letter-spacing: 0.3em;
+}
+
+
+/* ── Word-by-Word Streaming ──────────────────────────────────────────── */
+
+.word-stream span {
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.word-stream span.visible {
+  opacity: 1;
+}
+
+
+/* ── NPC Block Stagger ───────────────────────────────────────────────── */
+
+.npc-block-stagger {
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 0.5s ease, transform 0.5s ease;
+}
+
+.npc-block-stagger.revealed {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+
+/* ── Knowledge Types — information confidence as visual language ──────── */
+
+.known {
+  color: #d4d4d8;
+  opacity: 1;
+}
+
+.rumor {
+  color: #fcd34d;
+  opacity: 0.45;
+  font-style: italic;
+}
+
+.unknown {
+  display: none !important;
+}
+
+
+/* ── Turn Dimming — older turns recede visually ──────────────────────── */
+
+.turn-block {
+  opacity: var(--turn-opacity, 1);
+  transition: opacity 0.8s ease;
+}
+
+
+/* ── Observation Mode — muted, post-death state ──────────────────────── */
+
+.observation-muted {
+  filter: contrast(0.8) brightness(0.65) saturate(0.7);
+}
+
+
+/* ── Status Dots ─────────────────────────────────────────────────────── */
+
+.status-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  animation: statusPulse 2s ease-in-out infinite;
+}
+
+.status-dot-active   { background: #10b981; }
+.status-dot-warn     { background: #eab308; }
+.status-dot-critical { background: #ef4444; }
+
+.status-dot-sm {
+  width: 4px;
+  height: 4px;
+}
+
+
+/* ── Hamburger Panel ─────────────────────────────────────────────────── */
+
+#hamburger-panel {
+  transform: translateX(100%);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+#hamburger-panel.open {
+  transform: translateX(0);
+}
+
+
+/* ── Erasure Sequence ────────────────────────────────────────────────── */
+
+#erasure-dim-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  background: rgba(0, 0, 0, 0);
+  transition: background 10s ease;
+  pointer-events: none;
+}
+
+#erasure-dim-layer.active {
+  background: rgba(0, 0, 0, 0.95);
+}
+
+#erasure-content {
+  opacity: 0;
+  transition: opacity 3s ease;
+}
+
+#erasure-content.visible {
+  opacity: 1;
+}
+
+#erasure-restart {
+  opacity: 0;
+  transition: opacity 2.5s ease;
+}
+
+#erasure-restart.visible {
+  opacity: 1;
+}
+
+
+/* ── Leaflet Map Overrides ───────────────────────────────────────────── */
+
+.leaflet-container {
+  background: #000000 !important;
+}
+
+.leaflet-control-zoom {
+  display: none !important;
+}
+
+.marker-player {
+  background: #10b981;
+  border: 2px solid #34d399;
+  border-radius: 50%;
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.4);
+}
+
+.marker-visited {
+  background: #71717a;
+  border: 1.5px solid #a1a1aa;
+  border-radius: 50%;
+}
+
+.marker-unvisited {
+  background: #27272a;
+  border: 1px solid #3f3f46;
+  border-radius: 50%;
+  opacity: 0.5;
+}
+
+.marker-faded {
+  background: #18181b;
+  border: 1px solid #27272a;
+  border-radius: 50%;
+  opacity: 0.25;
+}
+
+.perception-popup .leaflet-popup-content-wrapper {
+  background: rgba(10, 10, 10, 0.95) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.7) !important;
+  backdrop-filter: blur(12px);
+}
+
+.perception-popup .leaflet-popup-tip {
+  background: rgba(10, 10, 10, 0.95) !important;
+  border: none !important;
+}
+
+.npc-tooltip {
+  background: rgba(10, 10, 10, 0.95) !important;
+  color: #d4d4d8 !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 6px !important;
+  padding: 8px 12px !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6) !important;
+  font-family: 'JetBrains Mono', ui-monospace, monospace !important;
+  font-size: 11px !important;
+  line-height: 1.5 !important;
+  backdrop-filter: blur(8px);
+}
+
+.npc-tooltip .leaflet-tooltip-arrow {
+  display: none;
+}
+
+.polity-tooltip {
+  background: rgba(10, 10, 10, 0.95) !important;
+  color: #a1a1aa !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 4px !important;
+  font-family: 'JetBrains Mono', ui-monospace, monospace !important;
+  font-size: 10px !important;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 4px 10px !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6) !important;
+  backdrop-filter: blur(8px);
+}
+
+.polity-tooltip .leaflet-tooltip-arrow {
+  display: none;
+}
+
+
+/* ── Word Definition Tooltip ─────────────────────────────────────────── */
+
+#word-tooltip {
+  position: fixed;
+  z-index: 9999;
+  background: rgba(10, 10, 10, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  padding: 12px 16px;
+  max-width: 300px;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #d4d4d8;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.7);
+  pointer-events: none;
+  display: none;
+  backdrop-filter: blur(12px);
+}
+
+#word-tooltip .def-word {
+  font-weight: 600;
+  color: #fafafa;
+  margin-bottom: 4px;
+}
+
+#word-tooltip .def-pos {
+  font-style: italic;
+  color: #71717a;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+#word-tooltip .def-meaning {
+  color: #a1a1aa;
+  margin-top: 6px;
+}
+
+
+/* ── Context Button & Panel ──────────────────────────────────────────── */
+
+#context-btn {
+  position: fixed;
+  z-index: 9999;
+  background: rgba(10, 10, 10, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  padding: 5px 12px;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #a1a1aa;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+  display: none;
+  transition: color 0.2s, border-color 0.2s;
+  backdrop-filter: blur(8px);
+}
+
+#context-btn:hover {
+  color: #fafafa;
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+#context-panel {
+  position: fixed;
+  z-index: 9999;
+  background: rgba(10, 10, 10, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 14px 18px;
+  max-width: 400px;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 12px;
+  line-height: 1.7;
+  color: #d4d4d8;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.7);
+  display: none;
+  backdrop-filter: blur(12px);
+}
+
+#context-panel .ctx-loading {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.2);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+
+/* ── Input Styling ───────────────────────────────────────────────────── */
+
+.player-input-field:focus {
+  border-color: rgba(255, 255, 255, 0.15) !important;
+  outline: none;
+}
+
+.input-dead {
+  color: #ef4444 !important;
+  border-color: rgba(239, 68, 68, 0.15) !important;
+}
+
+.input-dead::placeholder {
+  color: rgba(239, 68, 68, 0.3) !important;
+}
+
+
+/* ── Time-skip Control ───────────────────────────────────────────────── */
+
+.skip-btn {
+  background: transparent;
+}
+
+.skip-popup {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  right: 0;
+  background: rgba(10, 10, 10, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 10px 8px 8px;
+  min-width: 120px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(12px);
+  animation: fadeInSlide 0.15s ease;
+}
+
+.skip-option {
+  display: block;
+  width: 100%;
+  padding: 6px 10px;
+  background: none;
+  border: none;
+  border-radius: 4px;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 11px;
+  text-align: left;
+  color: rgba(255, 255, 255, 0.45);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.skip-option:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.7);
+}
+
+
+/* ── Region Knowledge Panel ──────────────────────────────────────────── */
+
+#region-panel {
+  position: fixed;
+  z-index: 9999;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(10, 10, 10, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 20px 24px;
+  max-width: 380px;
+  width: 90%;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(16px);
+  animation: fadeInSlide 0.2s ease;
+}
+
+#region-panel .region-header {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: rgba(255, 255, 255, 0.25);
+  font-weight: 500;
+  margin-bottom: 12px;
+}
+
+#region-panel .region-section-label {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: rgba(255, 255, 255, 0.15);
+  margin-bottom: 6px;
+  margin-top: 14px;
+  font-weight: 500;
+}
+
+#region-panel .region-fact {
+  font-size: 12px;
+  line-height: 1.7;
+  color: #d4d4d8;
+  margin-bottom: 4px;
+}
+
+#region-panel .region-rumor {
+  font-size: 12px;
+  line-height: 1.7;
+  color: rgba(252, 211, 77, 0.45);
+  font-style: italic;
+  margin-bottom: 4px;
+}
+
+#region-panel .region-note {
+  font-size: 11px;
+  line-height: 1.7;
+  color: rgba(255, 255, 255, 0.35);
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+#region-panel .region-close {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.15);
+  cursor: pointer;
+  background: none;
+  border: none;
+  transition: color 0.2s;
+}
+
+#region-panel .region-close:hover {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+#region-panel .region-loading {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.2);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+#region-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+  background: rgba(0, 0, 0, 0.4);
+}
+
+
+/* ── Utility ─────────────────────────────────────────────────────────── */
+
+.hidden {
+  display: none !important;
+}

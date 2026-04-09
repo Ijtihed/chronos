@@ -23,6 +23,14 @@ Tracking:
 - [ ] Session length target
 - [ ] NPC relationship graph granularity
 
+## Map and spatial systems
+
+- **Event marker coordinate resolution:** The Knowledge Matrix resolves region names to game locations, but event markers need lat/lon coordinates for map placement. How do we resolve region strings like "Byzantine Empire" or "Northern France" to coordinates accurately enough for map display? Options: expand the region hint map with centroid coordinates, use location lat/lon as proxy for nearby events, or generate coordinates at build time when events are ingested. Resolve before building Feature 3 (event markers on map).
+
+## Information system
+
+- **Information Provenance Graph — distortion parameters:** When the social graph is built in Phase 5, what are the distortion rates per hop? How does archetype affect transmission accuracy? How do we calibrate these so the world feels authentic without making information so degraded it becomes frustrating? Resolve through playtesting once the social graph exists.
+
 ## Observations (not blocking, worth tracking)
 
 - **NPC response length compliance:** The `llama3.1:8b` model frequently exceeds the "2-4 sentences" constraint. May need `max_tokens` or prompt rewording.
@@ -31,7 +39,7 @@ Tracking:
 - **Turn latency with all-NPC LLM calls:** Every NPC now gets an LLM call every turn (full for nearby, light for offscreen). With 12 NPCs this means 12 concurrent Ollama calls per turn. Latency depends on `OLLAMA_NUM_PARALLEL` setting and available VRAM. May need to swap Ollama for vLLM/SGLang if turns take >15s.
 - **Utility scoring opportunity set:** The 10 hardcoded world opportunities (trade_caravan_passing, siege_threat, etc.) may need era-specific variants. A 1990s run shouldn't advertise "siege_threat" in the same way as a medieval one.
 - **Consequence queue growth during time-skip:** Skipping 30 turns generates rumor consequences every 3 turns at high-tension locations. Queue cleanup runs each turn but the event list grows linearly. May need event list pruning for very long runs.
-- **Frontend skip button:** The `/api/run/{id}/skip` endpoint exists but the frontend has no UI for it. Needs a time-advance button or keyboard shortcut.
+- ~~**Frontend skip button:** The `/api/run/{id}/skip` endpoint exists but the frontend has no UI for it.~~ **Resolved** — time-skip UI added to the bottom bar (Phase 2.5).
 
 ## Closed
 
