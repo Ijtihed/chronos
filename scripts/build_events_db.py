@@ -794,6 +794,36 @@ async def build_era(era: str, year_start: int, year_end: int, region: str) -> di
             ev["wiki_extract"] = ""
         await asyncio.sleep(0.1)
 
+    # Pre-filter Wikipedia year page events by text relevance (before LLM)
+    _RELEVANT_KEYWORDS = {
+        "byzantine", "ottoman", "constantinople", "anatolia",
+        "balkans", "balkan", "mediterranean", "serbia", "serbian",
+        "bulgaria", "bulgarian", "hungary", "hungarian", "venice",
+        "venetian", "genoa", "genoese", "wallachia", "wallachian",
+        "moldavia", "moldavian", "albania", "albanian", "epirus",
+        "morea", "peloponnese", "thessalonica", "thessaloniki",
+        "adrianople", "gallipoli", "bosphorus", "dardanelles",
+        "black sea", "aegean", "levant", "crusade", "varna",
+        "kosovo", "nicopolis", "achaea", "athens", "murad",
+        "mehmed", "bayezid", "sultan", "palaiologos", "palaeologus",
+        "hunyadi", "skanderbeg", "despot", "patriarch",
+    }
+    pre_filtered = []
+    for ev in new_events:
+        if ev["qid"].startswith("wiki_year_"):
+            raw_text = (ev.get("wiki_extract") or ev.get("description") or "").lower()
+            if any(kw in raw_text for kw in _RELEVANT_KEYWORDS):
+                pre_filtered.append(ev)
+            else:
+                logger.debug("Pre-filter: skipping '%s'", ev.get("label", "?")[:60])
+        else:
+            pre_filtered.append(ev)
+    logger.info("Pre-filtered Wikipedia events: %d kept out of %d (removed %d irrelevant)",
+                len([e for e in pre_filtered if e["qid"].startswith("wiki_year_")]),
+                len([e for e in new_events if e["qid"].startswith("wiki_year_")]),
+                len(new_events) - len(pre_filtered))
+    new_events = pre_filtered
+
     # Process in batches of 10 through LLM
     inserted = 0
     batch_size = 10

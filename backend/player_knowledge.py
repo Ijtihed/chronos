@@ -101,16 +101,48 @@ def graph_distance(
     return _graph_distance_shared(loc_a, loc_b, state)
 
 
+_REGION_TO_LOCATION_HINTS: Dict[str, List[str]] = {
+    "byzantine": ["constantinople", "galata"],
+    "ottoman": ["adrianople", "constantinople"],
+    "anatolia": ["adrianople", "constantinople"],
+    "balkans": ["adrianople"],
+    "mediterranean": ["constantinople", "galata"],
+    "levant": ["acre", "tyre", "jaffa"],
+    "italia": ["ariminum", "ravenna", "mediolanum"],
+    "scandinavia": ["kaupang", "hedeby", "birka"],
+    "wallachia": ["adrianople"],
+    "moldavia": ["adrianople"],
+    "hungary": ["adrianople"],
+    "serbia": ["adrianople"],
+    "bulgaria": ["adrianople"],
+    "greece": ["constantinople"],
+    "venice": ["galata", "constantinople"],
+    "genoa": ["galata", "constantinople"],
+    "achaea": ["constantinople"],
+    "morea": ["constantinople"],
+    "thessalonica": ["constantinople"],
+}
+
+
 def _resolve_event_location(
     event_region: str, state: WorldState,
 ) -> Optional[str]:
     """Best-effort mapping from an event's region string to a location ID."""
     region_lower = event_region.lower()
+    loc_ids = {loc.id for loc in state.locations}
+
     for loc in state.locations:
         if region_lower in loc.id.lower() or region_lower in loc.name.lower():
             return loc.id
         if loc.id.lower() in region_lower or loc.name.lower() in region_lower:
             return loc.id
+
+    for hint_key, hint_locs in _REGION_TO_LOCATION_HINTS.items():
+        if hint_key in region_lower:
+            for candidate in hint_locs:
+                if candidate in loc_ids:
+                    return candidate
+
     return None
 
 
