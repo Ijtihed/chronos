@@ -1,0 +1,182 @@
+[
+  {
+    "year": 1347,
+    "region": "Mediterranean",
+    "event": "Genoese ships from Caffa bring plague to Messina, Sicily. Rats and fleas carry the disease ashore. Europe's worst disaster begins.",
+    "significance": "civilizational",
+    "type": "epidemic",
+    "affects": ["population", "trade"],
+    "wikidata_qid": null
+  },
+  {
+    "year": 1348,
+    "region": "Italia",
+    "event": "The Black Death reaches Florence. Within months, half the population is dead. Bodies are piled in the streets. The living cannot bury the dead fast enough.",
+    "significance": "civilizational",
+    "type": "epidemic",
+    "affects": ["population", "trade", "political_stability"],
+    "wikidata_qid": null
+  },
+  {
+    "year": 1348,
+    "region": "Francia",
+    "event": "The plague reaches Avignon, seat of the papacy. Pope Clement VI consecrates the Rhône river so bodies can be thrown in — the cemeteries are full.",
+    "significance": "regional",
+    "type": "epidemic",
+    "affects": ["population", "religion"],
+    "wikidata_qid": null
+  },
+  {
+    "year": 1348,
+    "region": "Francia",
+    "event": "Marseille is devastated by the plague. The port city that received the disease from Italian ships loses half its people in weeks.",
+    "significance": "regional",
+    "type": "epidemic",
+    "affects": ["population", "trade"],
+    "wikidata_qid": null
+  },
+  {
+    "year": 1349,
+    "region": "Europe",
+    "event": "The plague spreads north through France, reaches England, Germany, and Scandinavia. A third of Europe's population will die within three years.",
+    "significance": "civilizational",
+    "type": "epidemic",
+    "affects": ["population", "trade", "agriculture"],
+    "wikidata_qid": null
+  },
+  {
+    "year": 1361,
+    "region": "Europe",
+    "event": "The plague returns in a second wave, killing many who survived the first. Children born since 1348 are especially vulnerable.",
+    "significance": "regional",
+    "type": "epidemic",
+    "affects": ["population"],
+    "wikidata_qid": null
+  },
+  {
+    "year": 1348,
+    "region": "Italia",
+    "event": "Flagellant processions march through Italian and French cities. Penitents whip themselves bloody in the streets, believing the plague is God's punishment for human sin.",
+    "significance": "regional",
+    "type": "religious",
+    "affects": ["religion"],
+    "wikidata_qid": null
+  },
+  {
+    "year": 1349,
+    "region": "Europe",
+    "event": "Pogroms against Jews across Germany and France. Accused of poisoning wells to cause the plague, thousands are massacred in Strasbourg, Basel, and Mainz.",
+    "significance": "civilizational",
+    "type": "religious",
+    "affects": ["religion", "population"],
+    "wikidata_qid": null
+  },
+  {
+    "year": 1350,
+    "region": "Francia",
+    "event": "Pope Clement VI issues a papal bull defending the Jews and condemning the pogroms. He declares the plague is not their fault. Few listen.",
+    "significance": "regional",
+    "type": "religious",
+    "affects": ["religion", "political_stability"],
+    "wikidata_qid": null
+  },
+  {
+    "year": 1340,
+    "region": "Italia",
+    "event": "The great Florentine banking houses of the Bardi and Peruzzi collapse after King Edward III of England defaults on massive war loans. Florence's economy is shattered.",
+    "significance": "regional",
+    "type": "economic",
+    "affects": ["trade"],
+    "wikidata_qid": null
+  },
+  {
+    "year": 1348,
+    "region": "Europe",
+    "event": "Trade across Europe collapses as cities close their gates against the plague. Merchants cannot sell goods. Ships sit empty in harbors. The economy stops.",
+    "significance": "civilizational",
+    "type": "economic",
+    "affects": ["trade", "population"],
+    "wikidata_qid": null
+  },
+  {
+    "year": 1350,
+    "region": "Europe",
+    "event": "Labor is suddenly scarce after the plague. Surviving peasants demand higher wages. Landowners are furious but have no choice. The old feudal order begins to crack.",
+    "significance": "civilizational",
+    "type": "economic",
+    "affects": ["trade", "agriculture", "political_stability"],
+    "wikidata_qid": null
+  },
+  {
+    "year": 1337,
+    "region": "Francia",
+    "event": "The Hundred Years War begins as Edward III of England claims the French throne. England and France will fight for over a century.",
+    "significance": "civilizational",
+    "type": "war",
+    "affects": ["military", "political_stability", "trade"],
+    "wikidata_qid": "Q12548"
+  },
+  {
+    "year": 1346,
+    "region": "Francia",
+    "event": "Battle of Crécy — English longbowmen slaughter French knights. The mounted charge that defined medieval warfare is rendered obsolete.",
+    "significance": "regional",
+    "type": "war",
+    "affects": ["military"],
+    "wikidata_qid": "Q160381"
+  },
+  {
+    "year": 1356,
+    "region": "Francia",
+    "event": "Battle of Poitiers — the French king John II is captured by the English. France descends into chaos. The Estates-General demands reforms.",
+    "significance": "regional",
+    "type": "war",
+    "affects": ["military", "political_stability"],
+    "wikidata_qid": "Q160386"
+  },
+  {
+    "year": 1348,
+    "region": "Italia",
+    "event": "Food rots in the fields around Siena. There are not enough living people to harvest the crops. Bread is available but no one can bring it to market.",
+    "significance": "local",
+    "type": "famine",
+    "affects": ["agriculture", "population"],
+    "wikidata_qid": null
+  },
+  {
+    "year": 1348,
+    "region": "Italia",
+    "event": "Boccaccio begins writing the Decameron — stories told by young Florentines who fled the plague to a villa in the countryside. Literature born from catastrophe.",
+    "significance": "civilizational",
+    "type": "cultural",
+    "affects": ["culture"],
+    "wikidata_qid": null
+  },
+  {
+    "year": 1340,
+    "region": "Europa",
+    "event": "A series of bad harvests across northern Italy and southern France. Food prices rise sharply. The poor are already weakened when the plague arrives.",
+    "significance": "regional",
+    "type": "famine",
+    "affects": ["agriculture", "population"],
+    "wikidata_qid": null
+  },
+  {
+    "year": 1350,
+    "region": "Italia",
+    "event": "Siena's government collapses. Half the city council is dead from the plague. The survivors cannot maintain order. Looting begins in the empty quarters.",
+    "significance": "local",
+    "type": "political",
+    "affects": ["political_stability", "population"],
+    "wikidata_qid": null
+  },
+  {
+    "year": 1360,
+    "region": "Italia",
+    "event": "Florence slowly rebuilds after the plague. Wages for laborers have doubled. Skilled craftsmen can name their price. The survivors inherit the wealth of the dead.",
+    "significance": "local",
+    "type": "economic",
+    "affects": ["trade", "population"],
+    "wikidata_qid": null
+  }
+]
