@@ -13,6 +13,7 @@ when the hardware can run it; 8b is the minimum viable local model.
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
 from typing import Optional
 
@@ -23,15 +24,23 @@ logger = logging.getLogger("chronos")
 OLLAMA_URL = "http://localhost:11434"
 DEFAULT_MODEL = "llama3.1:8b"
 PREFERRED_MODEL = "llama3.1:70b"
+_MODEL_OVERRIDE = os.environ.get("CHRONOS_MODEL")
 
 _resolved_model: Optional[str] = None
 
 
 async def _resolve_model() -> str:
-    """Pick the best available model. Cached after first call."""
+    """Pick the best available model. Cached after first call.
+
+    Set CHRONOS_MODEL env var to force a specific model (e.g. llama3.2:3b for demos).
+    """
     global _resolved_model
     if _resolved_model:
         return _resolved_model
+    if _MODEL_OVERRIDE:
+        _resolved_model = _MODEL_OVERRIDE
+        logger.info("Using model (env override): %s", _MODEL_OVERRIDE)
+        return _MODEL_OVERRIDE
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
             resp = await client.get(f"{OLLAMA_URL}/api/tags")

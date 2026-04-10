@@ -1,0 +1,919 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CHRONOS — System Demo</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { height: 100%; }
+    body {
+      min-height: 100%; background: #000; color: #fafafa;
+      font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      -webkit-font-smoothing: antialiased;
+    }
+    ::selection { background: rgba(16,185,129,0.2); color: #fff; }
+
+    .noise-overlay {
+      position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.035;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+      background-repeat: repeat;
+    }
+
+    ::-webkit-scrollbar { width: 3px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.06); border-radius: 2px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.12); }
+
+    @keyframes fadeIn { from { opacity:0 } to { opacity:1 } }
+    @keyframes fadeInUp { from { opacity:0; transform:translateY(14px); filter:blur(4px) } to { opacity:1; transform:translateY(0); filter:blur(0) } }
+    @keyframes pulseDot { 0%,100% { opacity:0.2 } 50% { opacity:1 } }
+    @keyframes statusPulse { 0%,100% { transform:scale(1); opacity:0.45 } 50% { transform:scale(1.25); opacity:0.95 } }
+    @keyframes staggerIn { from { opacity:0; transform:translateY(10px) } to { opacity:1; transform:translateY(0) } }
+
+    /* ── Header + Nav ──────────────────────────────────────────── */
+    .demo-header {
+      position: fixed; top: 0; left: 0; right: 0; height: 48px; z-index: 100;
+      display: flex; align-items: center; gap: 16px; padding: 0 20px;
+      background: rgba(0,0,0,0.92); backdrop-filter: blur(16px);
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+    .header-brand {
+      font-size: 11px; font-weight: 700; letter-spacing: 0.25em;
+      text-transform: uppercase; color: rgba(255,255,255,0.80);
+      margin-right: 8px; flex-shrink: 0;
+    }
+    .nav-tabs { display: flex; gap: 2px; flex: 1; overflow-x: auto; }
+    .nav-tab {
+      font-family: inherit; font-size: 10px; font-weight: 500;
+      letter-spacing: 0.06em; text-transform: uppercase;
+      color: rgba(255,255,255,0.25); background: none; border: none;
+      padding: 6px 12px; border-radius: 4px; cursor: pointer;
+      transition: color 0.2s, background 0.2s; white-space: nowrap;
+    }
+    .nav-tab:hover { color: rgba(255,255,255,0.50); background: rgba(255,255,255,0.03); }
+    .nav-tab.active { color: #10b981; background: rgba(16,185,129,0.08); }
+    .header-status {
+      display: flex; align-items: center; gap: 6px; flex-shrink: 0;
+    }
+    .status-dot { width: 6px; height: 6px; border-radius: 50%; animation: statusPulse 2s ease-in-out infinite; }
+    .status-dot-active { background: #10b981; }
+    .status-dot-warn { background: #eab308; }
+    .status-dot-critical { background: #ef4444; }
+    .status-label { font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255,255,255,0.20); }
+
+    /* ── Panel Pages ───────────────────────────────────────────── */
+    .panel-page {
+      display: none; margin-top: 48px; padding: 32px 40px 60px;
+      max-width: 960px; margin-left: auto; margin-right: auto;
+      animation: fadeIn 0.3s ease;
+    }
+    .panel-page.active { display: block; }
+
+    .panel-num {
+      font-size: 9px; font-weight: 500; letter-spacing: 0.2em;
+      text-transform: uppercase; color: rgba(255,255,255,0.10); margin-bottom: 8px;
+    }
+    .panel-title {
+      font-size: 20px; font-weight: 700; letter-spacing: 0.02em;
+      color: rgba(255,255,255,0.90); margin-bottom: 6px;
+    }
+    .panel-desc {
+      font-size: 12px; font-weight: 400; line-height: 1.7;
+      color: rgba(255,255,255,0.35); margin-bottom: 28px; max-width: 640px;
+    }
+
+    /* ── Controls ──────────────────────────────────────────────── */
+    .controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; margin-bottom: 20px; }
+    .control-group { display: flex; flex-direction: column; gap: 3px; }
+    .control-label { font-size: 9px; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(255,255,255,0.15); }
+
+    select, input[type="text"] {
+      font-family: inherit; font-size: 11px; color: rgba(255,255,255,0.60);
+      background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 4px; padding: 7px 12px; outline: none; min-width: 160px;
+      transition: border-color 0.2s, color 0.2s;
+    }
+    select:focus, input[type="text"]:focus { border-color: rgba(255,255,255,0.15); color: rgba(255,255,255,0.80); }
+    select option { background: #0a0a0a; color: #fafafa; }
+    input[type="text"] { min-width: 300px; }
+
+    .btn-generate {
+      font-family: inherit; font-size: 11px; font-weight: 500;
+      letter-spacing: 0.06em; text-transform: uppercase;
+      color: #0a0a0a; background: rgba(255,255,255,0.85);
+      border: none; border-radius: 4px; padding: 8px 20px; cursor: pointer;
+      transition: background 0.2s;
+    }
+    .btn-generate:hover { background: rgba(255,255,255,0.95); }
+    .btn-generate:disabled { background: rgba(255,255,255,0.12); color: rgba(255,255,255,0.25); cursor: not-allowed; }
+
+    .era-buttons { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 20px; }
+    .btn-era {
+      font-family: inherit; font-size: 10px; font-weight: 500;
+      letter-spacing: 0.08em; text-transform: uppercase;
+      color: rgba(255,255,255,0.40); background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.06); border-radius: 4px;
+      padding: 7px 14px; cursor: pointer; transition: all 0.2s;
+    }
+    .btn-era:hover { color: rgba(255,255,255,0.70); border-color: rgba(255,255,255,0.12); }
+    .btn-era.active { color: #10b981; border-color: rgba(16,185,129,0.3); background: rgba(16,185,129,0.06); }
+
+    /* ── Output Area ───────────────────────────────────────────── */
+    .output-area {
+      min-height: 200px; background: rgba(255,255,255,0.015);
+      border: 1px solid rgba(255,255,255,0.04); border-radius: 8px;
+      padding: 20px; overflow-y: auto; max-height: 520px;
+    }
+    .output-empty {
+      display: flex; align-items: center; justify-content: center;
+      height: 100%; min-height: 160px;
+      font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase;
+      color: rgba(255,255,255,0.08);
+    }
+    .output-loading {
+      display: flex; align-items: center; justify-content: center;
+      height: 100%; min-height: 160px; gap: 4px;
+    }
+    .output-loading span {
+      display: inline-block; width: 4px; height: 4px;
+      border-radius: 50%; background: rgba(255,255,255,0.30);
+    }
+    .output-loading span:nth-child(1) { animation: pulseDot 1.6s ease-in-out 0s infinite; }
+    .output-loading span:nth-child(2) { animation: pulseDot 1.6s ease-in-out 0.15s infinite; }
+    .output-loading span:nth-child(3) { animation: pulseDot 1.6s ease-in-out 0.3s infinite; }
+    .output-error { font-size: 11px; color: #ef4444; line-height: 1.6; padding: 12px; }
+
+    /* ── API Log (dynamic, after each call) ────────────────────── */
+    .api-log {
+      margin-top: 16px; padding: 12px 14px;
+      background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.04);
+      border-radius: 6px; font-size: 10px; line-height: 1.8;
+      color: rgba(255,255,255,0.25);
+    }
+    .api-log .log-method { color: rgba(16,185,129,0.60); font-weight: 600; }
+    .api-log .log-path { color: rgba(255,255,255,0.45); }
+    .api-log .log-time { color: rgba(255,255,255,0.20); }
+    .api-log .log-detail { color: rgba(255,255,255,0.15); }
+
+    /* ── Explanation line ──────────────────────────────────────── */
+    .explanation {
+      margin-top: 16px; font-size: 10px; font-weight: 400; line-height: 1.6;
+      color: rgba(255,255,255,0.18); font-style: italic; letter-spacing: 0.02em;
+    }
+
+    /* ── Behind the Scenes ─────────────────────────────────────── */
+    .bts {
+      margin-top: 32px; padding-top: 24px;
+      border-top: 1px solid rgba(255,255,255,0.04);
+    }
+    .bts-header {
+      font-size: 9px; font-weight: 600; letter-spacing: 0.2em;
+      text-transform: uppercase; color: rgba(255,255,255,0.30); margin-bottom: 20px;
+    }
+    .bts-section { margin-bottom: 20px; }
+    .bts-label {
+      font-size: 9px; font-weight: 600; letter-spacing: 0.15em;
+      text-transform: uppercase; color: rgba(255,255,255,0.45); margin-bottom: 6px;
+    }
+    .bts-text {
+      font-size: 11px; line-height: 1.8; color: rgba(255,255,255,0.55);
+    }
+    .bts-text code {
+      font-size: 10px; color: rgba(16,185,129,0.75);
+      background: rgba(16,185,129,0.08); padding: 1px 5px; border-radius: 3px;
+    }
+    .bts-text strong { color: rgba(255,255,255,0.80); font-weight: 600; }
+
+    /* ── Output content styles (same as before) ────────────────── */
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .col-header { font-size: 10px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(255,255,255,0.50); margin-bottom: 12px; padding-bottom: 6px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+    .col-section { margin-bottom: 14px; }
+    .col-section-label { font-size: 9px; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(255,255,255,0.20); margin-bottom: 4px; }
+    .col-section-text { font-size: 12px; line-height: 1.7; color: rgba(255,255,255,0.60); }
+    .col-section-text.rumor { color: rgba(252,211,77,0.45); font-style: italic; }
+    .col-section-text.unknown { color: rgba(255,255,255,0.20); font-style: italic; }
+
+    .pov-card { background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 6px; padding: 16px; }
+    .pov-name { font-size: 10px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: rgba(255,255,255,0.50); margin-bottom: 2px; }
+    .pov-role { font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255,255,255,0.20); margin-bottom: 12px; }
+    .pov-text { font-size: 12px; line-height: 1.7; color: rgba(255,255,255,0.60); font-style: italic; }
+
+    .needs-grid { display: flex; flex-direction: column; gap: 5px; }
+    .need-row { display: flex; align-items: center; gap: 8px; }
+    .need-label { font-size: 9px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255,255,255,0.30); width: 80px; text-align: right; flex-shrink: 0; }
+    .need-bar-track { flex: 1; height: 8px; background: rgba(255,255,255,0.04); border-radius: 4px; overflow: hidden; }
+    .need-bar-fill { height: 100%; border-radius: 4px; transition: width 0.6s ease; }
+    .need-bar-fill.critical   { background: rgba(239,68,68,0.6); }
+    .need-bar-fill.urgent     { background: rgba(234,179,8,0.5); }
+    .need-bar-fill.stable     { background: rgba(16,185,129,0.35); }
+    .need-bar-fill.irrelevant { background: rgba(255,255,255,0.06); }
+    .need-value { font-size: 9px; color: rgba(255,255,255,0.20); width: 24px; flex-shrink: 0; }
+    .need-dominant { margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.05); font-size: 11px; line-height: 1.6; color: rgba(255,255,255,0.50); }
+    .need-dominant strong { color: #ef4444; font-weight: 600; }
+
+    .timeline { display: flex; flex-direction: column; }
+    .tick-block { padding: 14px 0; border-bottom: 1px solid rgba(255,255,255,0.03); opacity: 0; animation: staggerIn 0.4s ease forwards; }
+    .tick-block:last-child { border-bottom: none; }
+    .tick-label { font-size: 9px; font-weight: 600; letter-spacing: 0.15em; text-transform: uppercase; color: rgba(16,185,129,0.50); margin-bottom: 8px; }
+    .tick-action { font-size: 11px; line-height: 1.7; color: rgba(255,255,255,0.50); padding-left: 12px; border-left: 2px solid rgba(255,255,255,0.06); margin-bottom: 6px; }
+    .tick-action .npc-tag { color: rgba(255,255,255,0.70); font-weight: 500; }
+
+    .event-list { display: flex; flex-direction: column; gap: 4px; }
+    .event-item { display: flex; align-items: baseline; gap: 12px; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.02); opacity: 0; animation: staggerIn 0.4s ease forwards; }
+    .event-year { font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.50); flex-shrink: 0; width: 64px; }
+    .event-text { font-size: 11px; line-height: 1.6; color: rgba(255,255,255,0.55); flex: 1; }
+    .event-badges { display: flex; gap: 4px; flex-shrink: 0; }
+    .badge { font-size: 8px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; padding: 2px 6px; border-radius: 3px; white-space: nowrap; }
+    .badge-civ { background: rgba(16,185,129,0.15); color: rgba(16,185,129,0.70); }
+    .badge-reg { background: rgba(59,130,246,0.15); color: rgba(59,130,246,0.70); }
+    .badge-local { background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.30); }
+    .badge-war { background: rgba(239,68,68,0.12); color: rgba(239,68,68,0.60); }
+    .badge-epi { background: rgba(168,85,247,0.12); color: rgba(168,85,247,0.60); }
+    .badge-fam { background: rgba(234,179,8,0.12); color: rgba(234,179,8,0.60); }
+    .badge-pol { background: rgba(59,130,246,0.12); color: rgba(59,130,246,0.60); }
+    .badge-rel { background: rgba(251,146,60,0.12); color: rgba(251,146,60,0.60); }
+    .badge-eco { background: rgba(16,185,129,0.12); color: rgba(16,185,129,0.60); }
+    .badge-nat { background: rgba(234,179,8,0.12); color: rgba(234,179,8,0.60); }
+    .badge-cul { background: rgba(168,85,247,0.12); color: rgba(168,85,247,0.60); }
+    .badge-source { background: rgba(255,255,255,0.04); color: rgba(255,255,255,0.25); }
+
+    .divergence-section { margin-bottom: 16px; }
+    .divergence-label { font-size: 9px; font-weight: 600; letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 8px; }
+    .divergence-label.canonical { color: rgba(255,255,255,0.30); }
+    .divergence-label.detected { color: rgba(239,68,68,0.60); }
+    .divergence-card { background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 6px; padding: 16px; }
+    .divergence-card.superseded { border-color: rgba(255,255,255,0.03); text-decoration: line-through; opacity: 0.4; }
+    .divergence-card.active { border-color: rgba(239,68,68,0.20); background: rgba(239,68,68,0.03); }
+    .divergence-event { font-size: 12px; line-height: 1.6; color: rgba(255,255,255,0.55); }
+    .divergence-meta { margin-top: 8px; display: flex; gap: 10px; flex-wrap: wrap; }
+    .divergence-tag { font-size: 9px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; padding: 2px 8px; border-radius: 3px; }
+    .divergence-tag.sig { background: rgba(234,179,8,0.12); color: rgba(234,179,8,0.60); }
+    .divergence-tag.consequence { background: rgba(239,68,68,0.12); color: rgba(239,68,68,0.50); }
+  </style>
+</head>
+<body>
+  <div class="noise-overlay"></div>
+
+  <header class="demo-header">
+    <span class="header-brand">Chronos</span>
+    <nav class="nav-tabs">
+      <button class="nav-tab active" onclick="showPanel(0)">1 · Ground Context</button>
+      <button class="nav-tab" onclick="showPanel(1)">2 · Asymmetry</button>
+      <button class="nav-tab" onclick="showPanel(2)">3 · Needs</button>
+      <button class="nav-tab" onclick="showPanel(3)">4 · Autonomy</button>
+      <button class="nav-tab" onclick="showPanel(4)">5 · Events DB</button>
+      <button class="nav-tab" onclick="showPanel(5)">6 · Divergence</button>
+    </nav>
+    <div class="header-status">
+      <span class="status-dot status-dot-active" id="ollamaStatus"></span>
+      <span class="status-label" id="ollamaLabel">Checking...</span>
+    </div>
+  </header>
+
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <!-- PANEL 1 — Ground Context                                    -->
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <section class="panel-page active" id="page-0">
+    <div class="panel-num">Panel 01</div>
+    <div class="panel-title">Ground Context: What A Character Knows</div>
+    <div class="panel-desc">Every game session starts by building a world. But the player never sees the world — they see the world <em>filtered through one person</em>. This panel shows you both sides: what the system built, and what the character is allowed to know.</div>
+
+    <div class="controls">
+      <div class="control-group">
+        <span class="control-label">Era</span>
+        <select id="p1-era">
+          <option value="roman_late_empire">Roman Late Empire · 410 AD</option>
+          <option value="viking_age">Viking Age · 870 AD</option>
+          <option value="crusader_states">Crusader States · 1190 AD</option>
+          <option value="black_death">Black Death · 1348 AD</option>
+          <option value="fall_of_constantinople" selected>Fall of Constantinople · 1453 AD</option>
+        </select>
+      </div>
+      <button class="btn-generate" id="p1-btn" onclick="runPanel1()">Generate</button>
+    </div>
+
+    <div class="output-area" id="p1-output"><div class="output-empty">Select an era and generate</div></div>
+    <div class="api-log" id="p1-log" style="display:none"></div>
+    <div class="explanation">Ground context is filtered by archetype and geography — a farmer's world is local, a merchant's world is wider.</div>
+
+    <div class="bts">
+      <div class="bts-header">Behind the Scenes</div>
+      <div class="bts-section">
+        <div class="bts-label">The Data Flow</div>
+        <div class="bts-text"><code>POST /api/run</code> → <code>generate_run(era_config)</code> → rolls a random character from the era's archetype pool → generates 4-6 NPCs with random personality traits → calls <strong>local LLM</strong> (<code>llama3.1:8b</code>) with <code>prompts/ground_context.md</code> to build the character's initial knowledge → saves the full <code>WorldState</code> to SQLite → returns a <code>PlayerView</code> filtered through the Knowledge Matrix.</div>
+      </div>
+      <div class="bts-section">
+        <div class="bts-label">What the LLM Sees (ground_context prompt)</div>
+        <div class="bts-text">The prompt receives: <strong>era name, year, region, player's role, archetype, location name, location description</strong>, and nearby historical events from the Events DB. It returns structured JSON: <code>era_feel</code> (what the era feels like from this person's position), <code>what_character_knows</code>, <code>local_rumors</code>, <code>material_conditions</code>, <code>recent_events_known</code>, <code>recent_events_unknown</code>. This output is stored on the WorldState and fed into every subsequent NPC prompt.</div>
+      </div>
+      <div class="bts-section">
+        <div class="bts-label">The Knowledge Matrix</div>
+        <div class="bts-text">Archetypes are tiered: <strong>high</strong> (scholar, diplomat, noble, administrator), <strong>medium</strong> (merchant, soldier, craftsman, sailor), <strong>low</strong> (farmer, servant, refugee). High-tier characters can know about events 3+ graph hops from their location. Low-tier characters only know about events at their own location. The same <code>WorldState</code> produces radically different <code>PlayerView</code>s depending on who the character is. The gap between the two columns above IS the game.</div>
+      </div>
+      <div class="bts-section">
+        <div class="bts-label">The Region Knowledge Call</div>
+        <div class="bts-text">After creating the run, the demo calls <code>GET /api/run/{id}/region/{polity}</code>. This queries the Events DB for historical events in that region, filters them through the Knowledge Matrix (same archetype tiers), and then asks the <strong>local LLM</strong> to generate a one-sentence character-voice summary. The result: <code>known_facts</code> (events the character can know), <code>rumors</code> (events they've heard about but can't confirm), and <code>ignorance_acknowledged</code> (does the character know they don't know things?).</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <!-- PANEL 2 — Information Asymmetry                             -->
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <section class="panel-page" id="page-1">
+    <div class="panel-num">Panel 02</div>
+    <div class="panel-title">Information Asymmetry: Same Event, Three Perspectives</div>
+    <div class="panel-desc">One event enters the simulation. Every NPC at the location reacts to it — but each one filters it through their own social position, archetype, personality, and emotional state. The same fact becomes three different truths.</div>
+
+    <div class="controls">
+      <div class="control-group">
+        <span class="control-label">Era</span>
+        <select id="p2-era">
+          <option value="roman_late_empire">Roman Late Empire</option>
+          <option value="viking_age">Viking Age</option>
+          <option value="crusader_states">Crusader States</option>
+          <option value="black_death">Black Death</option>
+          <option value="fall_of_constantinople" selected>Fall of Constantinople</option>
+        </select>
+      </div>
+      <div class="control-group">
+        <span class="control-label">Event</span>
+        <input type="text" id="p2-event" value="The Ottoman army has crossed the Bosphorus" />
+      </div>
+      <button class="btn-generate" id="p2-btn" onclick="runPanel2()">Generate</button>
+    </div>
+
+    <div class="output-area" id="p2-output"><div class="output-empty">Enter an event and generate</div></div>
+    <div class="api-log" id="p2-log" style="display:none"></div>
+    <div class="explanation">Same event. Three social positions. Three different versions of the truth.</div>
+
+    <div class="bts">
+      <div class="bts-header">Behind the Scenes</div>
+      <div class="bts-section">
+        <div class="bts-label">The Turn Pipeline (7 stages, every turn)</div>
+        <div class="bts-text"><strong>1.</strong> <code>simulate_turn()</code> — every NPC at the location acts autonomously <em>before</em> the player. <strong>2.</strong> <code>parse_action()</code> — LLM classifies player text into <code>action_type</code>, <code>target</code>, <code>intent</code>, <code>significance</code> (0–1), <code>npc_impacts</code>. <strong>3.</strong> <code>apply_action()</code> — update WorldState. <strong>4.</strong> Schedule consequences if significance ≥ 0.5. <strong>5.</strong> <code>check_death()</code> — can the player die from this? <strong>6.</strong> <code>generate_npc_pov()</code> — parallel LLM calls, one per relevant NPC. <strong>7.</strong> Save + build response.</div>
+      </div>
+      <div class="bts-section">
+        <div class="bts-label">What Each NPC's LLM Call Sees</div>
+        <div class="bts-text">The prompt template (<code>prompts/npc_pov.md</code>) includes: the NPC's <strong>name, role, archetype, emotional state, personality traits, relationship to the player, disposition</strong>, the player's action and its era-description, <strong>ground context</strong> (the shared world-state knowledge), and <strong>historical context</strong> retrieved from the Events DB via keyword search. Each NPC returns a 2-3 sentence first-person perspective and an emotional state update.</div>
+      </div>
+      <div class="bts-section">
+        <div class="bts-label">Why the Responses Differ</div>
+        <div class="bts-text">A soldier hears "the Ottoman army crossed the Bosphorus" and thinks about <strong>defense, deployment, and survival</strong>. A merchant thinks about <strong>trade routes closing and prices rising</strong>. A priest sees <strong>divine punishment or prophecy</strong>. The NPC voice system (<code>npc-voice-system.md</code>) enforces authentic, era-appropriate voices — small concerns over big history, vulgarity when contextually accurate, biases that match the character's position. NPCs never speak like narrators or therapists.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <!-- PANEL 3 — Needs System                                      -->
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <section class="panel-page" id="page-2">
+    <div class="panel-num">Panel 03</div>
+    <div class="panel-title">Needs System: What's Driving This NPC Right Now</div>
+    <div class="panel-desc">Every NPC has 17 internal need dimensions. They're never shown to the player — but they drive every autonomous decision. When survival drops to critical, the merchant stops trading and starts hoarding. When faith spikes during a plague, the atheist becomes a pilgrim. Behavior isn't scripted. It emerges.</div>
+
+    <div class="controls">
+      <div class="control-group">
+        <span class="control-label">Archetype</span>
+        <select id="p3-archetype">
+          <option value="farmer">Farmer</option>
+          <option value="soldier" selected>Soldier</option>
+          <option value="merchant">Merchant</option>
+          <option value="clergy">Clergy</option>
+          <option value="scholar">Scholar</option>
+        </select>
+      </div>
+      <div class="control-group">
+        <span class="control-label">Situation</span>
+        <select id="p3-situation">
+          <option value="siege">Siege</option>
+          <option value="famine">Famine</option>
+          <option value="peace" selected>Peace</option>
+          <option value="plague">Plague</option>
+          <option value="political_crisis">Political Crisis</option>
+        </select>
+      </div>
+      <button class="btn-generate" id="p3-btn" onclick="runPanel3()">Generate</button>
+    </div>
+
+    <div class="output-area" id="p3-output"><div class="output-empty">Select archetype and situation</div></div>
+    <div class="explanation">Behavior isn't scripted — it emerges from need states. Critical survival needs override ambition. Always.</div>
+
+    <div class="bts">
+      <div class="bts-header">Behind the Scenes</div>
+      <div class="bts-section">
+        <div class="bts-label">No API Call — Pure Simulation Logic</div>
+        <div class="bts-text">This panel runs entirely client-side, mirroring the logic in <code>backend/npc_personality.py</code>. In the real game, needs are computed server-side and <strong>never sent to the player</strong>. The player only sees behavior that emerges from needs — they never see the numbers.</div>
+      </div>
+      <div class="bts-section">
+        <div class="bts-label">The 17 Dimensions</div>
+        <div class="bts-text"><strong>survival</strong>, <strong>safety</strong>, <strong>family</strong>, <strong>social</strong>, <strong>trade</strong>, <strong>profit</strong>, <strong>power</strong>, <strong>reputation</strong>, <strong>honor</strong>, <strong>duty</strong>, <strong>loyalty</strong>, <strong>faith</strong>, <strong>knowledge</strong>, <strong>order</strong>, <strong>community</strong>, <strong>harvest</strong>, <strong>stability</strong>. Each archetype starts with different base values — a farmer has harvest=70 and knowledge=10, a scholar has the inverse. Personality traits (randomly generated per NPC) add further variation.</div>
+      </div>
+      <div class="bts-section">
+        <div class="bts-label">Urgency Thresholds</div>
+        <div class="bts-text"><strong>Below 15 = critical</strong> (red). The NPC will abandon everything else to address this. <strong>Below 30 = urgent</strong> (amber). This need shapes most decisions. <strong>30+ = stable</strong> (green). Met needs don't drive behavior. The <code>get_dominant_need()</code> function returns the minimum value — the most starved dimension. The <code>get_urgent_needs()</code> function returns all needs below 30, sorted ascending.</div>
+      </div>
+      <div class="bts-section">
+        <div class="bts-label">How Needs Drive the LLM</div>
+        <div class="bts-text">In the actual game, the autonomous action prompt (<code>prompts/autonomous_action.md</code>) includes the NPC's <strong>top 3 urgent needs</strong> by name and value. The LLM generates actions that address those needs. A starving farmer tries to find food. A soldier with critical loyalty organizes a defense. A merchant with urgent trade needs seeks a buyer. The LLM doesn't "decide" to be interesting — the need state constrains it into contextually appropriate behavior.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <!-- PANEL 4 — NPC Autonomy                                      -->
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <section class="panel-page" id="page-3">
+    <div class="panel-num">Panel 04</div>
+    <div class="panel-title">NPC Autonomy: The World Without You</div>
+    <div class="panel-desc">The simulation advances whether you act or not. Every NPC gets a full LLM call every turn — they're not scripted, they're simulated. This panel runs 3 turns where the player does nothing. Watch what happens anyway.</div>
+
+    <div class="controls">
+      <div class="control-group">
+        <span class="control-label">Era</span>
+        <select id="p4-era">
+          <option value="roman_late_empire">Roman Late Empire</option>
+          <option value="viking_age">Viking Age</option>
+          <option value="crusader_states" selected>Crusader States</option>
+          <option value="black_death">Black Death</option>
+          <option value="fall_of_constantinople">Fall of Constantinople</option>
+        </select>
+      </div>
+      <button class="btn-generate" id="p4-btn" onclick="runPanel4()">Simulate 3 Turns</button>
+    </div>
+
+    <div class="output-area" id="p4-output"><div class="output-empty">Click simulate to advance 3 turns</div></div>
+    <div class="api-log" id="p4-log" style="display:none"></div>
+    <div class="explanation">Nobody waited. The world advanced 3 turns. The player did nothing.</div>
+
+    <div class="bts">
+      <div class="bts-header">Behind the Scenes</div>
+      <div class="bts-section">
+        <div class="bts-label">What Happens Each Tick</div>
+        <div class="bts-text"><code>POST /api/run/{id}/turn</code> with "I wait and observe silently." The action parser returns <code>is_inaction: true</code> — but <code>simulate_turn()</code> still runs first. For <strong>every NPC at the location</strong>, the backend calls <code>generate_autonomous_action()</code> via the local LLM. Each NPC decides independently: what to do, who to interact with, whether to travel, and how their mood shifts. These decisions update the WorldState before the player's non-action is processed.</div>
+      </div>
+      <div class="bts-section">
+        <div class="bts-label">The Autonomous Action Prompt</div>
+        <div class="bts-text"><code>prompts/autonomous_action.md</code> gives each NPC: their name, role, personality, <strong>top 3 urgent needs</strong>, emotional state, who else is present, location description, recent events, and ground context. The LLM returns JSON: <code>action</code> (what they do — narrated, not "thinking"), <code>interacts_with</code> (name or null), <code>wants_to_travel</code>, <code>travel_destination</code>, <code>mood_shift</code>. NPCs can and do leave locations, build relationships, and change emotional state without any player involvement.</div>
+      </div>
+      <div class="bts-section">
+        <div class="bts-label">Why 3 Turns, Not /skip</div>
+        <div class="bts-text">The <code>/skip</code> endpoint advances the world but only returns a summary. By running 3 individual inaction turns, we get the <code>ambient_activity</code> array from each tick — the detailed list of what every NPC did. That's why you see the activity appearing tick by tick: each one is a separate round-trip to the server where the full simulation runs.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <!-- PANEL 5 — Historical Events                                 -->
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <section class="panel-page" id="page-4">
+    <div class="panel-num">Panel 05</div>
+    <div class="panel-title">Historical Events: The Events DB Live</div>
+    <div class="panel-desc">Every era is seeded with real historical events before the simulation begins. Hand-curated seed events combined with automated Wikidata discovery and Wikipedia enrichment. No LLM needed for this call — pure database query.</div>
+
+    <div class="era-buttons">
+      <button class="btn-era" onclick="runPanel5('roman_late_empire',this)">Roman Empire</button>
+      <button class="btn-era" onclick="runPanel5('viking_age',this)">Viking Age</button>
+      <button class="btn-era" onclick="runPanel5('crusader_states',this)">Crusader States</button>
+      <button class="btn-era" onclick="runPanel5('black_death',this)">Black Death</button>
+      <button class="btn-era" onclick="runPanel5('fall_of_constantinople',this)">Constantinople</button>
+    </div>
+
+    <div class="output-area" id="p5-output"><div class="output-empty">Click an era to load events</div></div>
+    <div class="api-log" id="p5-log" style="display:none"></div>
+    <div class="explanation">1,500+ hand-curated historical events. Every era starts from real history before it diverges.</div>
+
+    <div class="bts">
+      <div class="bts-header">Behind the Scenes</div>
+      <div class="bts-section">
+        <div class="bts-label">The API Call</div>
+        <div class="bts-text"><code>POST /api/run/preview</code> — no LLM call, no run creation. The backend queries <code>historical_events</code> in SQLite: <code>SELECT * WHERE year BETWEEN {era_start - 55} AND {era_start + 5}</code>, filters for civilizational + regional significance, deduplicates by text and year, sorts chronologically, returns up to 6. Response includes both formatted strings (<code>loading_events</code>) and structured objects (<code>loading_events_structured</code>) with year, event, significance, and type.</div>
+      </div>
+      <div class="bts-section">
+        <div class="bts-label">How the Events DB Was Built</div>
+        <div class="bts-text"><code>scripts/build_events_db.py</code> builds in three layers. <strong>Layer 1:</strong> Hand-curated seed events (<code>seeds/*.json</code>) — ~30-40 per era, covering the most important events with accurate dates and classifications. <strong>Layer 2:</strong> Wikidata SPARQL queries that discover additional events by era, region, and type (wars, epidemics, famines, political events). <strong>Layer 3:</strong> Wikipedia enrichment — each Wikidata event gets context from the article intro, then LLM classification for significance and type.</div>
+      </div>
+      <div class="bts-section">
+        <div class="bts-label">Event Schema</div>
+        <div class="bts-text">Each event has: <code>year</code>, <code>region</code>, <code>event</code> (text), <code>significance</code> (civilizational / regional / local), <code>type</code> (war / epidemic / famine / political / religious / economic / natural_disaster / cultural), <code>affects</code> (list of entities), <code>canonical</code> (true = real history, false = game-generated), <code>wikidata_qid</code> (source linkage).</div>
+      </div>
+      <div class="bts-section">
+        <div class="bts-label">What These Events Do In the Game</div>
+        <div class="bts-text"><strong>1.</strong> Seed the loading screen while character generation runs. <strong>2.</strong> Populate the player's <code>confirmed_events</code> and <code>rumors</code> in PlayerView, filtered by the Knowledge Matrix. <strong>3.</strong> Serve as the canonical baseline for <strong>divergence detection</strong> — when you change history in Panel 6, these are the events you're contradicting.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <!-- PANEL 6 — Historical Divergence                              -->
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <section class="panel-page" id="page-5">
+    <div class="panel-num">Panel 06</div>
+    <div class="panel-title">Historical Divergence: When You Change History</div>
+    <div class="panel-desc">The simulation starts from real history. But players can contradict it. When a player action contradicts a canonical event, the system detects the divergence, supersedes the original timeline, and cancels downstream consequences. Alternative history begins.</div>
+
+    <div class="controls">
+      <div class="control-group">
+        <span class="control-label">Era</span>
+        <select id="p6-era" disabled>
+          <option value="fall_of_constantinople" selected>Fall of Constantinople · 1453 AD</option>
+        </select>
+      </div>
+      <button class="btn-generate" id="p6-btn" onclick="runPanel6()" style="background:rgba(239,68,68,0.15);color:rgba(239,68,68,0.80);">Prevent the Siege</button>
+    </div>
+
+    <div class="output-area" id="p6-output"><div class="output-empty">Click to attempt changing history</div></div>
+    <div class="api-log" id="p6-log" style="display:none"></div>
+    <div class="explanation">The system detected a contradiction with canonical history. Downstream consequences were superseded. Alternative history begins.</div>
+
+    <div class="bts">
+      <div class="bts-header">Behind the Scenes</div>
+      <div class="bts-section">
+        <div class="bts-label">The Divergence Detection Pipeline</div>
+        <div class="bts-text"><strong>1.</strong> <code>parse_action()</code> — LLM scores significance (0–1). A peace negotiation about Constantinople scores 0.7–0.9. <strong>2.</strong> If significance ≥ 0.6, <code>_check_historical_divergence()</code> fires. <strong>3.</strong> Detection is <strong>pure heuristic</strong> (no LLM): maps <code>action_type</code> to <code>event_type</code> (negotiate → political), queries canonical events within ±5 years of the current year. <strong>4.</strong> For each canonical event, checks if the action's <code>target</code> appears in the event text. <strong>5.</strong> If match: records divergence on <code>WorldState.historical_divergences</code>, calls <code>mark_consequence_superseded_mem()</code>.</div>
+      </div>
+      <div class="bts-section">
+        <div class="bts-label">The Consequence Queue</div>
+        <div class="bts-text">Significant player actions (significance ≥ 0.5) schedule future consequences via <code>ScheduledConsequence</code> objects. Each has: <code>trigger_turn</code> (when it fires), <code>effect_type</code>, <code>effect_payload</code>, <code>source_event_id</code>, and a <code>superseded</code> flag. When a divergence supersedes a canonical event, all unfired consequences linked to that event's ID are cancelled. The consequence queue is how the game makes history feel consequential — actions ripple forward in time.</div>
+      </div>
+      <div class="bts-section">
+        <div class="bts-label">What the Player Just Did</div>
+        <div class="bts-text">The player negotiated peace between Mehmed II and Constantine XI. The system detected that this contradicts the canonical event "Fall of Constantinople" (1453). The original timeline — where the Theodosian Walls are breached and the Byzantine Empire ends — is <strong>struck through</strong>. Any scheduled consequences of the fall (Ottoman expansion into the Balkans, collapse of Eastern trade routes, refugee movements) are <strong>superseded</strong>. From this turn forward, the simulation must reckon with a world where Constantinople still stands.</div>
+      </div>
+    </div>
+  </section>
+
+  <script>
+    const API = '';
+    const panelRuns = {};
+
+    // ── Navigation ────────────────────────────────────────────
+    function showPanel(idx) {
+      document.querySelectorAll('.panel-page').forEach((p, i) => {
+        p.classList.toggle('active', i === idx);
+      });
+      document.querySelectorAll('.nav-tab').forEach((t, i) => {
+        t.classList.toggle('active', i === idx);
+      });
+    }
+    document.addEventListener('keydown', e => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+      const n = parseInt(e.key);
+      if (n >= 1 && n <= 6) showPanel(n - 1);
+      if (e.key === 'ArrowRight') {
+        const cur = [...document.querySelectorAll('.nav-tab')].findIndex(t => t.classList.contains('active'));
+        if (cur < 5) showPanel(cur + 1);
+      }
+      if (e.key === 'ArrowLeft') {
+        const cur = [...document.querySelectorAll('.nav-tab')].findIndex(t => t.classList.contains('active'));
+        if (cur > 0) showPanel(cur - 1);
+      }
+    });
+
+    // ── Helpers ───────────────────────────────────────────────
+    function showLoading(el) { el.innerHTML = '<div class="output-loading"><span></span><span></span><span></span></div>'; }
+    function showError(el, msg) { el.innerHTML = `<div class="output-error">${esc(msg)}</div>`; }
+    function showEmpty(el, msg) { el.innerHTML = `<div class="output-empty">${esc(msg)}</div>`; }
+    function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+    function disableBtn(id) { document.getElementById(id).disabled = true; }
+    function enableBtn(id) { document.getElementById(id).disabled = false; }
+
+    async function apiPost(path, body = {}) {
+      const t0 = performance.now();
+      const r = await fetch(API + path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const ms = Math.round(performance.now() - t0);
+      if (!r.ok) throw new Error(`${r.status}: ${await r.text()}`);
+      return { data: await r.json(), ms, status: r.status };
+    }
+    async function apiGet(path) {
+      const t0 = performance.now();
+      const r = await fetch(API + path);
+      const ms = Math.round(performance.now() - t0);
+      if (!r.ok) throw new Error(`${r.status}: ${await r.text()}`);
+      return { data: await r.json(), ms, status: r.status };
+    }
+
+    function logApi(logEl, entries) {
+      logEl.style.display = 'block';
+      logEl.innerHTML = entries.map(e =>
+        `<span class="log-method">${e.method}</span> <span class="log-path">${esc(e.path)}</span> <span class="log-time">${e.ms}ms</span>${e.detail ? ` <span class="log-detail">· ${esc(e.detail)}</span>` : ''}`
+      ).join('<br>');
+    }
+
+    // ── Health ────────────────────────────────────────────────
+    (async () => {
+      try {
+        const { data: h } = await apiGet('/api/health');
+        document.getElementById('ollamaStatus').className = `status-dot ${h.ollama ? 'status-dot-active' : 'status-dot-warn'}`;
+        document.getElementById('ollamaLabel').textContent = h.ollama ? 'Ollama connected' : 'Ollama offline';
+      } catch {
+        document.getElementById('ollamaStatus').className = 'status-dot status-dot-critical';
+        document.getElementById('ollamaLabel').textContent = 'Backend unreachable';
+      }
+    })();
+
+    // ── Panel 1: Ground Context ──────────────────────────────
+    async function runPanel1() {
+      const out = document.getElementById('p1-output');
+      const log = document.getElementById('p1-log');
+      const era = document.getElementById('p1-era').value;
+      disableBtn('p1-btn'); showLoading(out); log.style.display = 'none';
+      const logs = [];
+
+      try {
+        const { data: runData, ms: runMs } = await apiPost('/api/run', { era });
+        const runId = runData.run_id;
+        const pv = runData.player_view;
+        const loc = pv.current_location;
+        logs.push({ method: 'POST', path: '/api/run', ms: runMs, detail: `run_id=${runId}, character=${pv.player_role} (${pv.player_archetype})` });
+
+        let regionData = null;
+        try {
+          const regionPath = `/api/run/${runId}/region/${encodeURIComponent(loc.name)}`;
+          const { data: rd, ms: rdMs } = await apiGet(regionPath);
+          regionData = rd;
+          logs.push({ method: 'GET', path: regionPath, ms: rdMs, detail: `${rd.known_facts.length} facts, ${rd.rumors.length} rumors` });
+        } catch {}
+
+        logApi(log, logs);
+
+        const knownFacts = regionData ? regionData.known_facts : [];
+        const rumors = regionData ? regionData.rumors : (pv.rumors || []).map(r => r.description);
+        const charNote = regionData ? regionData.character_note : '';
+        const ignorance = regionData ? regionData.ignorance_acknowledged : false;
+
+        let html = '<div class="two-col">';
+        html += '<div>';
+        html += `<div class="col-header">What ${esc(pv.player_name)} knows</div>`;
+        html += `<div class="col-section"><div class="col-section-label">Character</div><div class="col-section-text" style="color:rgba(255,255,255,0.75)">${esc(pv.player_role)}</div><div class="col-section-text" style="font-size:10px;color:rgba(255,255,255,0.25);margin-top:2px">${esc(pv.player_archetype)} · ${esc(pv.player_location)}</div></div>`;
+        html += `<div class="col-section"><div class="col-section-label">Era Feel</div><div class="col-section-text">${esc(pv.era_description)}</div></div>`;
+        html += `<div class="col-section"><div class="col-section-label">Material Conditions</div><div class="col-section-text">${esc(loc.description || 'No description available.')}</div></div>`;
+        if (knownFacts.length) { html += '<div class="col-section"><div class="col-section-label">Known Facts</div>'; knownFacts.forEach(f => { html += `<div class="col-section-text">· ${esc(f)}</div>`; }); html += '</div>'; }
+        if (rumors.length) { html += '<div class="col-section"><div class="col-section-label">Local Rumors</div>'; rumors.forEach(r => { html += `<div class="col-section-text rumor">· ${esc(r)}</div>`; }); html += '</div>'; }
+        if (charNote) { html += `<div class="col-section"><div class="col-section-label">Character Note</div><div class="col-section-text">${esc(charNote)}</div></div>`; }
+        html += '</div>';
+
+        html += '<div>';
+        html += `<div class="col-header">What ${esc(pv.player_name)} doesn't know</div>`;
+        if (ignorance) html += `<div class="col-section"><div class="col-section-text unknown">As a ${esc(pv.player_archetype)}, this character has limited awareness of events beyond their immediate surroundings.</div></div>`;
+        html += `<div class="col-section"><div class="col-section-label">Beyond their reach</div><div class="col-section-text unknown">Political machinations at court, military movements beyond the horizon, trade disputes in distant ports — all invisible to a ${esc(pv.player_archetype)}.</div></div>`;
+        const neighbors = loc.neighbors ? Object.keys(loc.neighbors) : [];
+        const unvisited = neighbors.filter(n => !(pv.visited_locations || []).includes(n));
+        if (unvisited.length) html += `<div class="col-section"><div class="col-section-label">Unvisited Neighbors</div><div class="col-section-text unknown">${unvisited.join(', ')}</div></div>`;
+        html += '</div></div>';
+
+        out.innerHTML = html;
+        fetch(API + `/api/run/${runId}`, { method: 'DELETE' }).catch(() => {});
+      } catch (e) { showError(out, e.message); }
+      enableBtn('p1-btn');
+    }
+
+    // ── Panel 2: Information Asymmetry ───────────────────────
+    async function runPanel2() {
+      const out = document.getElementById('p2-output');
+      const log = document.getElementById('p2-log');
+      const era = document.getElementById('p2-era').value;
+      const event = document.getElementById('p2-event').value.trim();
+      if (!event) { showError(out, 'Enter an event first'); return; }
+      disableBtn('p2-btn'); showLoading(out); log.style.display = 'none';
+      const logs = [];
+
+      try {
+        const { data: runData, ms: runMs } = await apiPost('/api/run', { era });
+        logs.push({ method: 'POST', path: '/api/run', ms: runMs, detail: `run_id=${runData.run_id}` });
+
+        const turnPath = `/api/run/${runData.run_id}/turn`;
+        const { data: turnData, ms: turnMs } = await apiPost(turnPath, { player_input: `I tell everyone nearby what I have heard: ${event}` });
+        const npcs = turnData.npc_responses || [];
+        const ambient = turnData.ambient_activity || [];
+        logs.push({ method: 'POST', path: turnPath, ms: turnMs, detail: `${npcs.length} NPC POVs, ${ambient.length} ambient actions` });
+        logApi(log, logs);
+
+        const sources = [];
+        npcs.forEach(n => sources.push({ name: n.npc_name, role: n.npc_role, text: n.pov }));
+        ambient.forEach(a => { if (sources.length < 3 && !sources.find(s => s.name === a.npc_name)) sources.push({ name: a.npc_name, role: a.npc_role, text: a.activity }); });
+
+        if (!sources.length) { showEmpty(out, 'No NPC responses — try a different era or event'); enableBtn('p2-btn'); return; }
+
+        const cols = Math.min(sources.length, 3);
+        let html = `<div style="display:grid;grid-template-columns:repeat(${cols},1fr);gap:14px;">`;
+        sources.slice(0, 3).forEach((s, i) => {
+          html += `<div class="pov-card" style="opacity:0;animation:staggerIn 0.4s ease ${i * 200}ms forwards"><div class="pov-name">${esc(s.name)}</div><div class="pov-role">${esc(s.role)}</div><div class="pov-text">"${esc(s.text)}"</div></div>`;
+        });
+        html += '</div>';
+        out.innerHTML = html;
+        fetch(API + `/api/run/${runData.run_id}`, { method: 'DELETE' }).catch(() => {});
+      } catch (e) { showError(out, e.message); }
+      enableBtn('p2-btn');
+    }
+
+    // ── Panel 3: Needs System ────────────────────────────────
+    const NEED_NAMES = ['survival','safety','family','social','trade','profit','power','reputation','honor','duty','loyalty','faith','knowledge','order','community','harvest','stability'];
+    const ARCHETYPE_BASES = {
+      farmer:   {survival:50,safety:45,family:65,social:35,trade:15,profit:10,power:5,reputation:15,honor:20,duty:30,loyalty:35,faith:45,knowledge:10,order:30,community:55,harvest:65,stability:55},
+      soldier:  {survival:35,safety:30,family:25,social:30,trade:10,profit:15,power:25,reputation:30,honor:55,duty:60,loyalty:55,faith:30,knowledge:10,order:45,community:20,harvest:5,stability:30},
+      merchant: {survival:50,safety:40,family:35,social:50,trade:60,profit:55,power:20,reputation:45,honor:25,duty:20,loyalty:25,faith:20,knowledge:40,order:30,community:30,harvest:5,stability:45},
+      clergy:   {survival:50,safety:45,family:20,social:40,trade:10,profit:5,power:15,reputation:40,honor:35,duty:55,loyalty:35,faith:65,knowledge:45,order:50,community:50,harvest:5,stability:45},
+      scholar:  {survival:45,safety:40,family:25,social:40,trade:10,profit:10,power:10,reputation:45,honor:30,duty:30,loyalty:25,faith:25,knowledge:65,order:45,community:25,harvest:5,stability:45},
+    };
+    const SIT_MODS = {
+      siege:            {survival:-30,safety:-35,family:-15,trade:-25,profit:-20,honor:10,duty:15,loyalty:10,stability:-25},
+      famine:           {survival:-35,safety:-20,family:-10,trade:-15,profit:-15,harvest:-40,community:-10,stability:-20},
+      peace:            {survival:10,safety:15,family:10,social:10,trade:10,profit:5,stability:15,community:10},
+      plague:           {survival:-40,safety:-30,family:-20,social:-25,faith:15,knowledge:5,community:-15,stability:-30},
+      political_crisis: {safety:-15,power:15,reputation:10,duty:10,loyalty:-10,order:-20,stability:-25},
+    };
+    const RELEVANCE = {
+      farmer:   new Set(['survival','safety','family','harvest','community','stability','faith']),
+      soldier:  new Set(['survival','safety','duty','loyalty','honor','order']),
+      merchant: new Set(['survival','trade','profit','reputation','social','stability','knowledge']),
+      clergy:   new Set(['survival','faith','duty','community','order','reputation','knowledge']),
+      scholar:  new Set(['survival','knowledge','reputation','social','order','stability']),
+    };
+    const STABLE_TEXT = {
+      farmer:   'needs are met — they tend the fields, mind the family, and keep their head down.',
+      soldier:  'needs are met — they drill, maintain equipment, and hold position. Discipline fills the quiet.',
+      merchant: 'needs are met — they count ledgers, cultivate contacts, and scout for the next deal.',
+      clergy:   'needs are met — they tend the flock, keep the rituals, and listen for trouble in the parish.',
+      scholar:  'needs are met — they read, write, and argue. Reputation is the slow game.',
+    };
+
+    function runPanel3() {
+      const out = document.getElementById('p3-output');
+      const arch = document.getElementById('p3-archetype').value;
+      const sit = document.getElementById('p3-situation').value;
+      const base = { ...ARCHETYPE_BASES[arch] };
+      const mods = SIT_MODS[sit] || {};
+      Object.keys(mods).forEach(k => { base[k] = Math.max(0, Math.min(100, (base[k] || 50) + mods[k])); });
+
+      const rel = RELEVANCE[arch] || new Set(NEED_NAMES);
+      const relNames = NEED_NAMES.filter(n => rel.has(n));
+      const irrelNames = NEED_NAMES.filter(n => !rel.has(n));
+      const displayOrder = [...relNames, ...irrelNames];
+
+      const relevant = relNames.map(n => ({ name: n, value: base[n] || 50 })).sort((a, b) => a.value - b.value);
+      const criticals = relevant.filter(s => s.value < 15);
+      const urgents = relevant.filter(s => s.value >= 15 && s.value < 30);
+
+      let html = '<div class="needs-grid">';
+      displayOrder.forEach(n => {
+        const v = base[n] || 50;
+        const isRelevant = rel.has(n);
+        const barWidth = 100 - v;
+        const cls = isRelevant ? (v < 15 ? 'critical' : v < 30 ? 'urgent' : 'stable') : 'irrelevant';
+        const rowStyle = isRelevant ? '' : ' style="opacity:0.25"';
+        html += `<div class="need-row"${rowStyle}><span class="need-label">${n}</span><div class="need-bar-track"><div class="need-bar-fill ${cls}" style="width:${barWidth}%"></div></div><span class="need-value">${v}</span></div>`;
+      });
+      html += '</div>';
+
+      const sitName = sit.replace('_', ' ');
+      let beh;
+      if (criticals.length) beh = `During ${sitName}, this ${arch}'s <strong>${criticals.map(c=>c.name).join(', ')}</strong> ${criticals.length===1?'is':'are'} critical. Everything else stops until ${criticals.length===1?'it is':'they are'} addressed.`;
+      else if (urgents.length) beh = `In ${sitName}, <strong>${urgents.map(u=>u.name).join(', ')}</strong> ${urgents.length===1?'is':'are'} under pressure for this ${arch}. Decisions bend toward resolving ${urgents.length===1?'it':'them'}.`;
+      else beh = `In ${sitName}, this ${arch}'s ${STABLE_TEXT[arch] || 'needs are broadly stable.'}`;
+      html += `<div class="need-dominant">${beh}</div>`;
+      out.innerHTML = html;
+    }
+
+    // ── Panel 4: NPC Autonomy (progressive output) ───────────
+    async function runPanel4() {
+      const out = document.getElementById('p4-output');
+      const log = document.getElementById('p4-log');
+      const era = document.getElementById('p4-era').value;
+      disableBtn('p4-btn'); log.style.display = 'none';
+      out.innerHTML = '<div class="timeline" id="p4-timeline"></div>';
+      const timeline = document.getElementById('p4-timeline');
+      const logs = [];
+
+      try {
+        const { data: runData, ms: runMs } = await apiPost('/api/run', { era });
+        const runId = runData.run_id;
+        logs.push({ method: 'POST', path: '/api/run', ms: runMs, detail: `run_id=${runId}` });
+
+        for (let i = 0; i < 3; i++) {
+          const turnPath = `/api/run/${runId}/turn`;
+          const { data: td, ms: tMs } = await apiPost(turnPath, { player_input: 'I wait and observe silently.' });
+          const amb = td.ambient_activity || [];
+          logs.push({ method: 'POST', path: turnPath, ms: tMs, detail: `tick ${i+1}: ${amb.length} NPC actions` });
+          logApi(log, logs);
+
+          const block = document.createElement('div');
+          block.className = 'tick-block';
+          block.style.animationDelay = '0ms';
+          let bhtml = `<div class="tick-label">Turn ${i + 1} · ${td.player_view.current_year} AD</div>`;
+          if (!amb.length) bhtml += '<div class="tick-action">The area is quiet.</div>';
+          amb.forEach(a => { bhtml += `<div class="tick-action"><span class="npc-tag">${esc(a.npc_name)}</span> ${esc(a.activity)}</div>`; });
+          block.innerHTML = bhtml;
+          timeline.appendChild(block);
+        }
+
+        fetch(API + `/api/run/${runId}`, { method: 'DELETE' }).catch(() => {});
+      } catch (e) { showError(out, e.message); }
+      enableBtn('p4-btn');
+    }
+
+    // ── Panel 5: Historical Events ───────────────────────────
+    const SIG_BADGES = { civilizational: 'badge-civ', regional: 'badge-reg', local: 'badge-local' };
+    const TYPE_BADGES = { war: 'badge-war', epidemic: 'badge-epi', famine: 'badge-fam', political: 'badge-pol', religious: 'badge-rel', economic: 'badge-eco', natural_disaster: 'badge-nat', cultural: 'badge-cul' };
+
+    async function runPanel5(era, btnEl) {
+      document.querySelectorAll('.btn-era').forEach(b => b.classList.remove('active'));
+      if (btnEl) btnEl.classList.add('active');
+      const out = document.getElementById('p5-output');
+      const log = document.getElementById('p5-log');
+      showLoading(out); log.style.display = 'none';
+
+      try {
+        const { data, ms } = await apiPost('/api/run/preview', { era });
+        const structured = data.loading_events_structured || [];
+        const fallback = data.loading_events || [];
+        const voices = data.loading_voices || [];
+        const useS = structured.length > 0;
+        logApi(log, [{ method: 'POST', path: '/api/run/preview', ms, detail: `${(useS ? structured : fallback).length} events, ${useS ? 'structured' : 'fallback strings'}` }]);
+
+        const events = useS ? structured : fallback.map(s => { const p = s.split(' \u2014 '); return { year: parseInt(p[0]) || p[0], event: p.slice(1).join(' \u2014 ') || s, significance: '', type: '' }; });
+        if (!events.length) { showEmpty(out, 'No events for this era'); return; }
+
+        let html = '<div class="event-list">';
+        events.forEach((e, idx) => {
+          html += `<div class="event-item" style="animation-delay:${idx * 120}ms"><span class="event-year">${esc(String(e.year))} AD</span><span class="event-text">${esc(e.event)}</span><div class="event-badges">`;
+          if (e.significance && SIG_BADGES[e.significance]) html += `<span class="badge ${SIG_BADGES[e.significance]}">${esc(e.significance)}</span>`;
+          if (e.type && TYPE_BADGES[e.type]) html += `<span class="badge ${TYPE_BADGES[e.type]}">${esc(e.type)}</span>`;
+          html += `<span class="badge badge-source">${useS ? 'Events DB' : 'Fallback'}</span></div></div>`;
+        });
+        html += '</div>';
+        if (voices.length) {
+          html += '<div style="margin-top:18px;padding-top:14px;border-top:1px solid rgba(255,255,255,0.03);">';
+          voices.slice(0, 2).forEach(v => { html += `<div style="font-size:11px;line-height:1.7;color:rgba(255,255,255,0.35);font-style:italic;margin-bottom:6px;">"${esc(v.quote)}" <span style="color:rgba(255,255,255,0.15);font-style:normal;margin-left:8px;">\u2014 ${esc(v.source)}</span></div>`; });
+          html += '</div>';
+        }
+        out.innerHTML = html;
+      } catch (e) { showError(out, e.message); }
+    }
+
+    // ── Panel 6: Historical Divergence ───────────────────────
+    const P6_PREFERRED = new Set(['merchant','sailor','diplomat','administrator']);
+    const P6_ACTION = {
+      merchant: (n, r) => `As ${r}, ${n} leverages trade relationships with both Ottoman and Byzantine courts to broker a peace. Through networks spanning both empires, ${n} arranges a secret meeting between Mehmed's grand vizier and Constantine's chief minister and proposes terms: Constantinople as a shared capital under joint governance, the city's commerce preserved, no siege.`,
+      sailor:   (n, r) => `As ${r} commanding ships in the strait, ${n} sends word to both Mehmed II and Emperor Constantine: no vessel moves until they negotiate. ${n} proposes terms — Constantinople under shared governance, free passage for all trade, Byzantine sovereignty preserved under Ottoman suzerainty.`,
+      scholar:  (n, r) => `As ${r}, ${n} uncovers an ancient precedent for shared governance in the monastery archives and brings it to the Patriarch, who sees an opening. ${n} is dispatched as unofficial envoy to Mehmed's camp to propose shared governance of Constantinople.`,
+      artisan:  (n, r) => `As ${r} commissioned to create works for the Sultan's court, ${n} carries a hidden letter from Emperor Constantine proposing peace — Constantinople preserved under shared governance, churches and mosques standing side by side, no blood.`,
+    };
+    function p6Action(pv) {
+      const a = pv.player_archetype;
+      const fn = P6_ACTION[a] || P6_ACTION.merchant;
+      return fn(pv.player_name, pv.player_role);
+    }
+
+    async function runPanel6() {
+      const out = document.getElementById('p6-output');
+      const log = document.getElementById('p6-log');
+      disableBtn('p6-btn'); showLoading(out); log.style.display = 'none';
+      const logs = [];
+
+      try {
+        let runData, runMs, attempts = 0;
+        do {
+          if (runData) fetch(API + `/api/run/${runData.run_id}`, { method: 'DELETE' }).catch(() => {});
+          const res = await apiPost('/api/run', { era: 'fall_of_constantinople' });
+          runData = res.data; runMs = res.ms; attempts++;
+        } while (!P6_PREFERRED.has(runData.player_view.player_archetype) && attempts < 5);
+
+        const pv = runData.player_view;
+        logs.push({ method: 'POST', path: '/api/run', ms: runMs, detail: `run_id=${runData.run_id}, character=${pv.player_role} (${pv.player_archetype})${attempts > 1 ? `, ${attempts} attempts` : ''}` });
+
+        const actionText = p6Action(pv);
+        const turnPath = `/api/run/${runData.run_id}/turn`;
+        const { data: td, ms: turnMs } = await apiPost(turnPath, { player_input: actionText });
+        const parsed = td.parsed_action || {};
+        const sig = parsed.significance_score || 0;
+        const divergences = td.divergences || [];
+        logs.push({ method: 'POST', path: turnPath, ms: turnMs, detail: `significance=${(sig*100).toFixed(0)}%, divergences=${divergences.length}, npc_responses=${(td.npc_responses||[]).length}` });
+        logApi(log, logs);
+
+        let html = '';
+        if (divergences.length) {
+          divergences.forEach(d => {
+            html += `<div class="divergence-section"><div class="divergence-label canonical">Canonical History — Superseded</div><div class="divergence-card superseded"><div class="divergence-event">${esc(d.canonical_event)}</div></div></div>`;
+            html += `<div class="divergence-section"><div class="divergence-label detected">Divergence Detected</div><div class="divergence-card active"><div class="divergence-event">${esc(d.player_action || parsed.era_description || parsed.intent || '')}</div><div class="divergence-meta"><span class="divergence-tag sig">Significance: ${(d.significance*100).toFixed(0)}%</span><span class="divergence-tag consequence">${d.superseded ? 'Consequences superseded' : 'Monitored'}</span></div></div></div>`;
+          });
+        } else {
+          html += `<div class="divergence-section"><div class="divergence-label canonical">Canonical History</div><div class="divergence-card"><div class="divergence-event">1453 AD \u2014 The Fall of Constantinople. Sultan Mehmed II breaches the Theodosian Walls. Emperor Constantine XI dies in the final defense. The Byzantine Empire ends after 1,100 years.</div></div></div>`;
+          html += `<div class="divergence-section"><div class="divergence-label" style="color:rgba(234,179,8,0.60)">Player Action (sig ${(sig*100).toFixed(0)}% — threshold not met or no keyword match)</div><div class="divergence-card"><div class="divergence-event">${esc(parsed.era_description || parsed.intent || '')}</div><div class="divergence-meta"><span class="divergence-tag sig">Significance: ${(sig*100).toFixed(0)}%</span><span class="badge badge-source">No divergence detected</span></div></div></div>`;
+        }
+
+        if (td.npc_responses && td.npc_responses.length) {
+          html += '<div style="margin-top:14px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.03);"><div style="font-size:9px;font-weight:500;letter-spacing:0.12em;text-transform:uppercase;color:rgba(255,255,255,0.20);margin-bottom:10px;">NPC Reactions</div>';
+          td.npc_responses.forEach(n => { html += `<div style="font-size:11px;line-height:1.7;color:rgba(255,255,255,0.45);margin-bottom:8px;padding-left:12px;border-left:2px solid rgba(239,68,68,0.15);"><span style="color:rgba(255,255,255,0.60);font-weight:500;">${esc(n.npc_name)}</span> <em>${esc(n.pov)}</em></div>`; });
+          html += '</div>';
+        }
+        out.innerHTML = html;
+        fetch(API + `/api/run/${runData.run_id}`, { method: 'DELETE' }).catch(() => {});
+      } catch (e) { showError(out, e.message); }
+      enableBtn('p6-btn');
+    }
+  </script>
+</body>
+</html>

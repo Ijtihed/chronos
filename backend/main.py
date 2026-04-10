@@ -133,6 +133,7 @@ async def preview_run(req: RunRequest = RunRequest()):
         era_key, era_config = random_era()
 
     loading_events = []
+    loading_events_structured = []
     try:
         year = era_config["year_start"]
         raw_events = await query_historical_events(
@@ -160,6 +161,15 @@ async def preview_run(req: RunRequest = RunRequest()):
         loading_events = [
             f"{e['year']} AD \u2014 {e['event']}" for e in selected
         ]
+        loading_events_structured = [
+            {
+                "year": e["year"],
+                "event": e["event"],
+                "significance": e.get("significance", ""),
+                "type": e.get("type", ""),
+            }
+            for e in selected
+        ]
     except Exception:
         pass
 
@@ -173,6 +183,7 @@ async def preview_run(req: RunRequest = RunRequest()):
         "description": era_config["description"],
         "region": era_config["region"],
         "loading_events": loading_events,
+        "loading_events_structured": loading_events_structured,
         "loading_voices": era_config.get("loading_voices", []),
     }
 
@@ -277,8 +288,18 @@ async def _execute_turn(run_id: str, req: TurnRequest) -> dict:
         _schedule_player_consequences(state, parsed)
 
     # --- Step 3c: Check for historical divergence ---
+    divergences_before = len(state.historical_divergences)
     if sig >= 0.6:
         await _check_historical_divergence(state, parsed)
+    new_divergences = [
+        {
+            "canonical_event": d["canonical_event"],
+            "player_action": d["player_action"],
+            "significance": sig,
+            "superseded": True,
+        }
+        for d in state.historical_divergences[divergences_before:]
+    ]
 
     # --- Step 4: Death check ---
     death_result = await check_death(state, parsed)
@@ -313,6 +334,7 @@ async def _execute_turn(run_id: str, req: TurnRequest) -> dict:
         "player_view": pv.model_dump(),
         "npc_responses": npc_responses,
         "death": death_info,
+        "divergences": new_divergences,
     }
 
 
