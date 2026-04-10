@@ -946,4 +946,5 @@ async def _check_historical_divergence(state: WorldState, parsed: dict) -> None:
 # Static files
 # ------------------------------------------------------------------
 
+app.mount("/demo", StaticFiles(directory="demo", html=True), name="demo")
 app.mount("/", StaticFiles(directory="frontend", html=True), name="frontend")
