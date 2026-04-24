@@ -1,6 +1,8 @@
-"""Generate characters from era configs via local Ollama.
+"""Generate characters from era configs via the LLM provider.
 
-Model tier: LOCAL — character generation is a one-time burst at run start.
+Model tier: QUALITY — player + 8-15 concurrent NPCs at run start. NPC
+voice fidelity matters here; the fan-out is capped by the Gemini
+concurrency semaphore in llm_provider.
 """
 
 from __future__ import annotations
@@ -16,7 +18,7 @@ from typing import List
 
 from pydantic import ValidationError
 
-from backend.llm import chat, load_prompt
+from backend.llm_provider import call_llm, load_prompt
 from backend.llm_schemas import CharacterGenResponse, character_gen_default
 from backend.npc_personality import generate_personality, calculate_needs
 from backend.world_state import Location, NPC, PlayerCharacter, WorldState, Era
@@ -51,7 +53,8 @@ async def generate_run(era_config: dict) -> WorldState:
     selected = random.sample(npc_archetypes, npc_count)
 
     npcs = await _generate_npcs(
-        raw_template, era_config, selected, locations, player.role
+        raw_template, era_config, selected, locations, player.role,
+        player_start_location=start_location.id,
     )
 
     state = WorldState(
@@ -93,7 +96,12 @@ async def _generate_player(
     )
 
     try:
-        raw = await chat(prompt, json_mode=True)
+        raw, _ = await call_llm(
+            prompt,
+            tier="quality",
+            schema=CharacterGenResponse,
+            call_site="character_gen.player",
+        )
         data = CharacterGenResponse.model_validate(json.loads(raw))
     except (json.JSONDecodeError, ValidationError, Exception) as exc:
         logger.warning("Player character gen validation failed: %s", exc)
@@ -121,6 +129,7 @@ async def _generate_npcs(
     archetypes: list,
     locations: List[Location],
     player_role: str,
+    player_start_location: str = "",
 ) -> List[NPC]:
     """Generate NPCs concurrently."""
     tasks = []
@@ -128,7 +137,8 @@ async def _generate_npcs(
         loc = locations[i % len(locations)]
         tasks.append(
             _generate_single_npc(
-                template_text, era_config, arch, loc, player_role, i
+                template_text, era_config, arch, loc, player_role, i,
+                is_player_location=(loc.id == player_start_location),
             )
         )
     return await asyncio.gather(*tasks)
@@ -141,6 +151,7 @@ async def _generate_single_npc(
     location: Location,
     player_role: str,
     index: int,
+    is_player_location: bool = False,
 ) -> NPC:
     prompt = Template(template_text).safe_substitute(
         region=era_config["region"],
@@ -154,7 +165,12 @@ async def _generate_single_npc(
     )
 
     try:
-        raw = await chat(prompt, json_mode=True)
+        raw, _ = await call_llm(
+            prompt,
+            tier="quality",
+            schema=CharacterGenResponse,
+            call_site="character_gen.npc",
+        )
         data = CharacterGenResponse.model_validate(json.loads(raw))
     except (json.JSONDecodeError, ValidationError, Exception) as exc:
         logger.warning("NPC gen validation failed (index %d): %s", index, exc)
@@ -175,8 +191,9 @@ async def _generate_single_npc(
         description=data.description,
         disposition=data.disposition or "cautious",
         relationship_to_player=data.relationship_to_player or f"Aware of the {player_role}.",
-        memory_of_player=0.1,
+        memory_of_player=0.4 if is_player_location else 0.15,
         last_interaction_turn=0,
         personality=personality,
         needs=needs,
+        current_activity=data.current_activity or f"Going about their duties as a {archetype['role']}.",
     )

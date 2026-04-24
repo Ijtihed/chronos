@@ -1,0 +1,18 @@
+# CHRONOS — Weekly version snapshots
+
+Every **Friday** (or the last session of the week), write a new snapshot file to `versions/`.
+
+## What to do
+
+1. Create `versions/week-NN.md` where NN is the next sequential number (zero-padded to two digits).
+2. The snapshot must cover **everything that changed this week**: new systems built, systems modified, bugs fixed, design decisions made, phases completed or advanced, open questions resolved or added.
+3. Structure the file the same way as `versions/week-01.md`: a date header, phase status, "What changed this week" section listing concrete additions/changes, an updated "What exists" section reflecting the cumulative state, and an updated "What is NOT built yet" section.
+4. Keep it factual and concise — this is a changelog + state snapshot, not a narrative.
+
+## When to remind
+
+If the current date is a **Friday** and no `versions/week-NN.md` has been written this week, **remind the user** at the start of the session that the weekly snapshot is due. Do not skip the reminder.
+
+## Why this exists
+
+The `versions/` folder is the project's week-over-week memory. It lets anyone reconstruct what was built when, what the state of the project was at any given week, and how the scope evolved over time.

@@ -1,0 +1,119 @@
+[
+  {
+    "qid": "Q1883854",
+    "label": "St. Mary Magdalene's flood",
+    "description": "1342 flood in Central Europe",
+    "year": 1342,
+    "location": "",
+    "country": "",
+    "source_type": "natural_disaster"
+  },
+  {
+    "qid": "Q117487867",
+    "label": "1344 Syria earthquake",
+    "description": "earthquake",
+    "year": 1344,
+    "location": "",
+    "country": "",
+    "source_type": "natural_disaster"
+  },
+  {
+    "qid": "Q56275702",
+    "label": "1345 Liverpool riot",
+    "description": "Historical event",
+    "year": 1345,
+    "location": "Liverpool",
+    "country": "",
+    "source_type": "natural_disaster"
+  },
+  {
+    "qid": "Q11971620",
+    "label": "Q11971620",
+    "description": "",
+    "year": 1345,
+    "location": "",
+    "country": "Norway",
+    "source_type": "natural_disaster"
+  },
+  {
+    "qid": "Q685849",
+    "label": "1348 Friuli earthquake",
+    "description": "1348 earthquake in Italy",
+    "year": 1348,
+    "location": "",
+    "country": "",
+    "source_type": "natural_disaster"
+  },
+  {
+    "qid": "Q3984657",
+    "label": "1349 Apennine earthquakes",
+    "description": "earthquake sequence in Italy's Apennine Mountain region",
+    "year": 1349,
+    "location": "",
+    "country": "Italy",
+    "source_type": "natural_disaster"
+  },
+  {
+    "qid": "Q3984657",
+    "label": "1349 Apennine earthquakes",
+    "description": "earthquake sequence in Italy's Apennine Mountain region",
+    "year": 1349,
+    "location": "",
+    "country": "Kingdom of Naples",
+    "source_type": "natural_disaster"
+  },
+  {
+    "qid": "Q3984657",
+    "label": "1349 Apennine earthquakes",
+    "description": "earthquake sequence in Italy's Apennine Mountain region",
+    "year": 1349,
+    "location": "",
+    "country": "Italy",
+    "source_type": "natural_disaster"
+  },
+  {
+    "qid": "Q3984657",
+    "label": "1349 Apennine earthquakes",
+    "description": "earthquake sequence in Italy's Apennine Mountain region",
+    "year": 1349,
+    "location": "",
+    "country": "Kingdom of Naples",
+    "source_type": "natural_disaster"
+  },
+  {
+    "qid": "Q4492320",
+    "label": "Q4492320",
+    "description": "",
+    "year": 1354,
+    "location": "",
+    "country": "",
+    "source_type": "natural_disaster"
+  },
+  {
+    "qid": "Q48879682",
+    "label": "1356 Cape St. Vincent earthquake",
+    "description": "earthquake that affected Lisbon, Portugal",
+    "year": 1356,
+    "location": "",
+    "country": "Kingdom of Portugal",
+    "source_type": "natural_disaster"
+  },
+  {
+    "qid": "Q48879682",
+    "label": "1356 Cape St. Vincent earthquake",
+    "description": "earthquake that affected Lisbon, Portugal",
+    "year": 1356,
+    "location": "",
+    "country": "Crown of Castile",
+    "source_type": "natural_disaster"
+  },
+  {
+    "qid": "Q672705",
+    "label": "1356 Basel earthquake",
+    "description": "natural disaster",
+    "year": 1356,
+    "location": "",
+    "country": "Switzerland",
+    "source_type": "natural_disaster"
+  }
+]

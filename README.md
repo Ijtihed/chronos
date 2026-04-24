@@ -4,9 +4,10 @@ A historical simulation you observe through one person's eyes. You're dropped in
 
 ## Requirements
 
-- **macOS** (tested on M4 Max) or any machine with 48GB+ RAM
-- **Python 3.9+**
-- **Ollama** — runs the LLM locally, no API keys needed
+- **macOS** (tested on M4 Max) or any machine with 16GB+ RAM
+- **Python 3.11**
+- **Ollama** — serves the fast tier locally
+- **Google Gemini API key** (optional) — enables the quality tier for prose-critical calls; without it, everything falls back to Ollama
 
 ## Quick start
 
@@ -15,10 +16,10 @@ A historical simulation you observe through one person's eyes. You're dropped in
 # Download from https://ollama.ai or:
 brew install ollama
 
-# 2. Pull the model (pick one based on your hardware)
-ollama pull llama3.1:70b    # Best quality. Needs 48GB RAM. ~42GB download.
-ollama pull llama3.1:8b     # Lighter. Works on 16GB. ~5GB download.
-# The game auto-detects the best available model at startup.
+# 2. Pull the fast-tier model
+ollama pull llama3.1:8b     # Default. Works on 16GB. ~5GB download.
+# (Optional) a larger fallback for quality-tier failover:
+ollama pull llama3.1:70b    # Needs 48GB RAM. ~42GB download.
 
 # 3. Make sure Ollama is running
 ollama serve    # skip if it's already running as a service
@@ -26,16 +27,32 @@ ollama serve    # skip if it's already running as a service
 # 4. Clone and set up
 git clone https://github.com/Ijtihed/Historicalsim.git
 cd Historicalsim
-python3 -m venv .venv
+python3.11 -m venv .venv      # or: uv venv --python 3.11 .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 
-# 5. Run the game
+# 5. (Optional) enable the Gemini quality tier
+cp .env.example .env
+# Edit .env and set: GEMINI_API_KEY=your_key_here
+# Without a key, quality-tier calls fall back to Ollama transparently.
+
+# 6. Run the game
 uvicorn backend.main:app --reload
 
-# 6. Open in browser
+# 7. Open in browser
 open http://localhost:8000
 ```
+
+## Environment variables
+
+| Variable | Purpose |
+|----------|---------|
+| `GEMINI_API_KEY` | Required to enable the quality tier (Gemini 3.1 Flash-Lite). Without it, all calls route to Ollama. Loaded from `.env` or the shell. **Never commit this.** |
+| `CHRONOS_QUALITY_MODEL` | Override the quality-tier model ID. Default: `gemini-3-1-flash-lite`. |
+| `CHRONOS_FAST_MODEL` | Force a specific Ollama model for fast-tier calls (skips auto-selection). |
+| `CHRONOS_FORCE_FAST_TIER` | Set to `1` to route every LLM call to Ollama, regardless of the Gemini key. Useful offline. |
+| `CHRONOS_GEMINI_MAX_CONCURRENT` | Cap on concurrent Gemini requests. Default: `10`. |
+| `OLLAMA_URL` | Override the Ollama base URL. Default: `http://localhost:11434`. |
 
 ## How to play
 
@@ -111,7 +128,8 @@ backend/              Python server (FastAPI)
   death_engine.py        Death check, memory decay, erasure
   character_gen.py       Character + NPC generation at run start (LLM)
   persistence.py         SQLite session storage (WAL mode, performance-tuned)
-  llm.py                 Ollama client — auto-selects best model
+  llm_provider.py        Two-tier LLM dispatcher — Gemini (quality) + Ollama (fast) + circuit breaker + cost accounting
+  config.py              Environment config — API keys, pricing constants, cost caps
   eras/                  5 era configs with locations, archetypes, coordinates
   hke/                   Historical Knowledge Engine (RAG — Chroma + Gutenberg/Wikipedia)
 frontend/             Browser UI
@@ -143,11 +161,20 @@ The turn endpoint handles everything. Type "go to Ravenna" and it routes to trav
 
 ## Model tier
 
-All LLM calls are local via Ollama. No API keys. No cost.
+Two-tier dispatch (see `.cursor/rules/chronos-model-tier.mdc` for the full policy).
 
-- **Preferred:** `llama3.1:70b` — best quality, needs 48GB RAM
-- **Fallback:** `llama3.1:8b` — lighter, works on 16GB
-- Auto-detected at startup. Logged in the terminal.
+**Quality tier** — Google Gemini 3.1 Flash-Lite (`gemini-3-1-flash-lite`). Prose-critical calls: `npc_pov`, `autonomous_action` (active NPCs / player skip-turn / arrival catch-up), `character_gen`, `ground_context`, `erasure`. Requires `GEMINI_API_KEY`.
+
+**Fast tier** — local Ollama. Short or structured calls: `action_parser`, `autonomous_action_light` (offscreen NPCs), `death_check`, `region_knowledge`, `npc_perception`, `historical_context`, `memory_fade`.
+
+**Fallback** — if `GEMINI_API_KEY` is missing, or Gemini fails 3 times in 60 seconds, every quality call routes to Ollama for the next 5 minutes (circuit breaker).
+
+**Per-run cost ceiling** — €1.00 soft (banner), €2.00 hard (turn submission blocked). Cost displayed in the top bar. Persisted in the session and in `turn_logs.turn_cost_usd`. Pricing: Gemini $0.25/M input, $1.50/M output.
+
+**Recommended local Ollama models:**
+
+- `llama3.1:8b` — default fast tier. Works on 16GB.
+- `llama3.1:70b` — auto-selected when available. Used as the fallback for quality calls when Gemini is down.
 
 ## Architecture
 

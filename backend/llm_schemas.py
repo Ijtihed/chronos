@@ -93,6 +93,7 @@ def action_parser_default(player_input: str, player_name: str,
 
 class AutonomousActionResponse(BaseModel):
     action: str = ""
+    new_activity: str = ""
     interacts_with: Optional[str] = None
     mood_shift: Optional[str] = None
     wants_to_travel: bool = False
@@ -155,6 +156,7 @@ class CharacterGenResponse(BaseModel):
     description: str = ""
     disposition: str = "cautious"
     relationship_to_player: str = ""
+    current_activity: str = ""
 
 
 def character_gen_default(role: str, location_name: str,
@@ -165,6 +167,7 @@ def character_gen_default(role: str, location_name: str,
         description=f"A {role} in {location_name}.",
         disposition="cautious" if index is not None else "anxious",
         relationship_to_player="" if index is None else f"Aware of the newcomer.",
+        current_activity=f"Going about their duties as a {role}.",
     )
 
 

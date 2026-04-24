@@ -77,6 +77,24 @@ async def init_db() -> None:
             ON turn_logs (run_id, turn_number)
             """
         )
+        # Phase 3 Step 3.1: illustration trigger audit column.
+        # SQLite has no ADD COLUMN IF NOT EXISTS — try/except is the
+        # idiomatic pattern (same shape as the QID unique-index block
+        # above). Safe on second+ startups.
+        try:
+            await db.execute(
+                "ALTER TABLE turn_logs ADD COLUMN illustration_trigger TEXT DEFAULT NULL"
+            )
+        except Exception:
+            pass
+        # Two-tier LLM provider migration: per-turn USD cost (0.0 for
+        # Ollama-only turns). Same idempotent ALTER pattern.
+        try:
+            await db.execute(
+                "ALTER TABLE turn_logs ADD COLUMN turn_cost_usd REAL DEFAULT 0.0"
+            )
+        except Exception:
+            pass
         await db.execute(
             """
             CREATE TABLE IF NOT EXISTS historical_events (
@@ -106,6 +124,32 @@ async def init_db() -> None:
             ON historical_events (type, significance)
             """
         )
+        try:
+            await db.execute(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_he_qid_unique
+                ON historical_events (wikidata_qid)
+                WHERE wikidata_qid IS NOT NULL AND wikidata_qid != ''
+                """
+            )
+        except Exception:
+            await db.execute(
+                """
+                DELETE FROM historical_events
+                WHERE id NOT IN (
+                    SELECT MIN(id) FROM historical_events
+                    WHERE wikidata_qid IS NOT NULL AND wikidata_qid != ''
+                    GROUP BY wikidata_qid
+                ) AND wikidata_qid IS NOT NULL AND wikidata_qid != ''
+                """
+            )
+            await db.execute(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_he_qid_unique
+                ON historical_events (wikidata_qid)
+                WHERE wikidata_qid IS NOT NULL AND wikidata_qid != ''
+                """
+            )
         await db.execute(
             """
             CREATE TABLE IF NOT EXISTS consequence_queue (
@@ -321,16 +365,26 @@ async def append_turn_log(
     state_changes: dict,
     narrative_output: str,
     player_view_snapshot: dict,
+    illustration_trigger: Optional[dict] = None,
+    turn_cost_usd: float = 0.0,
 ) -> None:
-    """Append one turn log row. Never updates existing rows."""
+    """Append one turn log row. Never updates existing rows.
+
+    `illustration_trigger` is a JSON blob from
+    IllustrationTrigger.log_dict() or None if no trigger fired.
+    `turn_cost_usd` is the sum of cost_usd across every LLM call made
+    during this turn (0.0 for turns that ran entirely on Ollama or had
+    no LLM activity at all).
+    """
     async with _connect() as db:
         await db.execute(
             """
             INSERT INTO turn_logs (
                 run_id, turn_number, player_input, parsed_action,
                 ambient_activity, npc_responses, state_changes,
-                narrative_output, player_view_snapshot
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                narrative_output, player_view_snapshot,
+                illustration_trigger, turn_cost_usd
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 run_id,
@@ -342,6 +396,8 @@ async def append_turn_log(
                 json.dumps(state_changes),
                 narrative_output,
                 json.dumps(player_view_snapshot),
+                json.dumps(illustration_trigger) if illustration_trigger else None,
+                float(turn_cost_usd),
             ),
         )
         await db.commit()
@@ -357,7 +413,8 @@ async def get_turn_logs(run_id: str) -> List[dict]:
             """
             SELECT id, run_id, turn_number, player_input, parsed_action,
                    ambient_activity, npc_responses, state_changes,
-                   narrative_output, player_view_snapshot, created_at
+                   narrative_output, player_view_snapshot,
+                   illustration_trigger, turn_cost_usd, created_at
             FROM turn_logs
             WHERE run_id = ?
             ORDER BY turn_number ASC
@@ -365,8 +422,11 @@ async def get_turn_logs(run_id: str) -> List[dict]:
             (run_id,),
         )
         rows = await cursor.fetchall()
-        return [
-            {
+        out: List[dict] = []
+        for r in rows:
+            keys = r.keys()
+            trigger_raw = r["illustration_trigger"] if "illustration_trigger" in keys else None
+            out.append({
                 "id": r["id"],
                 "run_id": r["run_id"],
                 "turn_number": r["turn_number"],
@@ -377,10 +437,15 @@ async def get_turn_logs(run_id: str) -> List[dict]:
                 "state_changes": json.loads(r["state_changes"]),
                 "narrative_output": r["narrative_output"],
                 "player_view_snapshot": json.loads(r["player_view_snapshot"]),
+                "illustration_trigger": (
+                    json.loads(trigger_raw) if trigger_raw else None
+                ),
+                "turn_cost_usd": (
+                    float(r["turn_cost_usd"]) if "turn_cost_usd" in keys and r["turn_cost_usd"] is not None else 0.0
+                ),
                 "created_at": r["created_at"],
-            }
-            for r in rows
-        ]
+            })
+        return out
 
 
 # ---------------------------------------------------------------------------

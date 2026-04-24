@@ -14,7 +14,9 @@ This means the player can:
 - Speed up the passage of time and watch the world unfold
 - Anything else they can articulate
 
-The game does not constrain the vocabulary or scope of player decisions. It interprets freely and responds with consequences — or with silence, if nobody cares.
+The game does not constrain the vocabulary or scope of player decisions. It interprets freely and responds with consequences, or with silence if nobody cares.
+
+**Internal routing vocabulary.** Player freedom at the input layer is absolute. Internally, the action parser normalizes each parsed action to one of 17 canonical action types used only for downstream routing: speak, trade, petition, threaten, betray, attack, steal, negotiate, defend, fight, siege, alliance, hoard, prevent, save, flee, other. The player never sees this list, is never asked to pick from it, and can type anything in any language or tense. The parser's job is to map arbitrary natural language onto the canonical set so the consequence scheduler and divergence check have a predictable contract. Synonyms and variants are normalized in code (ALIASES map). The vocabulary exists to make behavior consistent, not to limit expression.
 
 ## Decision scale
 
@@ -47,6 +49,8 @@ Stages 1-4 run whether or not the player does anything. The player's input is on
 ## Consequence queue
 
 Significant actions schedule delayed effects that fire on future turns. This gives the world momentum — past decisions haunt the present. Effect types: tension shifts, rumors, trade disruptions, NPC arrivals, event spawns, material changes, disposition shifts, and need pressure.
+
+Every canonical action type at significance 0.5 or above routes through a dispatch table and schedules at least one specific consequence. Hostile actions (attack, threaten, steal) and target-dependent actions (betray, save) schedule consequences at the target NPC's location; when the target string doesn't resolve to an NPC, they fall back to a generic rumor at the player's location rather than silently no-op. Three action types (speak, flee, other) intentionally have no type-specific handler and rely only on the generic graduated tiers (rumor at 0.6, tension shift at 0.8). This keeps low-ripple actions from producing phantom consequences.
 
 Consequences are validated when they fire, not just when they're scheduled. If the world has diverged (the target NPC died, the location was destroyed, the player changed history), obsolete consequences are cancelled. The queue is cleaned up each turn.
 

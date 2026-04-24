@@ -114,12 +114,16 @@ A `GroundContext` object attached to the world state:
 
 The Events DB contains canonical history. As soon as the player acts, the world diverges. The game tracks this divergence explicitly.
 
-When a player action creates a significant world event (a battle won, a ruler killed, a city abandoned), that event is written to the world state event log with `canonical: false`. These game-generated events:
-- Are treated as equally real to canonical events for the purposes of NPC reactions and world state
-- Can **override or contradict** canonical events — if the player prevents the fall of Constantinople, subsequent canonical events that depended on that fall are flagged as `superseded`
-- Accumulate over the run and are passed alongside canonical events to the Ground Context Generator when NPCs need context
+**Current implementation (as of 2026-04-21).** When a significant player action (significance 0.6 or above) mentions a target that substring-matches the text of a canonical event near the player's location and year window, the action is classified as a historical divergence. Divergence produces two observable effects:
 
-This means the further a run progresses, the more the world diverges from the canonical DB, and the more the HCE is working from game-generated history rather than real history. The system does not try to correct this — divergence is the point.
+1. An entry is appended to `state.historical_divergences` carrying the canonical event id, event text, player's action description, action type, and turn number.
+2. `mark_consequence_superseded_mem()` invalidates any queued consequences sourced from the canonical event (source_event_id match), so obsolete delayed effects never fire.
+
+End-to-end divergence detection is verified by `tests/test_divergence_e2e.py`. A divergence type map routes canonical player action types to event search types (war, political, economic); speak, flee, and other do not trigger divergence checks by design — speaking does not contradict history, fleeing is personal not historical, and other is unclassifiable.
+
+**Known gap.** Divergence is currently invisible to NPCs and to the narrative layer. The detection fires, state records the entry, and queued consequences are invalidated, but NPC POV prompts and narrative text do not see the divergence signal. An NPC in a world where the player prevented the Sack of Rome will still speak as if they are living in a world where the sack happened. Closing this gap is an open question (see `open-questions.md`): likely via either a flagged event written to `state.events` that POV prompts read, or a targeted `need_pressure` / `disposition_shift` consequence on NPCs who would plausibly know about the canonical event.
+
+This means the further a run progresses, the more the world structurally diverges from the canonical DB. The narrative layer does not yet reflect that divergence, which is the primary unfinished work of the divergence system.
 
 ---
 

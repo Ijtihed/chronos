@@ -44,6 +44,8 @@ What a character knows about a region depends on:
 
 Region knowledge is generated on demand when the player selects a region, as the character "recalling" what they know. Results are cached per region per turn.
 
+The current implementation uses archetype and geography filtering as a proxy for relational information flow. This is a known simplification. The full relational model — Information Provenance Graph — is designed and planned for Phase 5. The current system produces historically plausible outputs but loses the specificity of how individuals actually came to know things. The gap is noted and intentional.
+
 ### Events on the map
 
 Significant events — sieges, plagues, army movements, famines — appear on the map as visual markers at their location. These are **filtered by character awareness**: an event only appears on the map if the character has plausible knowledge of it. A siege 500 miles away does not show until someone tells the player about it (through NPC conversation or travel).
@@ -53,6 +55,29 @@ Events come from two sources:
 - **The world engine** — gameplay events (NPC autonomous actions, tension changes, player-caused consequences) promoted to map events when significant enough
 
 This means the map is always a partial view. It shows the world as the character understands it, not as it actually is. The gap between what the map shows and what is actually happening is part of the game.
+
+**Implementation (2026-04-21).** The endpoint `GET /api/run/{run_id}/events/visible` returns Knowledge-Matrix-filtered events with resolved coordinates. Each event carries a tier: witnessed, known, rumor_reliable, or rumor_unreliable. Events classified as unknown are omitted at the filter layer. The frontend renders known-tier events as a colored pin plus a circle, rumor tiers as plain circles with reduced opacity, and rumor_unreliable with a dashed border. Witnessed events carry a small white dot overlay on the pin as a "you were here" indicator. Event-type color mapping: war red, epidemic green, famine orange, political blue, religious purple, economic yellow, natural_disaster brown, cultural grey.
+
+Region centroids come from a hand-curated YAML (`backend/geo/region_centroids.yaml`) with a normalization fallback that splits compound strings on `/`, `,`, ` and `, and `&`. Current coverage: 97.2% of the 1,569 canonical events resolve to a centroid (86.9% exact match, 10.3% via normalization, 2.8% dropped as unmapped long-tail strings). Regions whose radius is 1000 km or larger (Mediterranean, Byzantine Empire, Europe, Asia, etc.) are flagged `broad: true` in the YAML and render as circles only, no pin, since a single pin at the geographic center of something that big is meaningless. Known limitations: the Byzantine Empire centroid is era-ambiguous across the 410-1453 span and sits at a median-period position that is geographically incorrect for early events; the `polity_context` column exists in the Events DB schema but is unpopulated by current ingestion, so the architecturally-planned polity-context fallback is dead code today.
+
+## Information Provenance Graph
+
+The information system has a relational dimension that goes beyond archetype and geography filtering. Every significant piece of information in the world has a provenance chain — not just what a character knows, but how they came to know it, who told them, and how distorted it got in transit.
+
+When a significant world event occurs, it generates a transmission record attached to the event log entry. This record tracks: who witnessed it directly, who they told, who those people told, and so on. Each transmission step applies a distortion factor based on: relationship strength between the two NPCs, archetype of the transmitter (merchants are more accurate about trade events, soldiers about military events), and time elapsed since the event.
+
+By the time information reaches a character three or four transmission hops away from the original event, it may have the core fact intact but wrong details, or right details but wrong attribution, or be entirely garbled. This is historically authentic — most information in pre-modern societies traveled as rumor, got distorted in transit, and was believed or disbelieved based on the source's social standing.
+
+When the ground context generator builds what a character knows, it traverses the information provenance graph outward from that character along their relationship edges — not just querying the Events DB filtered by archetype. The character ends up with a genuinely personal, relationally-specific view of the world. A farmer doesn't know about a raid because they're a farmer in that region. They know about it because their cousin came back shaken from a trading trip and said something vague about smoke on the horizon.
+
+The NPC autonomous action loop feeds this naturally. When NPCs interact each tick, they exchange information. What information was shared in an interaction is logged as part of the interaction record. The information provenance graph builds itself organically through the social simulation — it is not manually modeled.
+
+### Implementation constraints
+
+- Only track provenance for events with significance regional or civilizational — local events don't need chains
+- Maximum transmission depth: 4 hops. Beyond 4 hops, information is either common knowledge or effectively lost
+- Distortion parameters are tuned through playtesting, not derived from first principles
+- Requires the NPC-to-NPC social graph to exist before it can be implemented — this is a Phase 5 feature
 
 ## Autonomous world systems
 
@@ -119,6 +144,12 @@ The game covers all of post-0 AD history, including the modern period. Eras are 
 The simulation mechanics are identical regardless of era. What changes is the world context, the archetypes, the technology available, and the scale of events the player can influence. A 2003 Baghdad run uses the same turn loop as a 410 AD Italia run — the world simulates, NPCs act, the player observes and sometimes intervenes.
 
 Current starter set (Phase 1): Roman Late Empire (~410), Viking Age (~870), Crusader States (~1190), Black Death (~1348), Fall of Constantinople (~1453). Modern eras (1800s, 1900s, 2000s) are planned for expansion. Border data for post-1886 eras uses CShapes 2.0 (see `frontend/geo/sources.md`).
+
+## Known implementation gaps (as of 2026-04-10)
+
+**Ground context refresh:** ~~The GroundContext object was static for the entire run.~~ **Fixed** — ground context now refreshes on location change and significant world events (armed skirmish, civilian unrest). A `ground_context_stale` flag triggers regeneration at the start of the next simulation tick, using the current year and player location. Most turns do not trigger a refresh (one LLM call when it runs).
+
+**NPC-to-NPC social graph:** NPCs interact with each other every turn and name interaction partners, but there is no persistent NPC-to-NPC relationship data structure. NPC-on-NPC opinions, alliances, and rivalries are not tracked in structured state. This is a Phase 5 feature (see roadmap.md). The Information Provenance Graph depends on this graph existing.
 
 ## What makes each run unique
 

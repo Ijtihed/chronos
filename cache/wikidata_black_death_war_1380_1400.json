@@ -1,0 +1,1100 @@
+[
+  {
+    "qid": "Q681702",
+    "label": "Battle of S\u00f6renberg",
+    "description": "1380 battle",
+    "year": 1380,
+    "location": "S\u00f6renberg",
+    "country": "Switzerland",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q700880",
+    "label": "Battle of Dubravnica",
+    "description": "1380 battle",
+    "year": 1380,
+    "location": "",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q12625832",
+    "label": "Battle of Hwangsan",
+    "description": "battle in September 1380 (the 6th year of King U's reign) in which Lee Seong-gye and others won a major victory over Japanese pirates at Hwangsan (\u8352\u5c71: \u9ec3\u5c71) near Jiri Mountain in Jeolla-do.",
+    "year": 1380,
+    "location": "Namwon",
+    "country": "Goryeo",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q21060379",
+    "label": "Battle of Jinpo",
+    "description": "1380 naval battle",
+    "year": 1380,
+    "location": "Geum River",
+    "country": "Goryeo",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q4870733",
+    "label": "Battle of Chioggia",
+    "description": "1380 naval battle",
+    "year": 1380,
+    "location": "Chioggia",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q1979678",
+    "label": "Battle of Arum",
+    "description": "1380 battle",
+    "year": 1380,
+    "location": "Arum",
+    "country": "Netherlands",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q210354",
+    "label": "Battle of Kulikovo",
+    "description": "1380 battle between Russian principalities and Golden Horde",
+    "year": 1380,
+    "location": "Kulikovo Field",
+    "country": "Grand Principality of Moscow",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q138870767",
+    "label": "Siege of Herat",
+    "description": "1381 siege",
+    "year": 1381,
+    "location": "Herat",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q1919712",
+    "label": "Battle of Nevele",
+    "description": "1381 battle",
+    "year": 1381,
+    "location": "Nevele",
+    "country": "Belgium",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q4871910",
+    "label": "Battle of North Walsham",
+    "description": "medieval battle in 1381, part of The Peasants' Revolt",
+    "year": 1381,
+    "location": "North Walsham",
+    "country": "Kingdom of England",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q21061626",
+    "label": "Battle of Billericay",
+    "description": "battle during the Peasant's Revolt, 1381",
+    "year": 1381,
+    "location": "",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q2889892",
+    "label": "Battle of Saltes Island",
+    "description": "1381 naval battle",
+    "year": 1381,
+    "location": "Saltes Island",
+    "country": "Spain",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q3623233",
+    "label": "Siege of Sofia",
+    "description": "1382 siege",
+    "year": 1382,
+    "location": "Sofia",
+    "country": "Bulgaria",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q2618099",
+    "label": "Siege of Moscow",
+    "description": "1382 siege",
+    "year": 1382,
+    "location": "Moscow",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q2290648",
+    "label": "Battle of Beverhoutsveld",
+    "description": "1382 battle in Europe",
+    "year": 1382,
+    "location": "Bruges",
+    "country": "Belgium",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q1651134",
+    "label": "Battle of Roosebeke",
+    "description": "1382 battle in Europe",
+    "year": 1382,
+    "location": "Westrozebeke",
+    "country": "Belgium",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q110914842",
+    "label": "Battle of Dunkirk",
+    "description": "battle in 1383",
+    "year": 1383,
+    "location": "Dunkirk",
+    "country": "France",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q111211180",
+    "label": "Capture of Tlemcen",
+    "description": "1383 battle",
+    "year": 1383,
+    "location": "Tlemcen",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q85973571",
+    "label": "Battle of Gwaneumpo",
+    "description": "",
+    "year": 1383,
+    "location": "Gwaneumpo",
+    "country": "Goryeo",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q138795753",
+    "label": "Battle of Szamotu\u0142y",
+    "description": "a battle in Greater Poland in 1383",
+    "year": 1383,
+    "location": "Piotrk\u00f3wko, Greater Poland Voivodeship",
+    "country": "Kingdom of Poland",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q16931481",
+    "label": "Siege of Ypres",
+    "description": "Military action in 1383",
+    "year": 1383,
+    "location": "Ypres",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q5264903",
+    "label": "Despenser's Crusade",
+    "description": "14th-century military campaign",
+    "year": 1383,
+    "location": "",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q4871554",
+    "label": "Battle of Le\u00e7a",
+    "description": "1384 battle in Portugal",
+    "year": 1384,
+    "location": "",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q5518567",
+    "label": "Galician campaign",
+    "description": "Portuguese naval campaign",
+    "year": 1384,
+    "location": "Kingdom of Galicia",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q2530225",
+    "label": "Battle of Atoleiros",
+    "description": "1384 battle in Portugal",
+    "year": 1384,
+    "location": "Alentejo",
+    "country": "Portugal",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q6981766",
+    "label": "Naval Battle of the Tejo",
+    "description": "1384 battle between Portuguese and Castilian naval fleets",
+    "year": 1384,
+    "location": "Tagus River",
+    "country": "Kingdom of Portugal",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q612288",
+    "label": "Battle of Plo\u010dnik",
+    "description": "1385 battle",
+    "year": 1385,
+    "location": "Plo\u010dnik",
+    "country": "Serbia",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q4872562",
+    "label": "Battle of Tochar Cruachain-Bri-Ele",
+    "description": "1385 battle",
+    "year": 1385,
+    "location": "Croghan",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q108955626",
+    "label": "Battle of Perevitsk",
+    "description": "1385 battle",
+    "year": 1385,
+    "location": "Perevitsk hillfort",
+    "country": "Russia",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q4087472",
+    "label": "Battle of Trancoso",
+    "description": "1385 battle in Portugal",
+    "year": 1385,
+    "location": "Trancoso",
+    "country": "Portugal",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q55610896",
+    "label": "English invasion of Scotland",
+    "description": "1385 siege during the English invasion of Scotland",
+    "year": 1385,
+    "location": "Wark",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q1341972",
+    "label": "Battle of Aljubarrota",
+    "description": "1385 battle in Portugal",
+    "year": 1385,
+    "location": "Leiria",
+    "country": "Portugal",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q2603935",
+    "label": "Battle of Savra",
+    "description": "1385 battle between Ottoman and Zetan forces in modern-day Albania",
+    "year": 1385,
+    "location": "Lushnj\u00eb",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q2890299",
+    "label": "Battle of Valverde",
+    "description": "battle of the Portuguese Crisis of 1383-1385",
+    "year": 1385,
+    "location": "Valverde de Legan\u00e9s",
+    "country": "Kingdom of Leon",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q4871277",
+    "label": "Battle of Invernahavon",
+    "description": "battle in Highland, Scotland, UK",
+    "year": 1386,
+    "location": "Highland",
+    "country": "Kingdom of Scotland",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q118956780",
+    "label": "Battle of Frenkyaz\u0131s\u0131",
+    "description": "1386 battle",
+    "year": 1386,
+    "location": "Konya Plain",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q21481366",
+    "label": "Siege of Tbilisi",
+    "description": "1386 successful Timurid attack on the capital of Kingdom of Georgia",
+    "year": 1386,
+    "location": "Tbilisi",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q97353659",
+    "label": "Siege of Brest",
+    "description": "1386 siege",
+    "year": 1386,
+    "location": "Brest",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q110425500",
+    "label": "Timur's campaign in Azerbaijan",
+    "description": "1386 campaign",
+    "year": 1386,
+    "location": "Azerbaijan",
+    "country": "Azerbaijan",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q12790010",
+    "label": "Battle of the Vikhra River",
+    "description": "1386 battle",
+    "year": 1386,
+    "location": "Vikhra",
+    "country": "Russia",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q19621560",
+    "label": "Battle in Brentelle",
+    "description": "1386 battle",
+    "year": 1386,
+    "location": "",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q661759",
+    "label": "Battle of Sempach",
+    "description": "1386 battle between old Switzerland confederation and Habsburg",
+    "year": 1386,
+    "location": "Sempach",
+    "country": "Switzerland",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q12848474",
+    "label": "Battle of Chapakchur",
+    "description": "1387 battle",
+    "year": 1387,
+    "location": "Bing\u00f6l",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q135082155",
+    "label": "Battle of Mu\u015f",
+    "description": "1387 battle",
+    "year": 1387,
+    "location": "Mu\u015f",
+    "country": "Qara Qoyunlu",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q21905295",
+    "label": "Siege of Isfahan",
+    "description": "1387 siege in Isfahan",
+    "year": 1387,
+    "location": "Isfahan",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q11087779",
+    "label": "Ming campaign against the Uriyangkhad horde",
+    "description": "offensive military expedition campaign",
+    "year": 1387,
+    "location": "Manchuria",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q110425512",
+    "label": "Timur's campaigns against the Turkmens, Van, Erzincan and Kurdistan",
+    "description": "",
+    "year": 1387,
+    "location": "Lake Van",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q110425512",
+    "label": "Timur's campaigns against the Turkmens, Van, Erzincan and Kurdistan",
+    "description": "",
+    "year": 1387,
+    "location": "Upper Mesopotamia",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q110425512",
+    "label": "Timur's campaigns against the Turkmens, Van, Erzincan and Kurdistan",
+    "description": "",
+    "year": 1387,
+    "location": "Diyar Bakr",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q646532",
+    "label": "Battle of Castagnaro",
+    "description": "1387 battle",
+    "year": 1387,
+    "location": "Castagnaro",
+    "country": "Italy",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q17622618",
+    "label": "Battle of Margate",
+    "description": "1387 naval battle during the Hundred Years' War",
+    "year": 1387,
+    "location": "English Channel",
+    "country": "Kingdom of England",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q2889732",
+    "label": "Battle of Radcot Bridge",
+    "description": "1387 battle in England",
+    "year": 1387,
+    "location": "Radcot Bridge",
+    "country": "Kingdom of England",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q10297227",
+    "label": "Battle of Buyur Lake",
+    "description": "1388 battle between Chinese and Mongols",
+    "year": 1388,
+    "location": "Buir Lake",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q131455946",
+    "label": "Battle of Visp",
+    "description": "",
+    "year": 1388,
+    "location": "Visp",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q667460",
+    "label": "Battle of N\u00e4fels",
+    "description": "1388 Swiss victory over Austria",
+    "year": 1388,
+    "location": "N\u00e4fels",
+    "country": "Old Swiss Confederacy",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q2056678",
+    "label": "Battle of Niftrik",
+    "description": "1388 battle",
+    "year": 1388,
+    "location": "Niftrik",
+    "country": "Netherlands",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q1648673",
+    "label": "Battle of Otterburn",
+    "description": "1388 Medieval battle between England and Scotland",
+    "year": 1388,
+    "location": "Otterburn",
+    "country": "Kingdom of England",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q1648673",
+    "label": "Battle of Otterburn",
+    "description": "1388 Medieval battle between England and Scotland",
+    "year": 1388,
+    "location": "Otterburn",
+    "country": "Kingdom of England",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q873286",
+    "label": "Battle of D\u00f6ffingen",
+    "description": "1388 battle",
+    "year": 1388,
+    "location": "",
+    "country": "Germany",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q700874",
+    "label": "Battle of Bile\u0107a",
+    "description": "1388 battle",
+    "year": 1388,
+    "location": "Bile\u0107a",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q65266471",
+    "label": "Battle of Hirao",
+    "description": "",
+    "year": 1388,
+    "location": "Hirao",
+    "country": "Japan",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q111211181",
+    "label": "Capture of Tlemcen",
+    "description": "1389 battle",
+    "year": 1389,
+    "location": "Tlemcen",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q1794532",
+    "label": "Battle of \u00c5sle",
+    "description": "fight between Danish and Swedish forces 1389",
+    "year": 1389,
+    "location": "\u00c5sle",
+    "country": "Sweden",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q179288",
+    "label": "Battle of Kosovo",
+    "description": "battle on 28th June 1389",
+    "year": 1389,
+    "location": "Kosovo Field",
+    "country": "Kosovo",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q19368006",
+    "label": "Capture of Fraiss\u00e9",
+    "description": "1390 battle",
+    "year": 1390,
+    "location": "Fraiss\u00e9-des-Corbi\u00e8res",
+    "country": "France",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q1085253",
+    "label": "Battle of the Kondurcha River",
+    "description": "1391 battle",
+    "year": 1391,
+    "location": "Kondurcha",
+    "country": "Russia",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q11908704",
+    "label": "Battle of Alessandria",
+    "description": "bellic event of 1391",
+    "year": 1391,
+    "location": "Alessandria",
+    "country": "Italy",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q110425535",
+    "label": "War between Timur and the Sayyids of Mazandaran",
+    "description": "",
+    "year": 1392,
+    "location": "Mazandaran Province",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q6049704",
+    "label": "Battle of K\u0131rkdilim",
+    "description": "14th-century battle between Ottoman sultan and ruler of northeastern Anatolia",
+    "year": 1392,
+    "location": "K\u0131rkdilim",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q20875410",
+    "label": "Battle of Ascoli",
+    "description": "1392 battle in Kingdom of Naples",
+    "year": 1392,
+    "location": "Ascoli Piceno",
+    "country": "Italy",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q20875410",
+    "label": "Battle of Ascoli",
+    "description": "1392 battle in Kingdom of Naples",
+    "year": 1392,
+    "location": "Ascoli Satriano",
+    "country": "Italy",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q111211182",
+    "label": "Capture of Tlemcen",
+    "description": "1393 battle",
+    "year": 1393,
+    "location": "Tlemcen",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q7396832",
+    "label": "Sacking of Bergen",
+    "description": "",
+    "year": 1393,
+    "location": "",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q110425558",
+    "label": "1393 Little Lorestan campaign",
+    "description": "",
+    "year": 1393,
+    "location": "Little Lorestan",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q110425560",
+    "label": "1393 Khuzestan campaign",
+    "description": "",
+    "year": 1393,
+    "location": "Khuzestan Province",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q110425581",
+    "label": "1393 Timur's campaign against the Turkmens",
+    "description": "",
+    "year": 1393,
+    "location": "Kurdistan",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q110425586",
+    "label": "1393 Kurdistan and Arab Iraq campaign",
+    "description": "",
+    "year": 1393,
+    "location": "Kurdistan",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q110425586",
+    "label": "1393 Kurdistan and Arab Iraq campaign",
+    "description": "",
+    "year": 1393,
+    "location": "Arab Iraq",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q110425591",
+    "label": "1393 Kirkuk and Mosul campaign",
+    "description": "",
+    "year": 1393,
+    "location": "Mosul",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q110425591",
+    "label": "1393 Kirkuk and Mosul campaign",
+    "description": "",
+    "year": 1393,
+    "location": "Kirkuk",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q5722976",
+    "label": "Battle of Shiraz",
+    "description": "1393 battle",
+    "year": 1393,
+    "location": "Shiraz",
+    "country": "Muzaffarids of Iran",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q3394064",
+    "label": "Siege of Tarnovo",
+    "description": "1393 armed conflict",
+    "year": 1393,
+    "location": "Veliko Tarnovo",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q4872204",
+    "label": "Battle of Ros-Mhic-Thri\u00fain",
+    "description": "1394 battle",
+    "year": 1394,
+    "location": "New Ross",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q12865045",
+    "label": "Timur's third campaign in Georgia",
+    "description": "",
+    "year": 1394,
+    "location": "Samtskhe atabegate",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q12865048",
+    "label": "Timur's fourth campaign in Georgia",
+    "description": "",
+    "year": 1394,
+    "location": "Kingdom of Georgia",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q110425595",
+    "label": "1394 Diyar Bakr campaign",
+    "description": "",
+    "year": 1394,
+    "location": "Diyar Bakr",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q131686595",
+    "label": "Battle of Puerto Lope",
+    "description": "1394 battle",
+    "year": 1394,
+    "location": "Puerto Lope",
+    "country": "Emirate of Granada",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q4871384",
+    "label": "Battle of Arge\u0219",
+    "description": "1394 battle",
+    "year": 1394,
+    "location": "Arge\u0219 River",
+    "country": "Romania",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q119788473",
+    "label": "Battle of Erci\u015f",
+    "description": "1395 battle",
+    "year": 1394,
+    "location": "Erci\u015f",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q4872133",
+    "label": "Battle of Qara-Derrah Pass",
+    "description": "1395 battle",
+    "year": 1395,
+    "location": "Lake Van",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q118697661",
+    "label": "Battle of Ushkudzhe",
+    "description": "1395 battle",
+    "year": 1395,
+    "location": "Dagestan",
+    "country": "Russia",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q118902843",
+    "label": "Battle of Khankala",
+    "description": "1395 battle",
+    "year": 1395,
+    "location": "Chechnya",
+    "country": "Russia",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q120496592",
+    "label": "Siege of Ohrid",
+    "description": "1395 siege",
+    "year": 1395,
+    "location": "Ohrid",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q136702627",
+    "label": "Siege of Sarai",
+    "description": "1395 siege",
+    "year": 1395,
+    "location": "Sarai",
+    "country": "Golden Horde",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q110425641",
+    "label": "Timurid campaign against the Qara Qoyunlu",
+    "description": "1395 campaign",
+    "year": 1395,
+    "location": "Azerbaijan",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q2889689",
+    "label": "Battle of Portomaggiore",
+    "description": "1395 battle in Italy",
+    "year": 1395,
+    "location": "Portomaggiore",
+    "country": "Italy",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q2508958",
+    "label": "Battle of the Terek River",
+    "description": "1395 2nd major battle of Tokhtamysh\u2013Timur war",
+    "year": 1395,
+    "location": "Terek",
+    "country": "Russia",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q2237751",
+    "label": "Battle of Rovine",
+    "description": "1395 battle between the Ottomans and Wallachians",
+    "year": 1395,
+    "location": "Danube basin",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q2237751",
+    "label": "Battle of Rovine",
+    "description": "1395 battle between the Ottomans and Wallachians",
+    "year": 1395,
+    "location": "Lower Danubian Plain",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q4872973",
+    "label": "Battle of the North Inch",
+    "description": "1396 battle",
+    "year": 1396,
+    "location": "",
+    "country": "Kingdom of Scotland",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q212220",
+    "label": "Battle of Nicopolis",
+    "description": "Ottoman victory and raising of the siege of the fortress of Nicopolis in September 1396",
+    "year": 1396,
+    "location": "Nikopol",
+    "country": "Second Bulgarian Empire",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q872364",
+    "label": "Battle of Kleverhamm",
+    "description": "1397 battle",
+    "year": 1397,
+    "location": "Kleve",
+    "country": "Germany",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q20622390",
+    "label": "Q20622390",
+    "description": "1397 battle",
+    "year": 1397,
+    "location": "",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q3636456",
+    "label": "Battle of Governolo",
+    "description": "1397 battle",
+    "year": 1397,
+    "location": "Governolo",
+    "country": "Italy",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q20925299",
+    "label": "Borgoforte Battle",
+    "description": "1397 battle",
+    "year": 1397,
+    "location": "Borgoforte",
+    "country": "Italy",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q115177789",
+    "label": "Battle of Ak\u00e7ay",
+    "description": "1398 battle",
+    "year": 1398,
+    "location": "Ak\u00e7ay",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q123739063",
+    "label": "Siege of Multan",
+    "description": "14th century battle in Multan, Pakistan",
+    "year": 1398,
+    "location": "Multan",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q135116955",
+    "label": "Siege of Bhatner",
+    "description": "1398 siege",
+    "year": 1398,
+    "location": "Bhatner Fort",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q4872582",
+    "label": "Battle of Tragh-Bhaile",
+    "description": "1399 battle in Ireland",
+    "year": 1399,
+    "location": "Ireland",
+    "country": "Kingdom of England",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q126936039",
+    "label": "Battle of Alinja",
+    "description": "late 14th century battle",
+    "year": 1399,
+    "location": "Alinja Tower",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q120776574",
+    "label": "Siege of Kiev",
+    "description": "1399 siege",
+    "year": 1399,
+    "location": "Kyiv",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q597478",
+    "label": "Battle of the Vorskla River",
+    "description": "1399 battle",
+    "year": 1399,
+    "location": "Vorskla",
+    "country": "Russia",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q4870929",
+    "label": "Battle of Drumnacoub",
+    "description": "battle in Highland, Scotland, UK",
+    "year": 1400,
+    "location": "Highland",
+    "country": "Kingdom of Scotland",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q11433918",
+    "label": "Battle of \u014ct\u014d",
+    "description": "1400 battle",
+    "year": 1400,
+    "location": "Nagano Basin",
+    "country": "Japan",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q109370396",
+    "label": "Satake Rebellion",
+    "description": "",
+    "year": 1400,
+    "location": "",
+    "country": "Japan",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q110560826",
+    "label": "Battle of Urrexola-Garai",
+    "description": "14th-century battle",
+    "year": 1400,
+    "location": "O\u00f1ati",
+    "country": "Spain",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q110560826",
+    "label": "Battle of Urrexola-Garai",
+    "description": "14th-century battle",
+    "year": 1400,
+    "location": "Aretxabaleta",
+    "country": "Spain",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q5162429",
+    "label": "Conquest of Ai",
+    "description": "",
+    "year": 1400,
+    "location": "Ai",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q2237350",
+    "label": "Battle of Bergtheim",
+    "description": "1400 battle",
+    "year": 1400,
+    "location": "Bergtheim",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q135005721",
+    "label": "Battle of Aleppo",
+    "description": "1400 battle",
+    "year": 1400,
+    "location": "Aleppo",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q96373247",
+    "label": "Battle of Fulhope Law",
+    "description": "14th century battle",
+    "year": 1400,
+    "location": "",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q9172725",
+    "label": "Battle of Aleppo",
+    "description": "1400 Timurid-Mamluk battle at Aleppo",
+    "year": 1400,
+    "location": "Aleppo",
+    "country": "",
+    "source_type": "war"
+  }
+]

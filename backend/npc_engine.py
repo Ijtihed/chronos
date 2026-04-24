@@ -1,7 +1,9 @@
-"""Generate NPC point-of-view responses via local Ollama.
+"""Generate NPC point-of-view responses via the LLM provider.
 
-Model tier: LOCAL — this is the highest-volume LLM call in the game.
+Model tier: QUALITY — this is the most prose-critical call in the game.
 Returns structured NPCPOVResponse; stores emotional_state on the NPC.
+On JSON parse failure, retries with raw text (still via the same tier
+dispatcher so quality-vs-fast routing is preserved on the retry).
 """
 
 from __future__ import annotations
@@ -14,7 +16,7 @@ from string import Template
 from pydantic import ValidationError
 
 from backend.hke.retrieve import retrieve_context
-from backend.llm import chat, load_prompt
+from backend.llm_provider import call_llm, load_prompt
 from backend.llm_schemas import NPCPOVResponse, leaks_raw_numbers, scrub_leaked_numbers
 from backend.npc_personality import get_dominant_need, get_urgent_needs
 from backend.world_state import (
@@ -62,6 +64,7 @@ async def generate_npc_pov(
         npc_disposition=npc.disposition,
         dominant_need=get_dominant_need(npc.needs).replace("_", " "),
         urgent_needs=urgent_str,
+        current_activity=getattr(npc, "current_activity", "") or "Going about their day.",
         relationship_to_player=npc.relationship_to_player,
         player_name=state.player.name,
         era_description=state.era.description,
@@ -80,7 +83,12 @@ async def generate_npc_pov(
     )
 
     try:
-        raw = await chat(prompt, json_mode=True)
+        raw, _ = await call_llm(
+            prompt,
+            tier="quality",
+            schema=NPCPOVResponse,
+            call_site="npc_pov",
+        )
         parsed = NPCPOVResponse.model_validate(json.loads(raw))
         text = parsed.perspective or f"[{npc.name} is silent]"
         if leaks_raw_numbers(text):
@@ -91,11 +99,15 @@ async def generate_npc_pov(
         return text
     except (json.JSONDecodeError, ValidationError):
         try:
-            raw_text = await chat(prompt)
+            raw_text, _ = await call_llm(
+                prompt,
+                tier="quality",
+                call_site="npc_pov.retry",
+            )
             if leaks_raw_numbers(raw_text):
                 raw_text = scrub_leaked_numbers(raw_text)
             return raw_text
         except Exception as exc:
-            return f"[{npc.name} is silent — Ollama error: {exc}]"
+            return f"[{npc.name} is silent — LLM error: {exc}]"
     except Exception as exc:
-        return f"[{npc.name} is silent — Ollama error: {exc}]"
+        return f"[{npc.name} is silent — LLM error: {exc}]"

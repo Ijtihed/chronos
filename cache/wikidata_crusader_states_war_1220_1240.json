@@ -1,0 +1,29 @@
+[
+  {
+    "qid": "Q24260593",
+    "label": "Battle of Adrian\u00f3polis",
+    "description": "1226 battle",
+    "year": 1226,
+    "location": "Edirne",
+    "country": "Byzantine Empire",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q2742323",
+    "label": "Siege of Constantinople",
+    "description": "1235 siege",
+    "year": 1235,
+    "location": "Constantinople",
+    "country": "Byzantine Empire",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q2742323",
+    "label": "Siege of Constantinople",
+    "description": "1235 siege",
+    "year": 1235,
+    "location": "Constantinople",
+    "country": "Latin Empire",
+    "source_type": "war"
+  }
+]

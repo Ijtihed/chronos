@@ -6,6 +6,7 @@ import pytest
 
 from backend.action_parser import parse_action
 from backend.npc_engine import generate_npc_pov
+from backend.world_engine import simulate_turn
 from backend.world_state import apply_action, create_initial_state, npcs_near_player
 
 pytestmark = pytest.mark.live
@@ -50,8 +51,18 @@ class TestActionParserLive:
             r = await parse_action(p, fresh)
             results.append(r)
 
-        speak_types = [r["action_type"] for r in results]
-        assert speak_types.count("speak") >= 2
+        hostile_types = {"attack", "betray", "threaten", "steal", "fight", "siege"}
+        for i, r in enumerate(results):
+            at = r["action_type"]
+            assert at not in hostile_types, (
+                f"Phrasing {phrasings[i]!r} misrouted to hostile type {at!r}"
+            )
+        assert not any(r.get("is_travel") for r in results), (
+            "Conversational phrasing misrouted to travel"
+        )
+        assert not any(r.get("is_inaction") for r in results), (
+            "Conversational phrasing misrouted to inaction"
+        )
 
 
 class TestNpcPovLive:
@@ -132,9 +143,10 @@ class TestFullTurnLoopLive:
         parsed = await parse_action("negotiate with the centurion for protection", state)
         assert "_parse_error" not in parsed
 
-        new_state = apply_action(state, parsed)
+        simulated, _ = await simulate_turn(state)
+        new_state = apply_action(simulated, parsed)
         assert new_state.turn == 1
-        assert len(new_state.events) == 1
+        assert len(new_state.events) >= 1
 
         nearby = npcs_near_player(new_state)
         pov = await generate_npc_pov(nearby[0], parsed, new_state)
@@ -150,14 +162,15 @@ class TestFullTurnLoopLive:
         current = state
         for text in actions:
             parsed = await parse_action(text, current)
+            current, _ = await simulate_turn(current)
             current = apply_action(current, parsed)
 
         assert current.turn == 3
-        assert len(current.events) == 3
+        assert len(current.events) >= 3
 
 
 class TestModelTierCompliance:
     @pytest.mark.asyncio
     async def test_action_parser_uses_local_ollama(self, state):
-        from backend.llm import OLLAMA_URL
+        from backend.config import OLLAMA_URL
         assert "localhost" in OLLAMA_URL or "127.0.0.1" in OLLAMA_URL

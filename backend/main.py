@@ -28,7 +28,13 @@ from backend.death_engine import (
     generate_memory_fade,
 )
 from backend.eras import ALL_ERAS, random_era
-from backend.llm import chat, load_prompt, ollama_ok
+from backend.llm_provider import (
+    call_llm,
+    gemini_ok,
+    load_prompt,
+    track_turn_cost,
+)
+from backend import config
 from backend.npc_engine import generate_npc_pov
 from backend.persistence import (
     append_turn_log,
@@ -46,6 +52,10 @@ from backend.player_knowledge import (
     build_player_view,
     filter_historical_events,
     _knowledge_tier,
+)
+from backend.scene_triggers import (
+    check_illustration_trigger,
+    compute_witnessed_events_this_turn,
 )
 from backend.world_engine import (
     advance_world,
@@ -77,6 +87,73 @@ _NPC_PERCEPTION_PATH = (
 )
 
 
+# ------------------------------------------------------------------
+# Cost tracking helpers (two-tier LLM provider)
+# ------------------------------------------------------------------
+
+def _finalize_turn_cost(state: WorldState, bucket: list) -> float:
+    """Accumulate bucket into state, update cap state, return turn delta.
+
+    Returns turn_cost_usd (the sum across this turn), to be persisted in
+    turn_logs.turn_cost_usd. Mutates `state.cumulative_cost_usd` and
+    `state.cost_cap_state` in place.
+    """
+    turn_delta = sum(u.cost_usd for u in bucket)
+    state.cumulative_cost_usd = float(state.cumulative_cost_usd) + turn_delta
+    _enforce_cost_caps(state)
+    return turn_delta
+
+
+def _enforce_cost_caps(state: WorldState) -> None:
+    """Update state.cost_cap_state based on cumulative EUR cost.
+
+    State machine:
+      none           -> initial
+      soft_crossed   -> >= COST_CAP_SOFT_EUR (banner shown in frontend)
+      hard           -> >= COST_CAP_HARD_EUR (turn advancement blocked)
+    """
+    cost_eur = float(state.cumulative_cost_usd) * config.USD_TO_EUR
+    if cost_eur >= config.COST_CAP_HARD_EUR:
+        if state.cost_cap_state != "hard":
+            logger.warning(
+                "HARD COST CAP reached for run %s: %.4f USD (EUR %.2f)",
+                state.run_id, state.cumulative_cost_usd, cost_eur,
+            )
+            state.cost_cap_state = "hard"
+    elif cost_eur >= config.COST_CAP_SOFT_EUR:
+        if state.cost_cap_state == "none":
+            logger.warning(
+                "Soft cost cap crossed for run %s: %.4f USD (EUR %.2f)",
+                state.run_id, state.cumulative_cost_usd, cost_eur,
+            )
+            state.cost_cap_state = "soft_crossed"
+
+
+def _check_hard_cap_or_raise(state: WorldState) -> None:
+    """Raise 402 if the run has hit its hard cost cap.
+
+    Applied at the entry of every turn-advancing endpoint. Read-only
+    endpoints (/state, /perception, /region, /context) are NOT gated —
+    the player can still observe the world and end the run manually.
+    """
+    if state.cost_cap_state == "hard":
+        cost_eur = float(state.cumulative_cost_usd) * config.USD_TO_EUR
+        raise HTTPException(
+            status_code=402,
+            detail={
+                "code": "cost_cap_hard",
+                "cost_usd": float(state.cumulative_cost_usd),
+                "cost_eur": cost_eur,
+                "cap_eur": config.COST_CAP_HARD_EUR,
+                "message": (
+                    f"Hard cost cap reached (€{cost_eur:.2f} / "
+                    f"€{config.COST_CAP_HARD_EUR:.2f}). End run manually "
+                    "to continue."
+                ),
+            },
+        )
+
+
 class TurnRequest(BaseModel):
     player_input: str
 
@@ -92,11 +169,21 @@ class RunRequest(BaseModel):
 @app.on_event("startup")
 async def _startup() -> None:
     await init_db()
-    ok = await ollama_ok()
-    if ok:
-        logger.info("Ollama is reachable")
-    else:
-        logger.warning("Ollama is NOT reachable — LLM calls will fail")
+    config.startup_log(logger)
+    if config.GEMINI_API_KEY:
+        ok, detail = await gemini_ok()
+        if ok:
+            logger.info(
+                "Gemini startup smoke test OK (%s, %s)",
+                config.CHRONOS_GEMINI_MODEL, detail,
+            )
+        else:
+            logger.warning(
+                "Gemini startup smoke test FAILED (%s). LLM calls will return "
+                "NoOp responses until the circuit recovers. "
+                "Check GEMINI_API_KEY and model name '%s'.",
+                detail, config.CHRONOS_GEMINI_MODEL,
+            )
 
 
 # ------------------------------------------------------------------
@@ -105,7 +192,8 @@ async def _startup() -> None:
 
 @app.get("/api/health")
 async def health():
-    return {"status": "ok", "phase": 2, "ollama": await ollama_ok()}
+    gemini_status, gemini_detail = await gemini_ok()
+    return {"status": "ok", "phase": 2, "gemini": gemini_status, "gemini_detail": gemini_detail}
 
 
 @app.get("/api/geo/{era_key}")
@@ -195,11 +283,9 @@ async def new_run(req: RunRequest = RunRequest()):
     else:
         era_key, era_config = random_era()
 
-    if await ollama_ok():
+    with track_turn_cost() as bucket:
         state = await generate_run(era_config)
-    else:
-        logger.warning("Ollama down — using hardcoded initial state")
-        state = create_initial_state()
+        _finalize_turn_cost(state, bucket)
 
     await save_session(state)
     return {
@@ -261,59 +347,70 @@ async def _execute_turn(run_id: str, req: TurnRequest) -> dict:
     if state.run_status != "active":
         raise HTTPException(403, f"Run is '{state.run_status}'")
 
+    _check_hard_cap_or_raise(state)
+
     text = req.player_input.strip()
     if not text:
         raise HTTPException(400, "Empty input")
 
     state_before = state.model_dump()
 
-    # --- Step 1: World simulates (NPCs act autonomously) ---
-    state, ambient = await simulate_turn(state)
+    with track_turn_cost() as bucket:
+        # --- Step 1: World simulates (NPCs act autonomously) ---
+        state, ambient = await simulate_turn(state)
 
-    # --- Step 2: Parse player action ---
-    parsed = await parse_action(text, state)
+        # --- Step 2: Parse player action ---
+        parsed = await parse_action(text, state)
 
-    if parsed.get("is_travel") and parsed.get("destination"):
-        return await _handle_travel(state, parsed, ambient, text, state_before)
+        if parsed.get("is_travel") and parsed.get("destination"):
+            return await _handle_travel(state, parsed, ambient, text, state_before, bucket)
 
-    if parsed.get("is_inaction"):
-        return await _handle_inaction(state, parsed, ambient, text, state_before)
+        if parsed.get("is_inaction"):
+            return await _handle_inaction(state, parsed, ambient, text, state_before, bucket)
 
-    # --- Step 3: Apply player action ---
-    state = apply_action(state, parsed)
+        # --- Step 3: Apply player action ---
+        state = apply_action(state, parsed)
 
-    # --- Step 3b: Schedule consequences from significant actions ---
-    sig = parsed.get("significance_score", 0.0)
-    if sig >= 0.5:
-        _schedule_player_consequences(state, parsed)
+        # --- Step 3b: Schedule consequences from significant actions ---
+        sig = parsed.get("significance_score", 0.0)
+        if sig >= 0.5:
+            _schedule_player_consequences(state, parsed)
 
-    # --- Step 3c: Check for historical divergence ---
-    divergences_before = len(state.historical_divergences)
-    if sig >= 0.6:
-        await _check_historical_divergence(state, parsed)
-    new_divergences = [
-        {
-            "canonical_event": d["canonical_event"],
-            "player_action": d["player_action"],
-            "significance": sig,
-            "superseded": True,
-        }
-        for d in state.historical_divergences[divergences_before:]
-    ]
+        # --- Step 3c: Check for historical divergence ---
+        divergences_before = len(state.historical_divergences)
+        if sig >= 0.6:
+            await _check_historical_divergence(state, parsed)
+        new_divergences = [
+            {
+                "canonical_event": d["canonical_event"],
+                "player_action": d["player_action"],
+                "significance": sig,
+                "superseded": True,
+            }
+            for d in state.historical_divergences[divergences_before:]
+        ]
 
-    # --- Step 4: Death check ---
-    death_result = await check_death(state, parsed)
+        # --- Step 4: Death check ---
+        death_result = await check_death(state, parsed)
 
-    # --- Step 5: Generate NPC reactions to player (selective) ---
-    relevant = _filter_relevant(npcs_near_player(state), parsed.get("npc_impacts", []))
-    pov_tasks = [generate_npc_pov(npc, parsed, state) for npc in relevant]
-    pov_results = await asyncio.gather(*pov_tasks, return_exceptions=True)
-    npc_responses = _build_npc_responses(relevant, pov_results)
-    _store_povs(state, relevant, pov_results)
+        # --- Step 5: Generate NPC reactions to player (selective) ---
+        relevant = _filter_relevant(npcs_near_player(state), parsed.get("npc_impacts", []))
+        pov_tasks = [generate_npc_pov(npc, parsed, state) for npc in relevant]
+        pov_results = await asyncio.gather(*pov_tasks, return_exceptions=True)
+        npc_responses = _build_npc_responses(relevant, pov_results)
+        _store_povs(state, relevant, pov_results)
 
-    death_info = death_result if death_result["died"] else None
-    if death_result["died"]:
-        state = apply_death(state, death_result["cause"])
+        death_info = death_result if death_result["died"] else None
+        if death_result["died"]:
+            state = apply_death(state, death_result["cause"])
+
+        trigger_log = await _check_and_record_illustration_trigger(
+            state,
+            parsed=parsed,
+            death_info=death_info,
+            new_divergences=new_divergences,
+        )
+        turn_cost_usd = _finalize_turn_cost(state, bucket)
 
     await save_session(state)
 
@@ -326,6 +423,8 @@ async def _execute_turn(run_id: str, req: TurnRequest) -> dict:
         state_changes=compute_state_diff(state_before, state.model_dump()),
         narrative_output=narrative,
         player_view_snapshot=pv.model_dump(),
+        illustration_trigger=trigger_log,
+        turn_cost_usd=turn_cost_usd,
     )
 
     return {
@@ -358,23 +457,29 @@ async def _execute_skip(run_id: str, req: SkipRequest) -> dict:
     if state.run_status != "active":
         raise HTTPException(403, f"Run is '{state.run_status}'")
 
+    _check_hard_cap_or_raise(state)
+
     ticks = max(1, min(30, req.ticks))
     state_before = state.model_dump()
 
-    state = await advance_world_skip(state, ticks=ticks)
+    with track_turn_cost() as bucket:
+        state = await advance_world_skip(state, ticks=ticks)
 
-    nearby = npcs_near_player(state)
-    player_loc = get_player_location(state)
+        nearby = npcs_near_player(state)
+        player_loc = get_player_location(state)
 
-    regrounding = (
-        f"Time passes. It is now year {state.current_year} AD. "
-        f"You are in {player_loc.name}. "
-    )
-    if nearby:
-        npc_names = ", ".join(n.name for n in nearby[:3])
-        regrounding += f"{npc_names} {'is' if len(nearby[:3]) == 1 else 'are'} nearby."
-    else:
-        regrounding += "The area seems quiet."
+        regrounding = (
+            f"Time passes. It is now year {state.current_year} AD. "
+            f"You are in {player_loc.name}. "
+        )
+        if nearby:
+            npc_names = ", ".join(n.name for n in nearby[:3])
+            regrounding += f"{npc_names} {'is' if len(nearby[:3]) == 1 else 'are'} nearby."
+        else:
+            regrounding += "The area seems quiet."
+
+        trigger_log = await _check_and_record_illustration_trigger(state)
+        turn_cost_usd = _finalize_turn_cost(state, bucket)
 
     await save_session(state)
 
@@ -388,6 +493,8 @@ async def _execute_skip(run_id: str, req: SkipRequest) -> dict:
         state_changes=compute_state_diff(state_before, state.model_dump()),
         narrative_output=narrative,
         player_view_snapshot=pv.model_dump(),
+        illustration_trigger=trigger_log,
+        turn_cost_usd=turn_cost_usd,
     )
 
     return {
@@ -428,12 +535,21 @@ async def npc_perception(run_id: str, npc_id: str):
         story_so_far=build_story_summary(state),
     )
 
-    try:
-        text = await chat(prompt)
-        if leaks_raw_numbers(text):
-            text = scrub_leaked_numbers(text)
-    except Exception:
-        text = f"You are not sure what to make of {npc.name}."
+    # Read-only endpoint; wrap in a local bucket so ContextVar warnings
+    # don't fire. The cost (FAST tier = $0) is intentionally not added
+    # to state.cumulative_cost_usd — this endpoint does not advance the
+    # world or mutate state.
+    with track_turn_cost():
+        try:
+            text, _ = await call_llm(
+                prompt,
+                tier="fast",
+                call_site="npc_perception",
+            )
+            if leaks_raw_numbers(text):
+                text = scrub_leaked_numbers(text)
+        except Exception:
+            text = f"You are not sure what to make of {npc.name}."
 
     return {"npc_id": npc.id, "npc_name": npc.name, "perception": text}
 
@@ -465,10 +581,15 @@ async def explain_context(run_id: str, req: ContextRequest):
         f"Do not repeat the passage. Do not use modern language. Stay in the voice of a scholarly chronicler."
     )
 
-    try:
-        text = await chat(prompt)
-    except Exception:
-        text = "The archives offer no further illumination on this matter."
+    with track_turn_cost():
+        try:
+            text, _ = await call_llm(
+                prompt,
+                tier="fast",
+                call_site="historical_context",
+            )
+        except Exception:
+            text = "The archives offer no further illumination on this matter."
 
     return {"context": text}
 
@@ -496,19 +617,24 @@ async def region_knowledge(run_id: str, polity_name: str):
     year = state.current_year or state.era.year_start
     try:
         raw_events = await query_historical_events(
-            year_start=year - 100, year_end=year + 5, region=polity_name,
+            year_start=year - 25, year_end=year + 5, region=polity_name,
         )
     except Exception:
         raw_events = []
 
     filtered = filter_historical_events(raw_events, state)
 
+    _SIG_ORDER = {"civilizational": 0, "regional": 1, "local": 2}
+    filtered.sort(key=lambda ev: (_SIG_ORDER.get(ev.significance, 9), -ev.year))
+    _MAX_REGION_EVENTS = 12
+    capped = filtered[:_MAX_REGION_EVENTS]
+
     known_facts = [
-        ev.event for ev in filtered
+        ev.event for ev in capped
         if ev.knowledge_quality in ("witnessed", "known")
     ]
     rumors = [
-        ev.event for ev in filtered
+        ev.event for ev in capped
         if ev.knowledge_quality.startswith("rumor")
     ]
 
@@ -516,24 +642,29 @@ async def region_knowledge(run_id: str, polity_name: str):
     ignorance = len(known_facts) == 0 and tier == "low"
 
     character_note = ""
-    try:
-        raw_template = load_prompt(_REGION_KNOWLEDGE_PROMPT_PATH)
-        player_loc = get_player_location(state)
-        prompt = Template(raw_template).safe_substitute(
-            character_name=state.player.name,
-            character_role=state.player.role,
-            character_archetype=state.player.archetype,
-            location_name=player_loc.name,
-            year=year,
-            era_description=state.era.description,
-            region_name=polity_name,
-            known_facts="\n".join(f"- {f}" for f in known_facts) or "Nothing specific.",
-            rumors="\n".join(f"- {r}" for r in rumors) or "No rumors heard.",
-        )
-        character_note = await chat(prompt)
-        character_note = character_note.strip().split("\n")[0][:200]
-    except Exception:
-        character_note = f"You know little of {polity_name}."
+    with track_turn_cost():
+        try:
+            raw_template = load_prompt(_REGION_KNOWLEDGE_PROMPT_PATH)
+            player_loc = get_player_location(state)
+            prompt = Template(raw_template).safe_substitute(
+                character_name=state.player.name,
+                character_role=state.player.role,
+                character_archetype=state.player.archetype,
+                location_name=player_loc.name,
+                year=year,
+                era_description=state.era.description,
+                region_name=polity_name,
+                known_facts="\n".join(f"- {f}" for f in known_facts) or "Nothing specific.",
+                rumors="\n".join(f"- {r}" for r in rumors) or "No rumors heard.",
+            )
+            character_note, _ = await call_llm(
+                prompt,
+                tier="fast",
+                call_site="region_knowledge",
+            )
+            character_note = character_note.strip().split("\n")[0][:200]
+        except Exception:
+            character_note = f"You know little of {polity_name}."
 
     return RegionKnowledge(
         polity_name=polity_name,
@@ -545,12 +676,100 @@ async def region_knowledge(run_id: str, polity_name: str):
 
 
 # ------------------------------------------------------------------
+# Visible events for map (knowledge-filtered + geocoded)
+# ------------------------------------------------------------------
+
+_VISIBLE_EVENTS_WINDOW_BEFORE = 50
+_VISIBLE_EVENTS_WINDOW_AFTER = 5
+
+
+def _era_key_for_state(state: WorldState) -> str:
+    """Reverse-lookup era_key from state.era.name. Defaults to first key."""
+    for key, cfg in ALL_ERAS.items():
+        if cfg["name"] == state.era.name:
+            return key
+    return next(iter(ALL_ERAS.keys()))
+
+
+@app.get("/api/run/{run_id}/events/visible")
+async def events_visible(run_id: str):
+    """Knowledge-filtered historical events with resolved coordinates.
+
+    Used by the map to render event markers.  Per-turn recompute (no
+    cache): the player's knowledge changes as they travel.
+
+    Events are filtered through the Knowledge Matrix
+    (filter_historical_events); `unknown`-tier events are omitted at
+    that layer.  Events whose `region` does not resolve to a
+    centroid are also omitted — no pin we could plausibly render.
+    """
+    from backend.geo.centroids import resolve_region
+
+    state = await _load_or_404(run_id)
+    year = state.current_year or state.era.year_start
+
+    try:
+        raw_events = await query_historical_events(
+            year_start=year - _VISIBLE_EVENTS_WINDOW_BEFORE,
+            year_end=year + _VISIBLE_EVENTS_WINDOW_AFTER,
+            region=state.era.region,
+        )
+        # Widen to all regions if region-scoped query is empty — matches
+        # HCE behavior and ensures we show what the character could
+        # plausibly hear from abroad.
+        if not raw_events:
+            raw_events = await query_historical_events(
+                year_start=year - _VISIBLE_EVENTS_WINDOW_BEFORE,
+                year_end=year + _VISIBLE_EVENTS_WINDOW_AFTER,
+            )
+    except Exception as exc:
+        logger.warning("events/visible: DB query failed: %s", exc)
+        raw_events = []
+
+    # Build a quick id lookup so we can carry the DB id through the
+    # HistoricalEventView layer (which doesn't expose it).
+    id_by_sig = {
+        (ev.get("year"), ev.get("event"), ev.get("region")): ev.get("id")
+        for ev in raw_events
+    }
+
+    filtered = filter_historical_events(raw_events, state)
+
+    out: list[dict] = []
+    for ev_view in filtered:
+        centroid = resolve_region(ev_view.region)
+        if centroid is None:
+            continue
+        ev_id = id_by_sig.get((ev_view.year, ev_view.event, ev_view.region))
+        out.append({
+            "id": ev_id,
+            "year": ev_view.year,
+            "type": ev_view.event_type,
+            "significance": ev_view.significance,
+            "tier": ev_view.knowledge_quality,
+            "accuracy": ev_view.accuracy,
+            "lat": centroid["lat"],
+            "lon": centroid["lon"],
+            "radius_km": centroid["radius_km"],
+            "broad": centroid["broad"],
+            "summary": ev_view.event,
+            "region": ev_view.region or "",
+        })
+
+    return {
+        "era_key": _era_key_for_state(state),
+        "events": out,
+    }
+
+
+# ------------------------------------------------------------------
 # Turn handlers
 # ------------------------------------------------------------------
 
 async def _handle_inaction(
     state: WorldState, parsed: dict, ambient: list,
     player_input: str = "", state_before: dict = None,
+    cost_bucket: list | None = None,
 ) -> dict:
     auto = await player_skip_turn(state)
     auto["era_description"] = parsed.get("era_description") or auto.get("era_description", "")
@@ -561,6 +780,12 @@ async def _handle_inaction(
     if death_result["died"]:
         state = apply_death(state, death_result["cause"])
 
+    trigger_log = await _check_and_record_illustration_trigger(
+        state, parsed=auto, death_info=death_info,
+    )
+    turn_cost_usd = (
+        _finalize_turn_cost(state, cost_bucket) if cost_bucket is not None else 0.0
+    )
     await save_session(state)
 
     pv = build_player_view(state, state.run_id)
@@ -573,6 +798,8 @@ async def _handle_inaction(
             state_changes=compute_state_diff(state_before, state.model_dump()),
             narrative_output=narrative,
             player_view_snapshot=pv.model_dump(),
+            illustration_trigger=trigger_log,
+            turn_cost_usd=turn_cost_usd,
         )
 
     return {
@@ -587,12 +814,19 @@ async def _handle_inaction(
 async def _handle_travel(
     state: WorldState, parsed: dict, ambient: list,
     player_input: str = "", state_before: dict = None,
+    cost_bucket: list | None = None,
 ) -> dict:
     dest_id = parsed["destination"].lower().strip()
     player_loc = get_player_location(state)
 
     if dest_id not in player_loc.neighbors:
         state = apply_action(state, parsed)
+        trigger_log = await _check_and_record_illustration_trigger(
+            state, parsed=parsed,
+        )
+        turn_cost_usd = (
+            _finalize_turn_cost(state, cost_bucket) if cost_bucket is not None else 0.0
+        )
         await save_session(state)
         pv = build_player_view(state, state.run_id)
         narrative = build_narrative_output(ambient, parsed, [])
@@ -604,6 +838,8 @@ async def _handle_travel(
                 state_changes=compute_state_diff(state_before, state.model_dump()),
                 narrative_output=narrative,
                 player_view_snapshot=pv.model_dump(),
+                illustration_trigger=trigger_log,
+                turn_cost_usd=turn_cost_usd,
             )
         return {
             "ambient_activity": ambient,
@@ -619,6 +855,15 @@ async def _handle_travel(
     state.player.location = dest_id
     if dest_id not in state.visited_locations:
         state.visited_locations.append(dest_id)
+
+    try:
+        from backend.hce import generate_ground_context
+        state.ground_context = await generate_ground_context(state)
+        state.ground_context_stale = False
+        logger.info("Ground context refreshed on arrival at %s", dest_id)
+    except Exception as exc:
+        logger.warning("Ground context refresh on arrival failed: %s", exc)
+        state.ground_context_stale = True
 
     try:
         dest_name = get_location(state, dest_id).name
@@ -648,6 +893,12 @@ async def _handle_travel(
         arrival_povs = _build_npc_responses(nearby[:3], pov_results)
         _store_povs(state, nearby[:3], pov_results)
 
+    trigger_log = await _check_and_record_illustration_trigger(
+        state, parsed=parsed,
+    )
+    turn_cost_usd = (
+        _finalize_turn_cost(state, cost_bucket) if cost_bucket is not None else 0.0
+    )
     await save_session(state)
 
     pv = build_player_view(state, state.run_id)
@@ -663,6 +914,8 @@ async def _handle_travel(
             state_changes=compute_state_diff(state_before, state.model_dump()),
             narrative_output=narrative,
             player_view_snapshot=pv.model_dump(),
+            illustration_trigger=trigger_log,
+            turn_cost_usd=turn_cost_usd,
         )
 
     return {
@@ -676,24 +929,62 @@ async def _handle_travel(
 
 
 async def _handle_observation(state: WorldState, text: str) -> dict:
+    # Observation mode still burns tokens (NPC actions, memory-fade, erasure).
+    # The hard cap applies — a run capped at €2 stays frozen until the player
+    # ends it manually via DELETE /api/run/{run_id}.
+    _check_hard_cap_or_raise(state)
+
     state_before = state.model_dump()
     parsed = await parse_action(text, state)
     state = state.model_copy(deep=True)
 
-    if parsed.get("is_travel") and parsed.get("destination"):
-        dest_id = parsed["destination"].lower().strip()
-        player_loc = get_player_location(state)
-        if dest_id in player_loc.neighbors:
-            travel_turns = player_loc.neighbors[dest_id]
-            state = await advance_world(state, ticks=travel_turns)
-            for _ in range(travel_turns):
-                state = decay_memories(state)
-            if state.run_status == "ended":
-                erasure_text = await generate_erasure(state)
+    with track_turn_cost() as bucket:
+        if parsed.get("is_travel") and parsed.get("destination"):
+            dest_id = parsed["destination"].lower().strip()
+            player_loc = get_player_location(state)
+            if dest_id in player_loc.neighbors:
+                travel_turns = player_loc.neighbors[dest_id]
+                state = await advance_world(state, ticks=travel_turns)
+                for _ in range(travel_turns):
+                    state = decay_memories(state)
+                if state.run_status == "ended":
+                    erasure_text = await generate_erasure(state)
+                    state.player.location = dest_id
+                    trigger_log = await _check_and_record_illustration_trigger(
+                        state, parsed=parsed,
+                    )
+                    turn_cost_usd = _finalize_turn_cost(state, bucket)
+                    await save_session(state)
+                    pv = build_player_view(state, state.run_id)
+                    narrative = build_narrative_output([], parsed, [], erasure=erasure_text)
+                    await append_turn_log(
+                        run_id=state.run_id, turn_number=state.turn,
+                        player_input=text, parsed_action=parsed,
+                        ambient_activity=[], npc_responses=[],
+                        state_changes=compute_state_diff(state_before, state.model_dump()),
+                        narrative_output=narrative,
+                        player_view_snapshot=pv.model_dump(),
+                        illustration_trigger=trigger_log,
+                        turn_cost_usd=turn_cost_usd,
+                    )
+                    return {"erasure": erasure_text, "player_view": pv.model_dump()}
                 state.player.location = dest_id
+                if dest_id not in state.visited_locations:
+                    state.visited_locations.append(dest_id)
+                try:
+                    from backend.hce import generate_ground_context
+                    state.ground_context = await generate_ground_context(state)
+                    state.ground_context_stale = False
+                except Exception:
+                    state.ground_context_stale = True
+                fade_text = await generate_memory_fade(state)
+                trigger_log = await _check_and_record_illustration_trigger(
+                    state, parsed=parsed,
+                )
+                turn_cost_usd = _finalize_turn_cost(state, bucket)
                 await save_session(state)
                 pv = build_player_view(state, state.run_id)
-                narrative = build_narrative_output([], parsed, [], erasure=erasure_text)
+                narrative = build_narrative_output([], parsed, [])
                 await append_turn_log(
                     run_id=state.run_id, turn_number=state.turn,
                     player_input=text, parsed_action=parsed,
@@ -701,44 +992,53 @@ async def _handle_observation(state: WorldState, text: str) -> dict:
                     state_changes=compute_state_diff(state_before, state.model_dump()),
                     narrative_output=narrative,
                     player_view_snapshot=pv.model_dump(),
+                    illustration_trigger=trigger_log,
+                    turn_cost_usd=turn_cost_usd,
                 )
-                return {"erasure": erasure_text, "player_view": pv.model_dump()}
-            state.player.location = dest_id
-            if dest_id not in state.visited_locations:
-                state.visited_locations.append(dest_id)
-            fade_text = await generate_memory_fade(state)
+                return {
+                    "ambient_activity": [],
+                    "parsed_action": parsed,
+                    "player_view": pv.model_dump(),
+                    "npc_responses": [],
+                    "death": None,
+                    "memory_fade": fade_text,
+                }
+
+        # World keeps moving even after death — run full simulation
+        state, ambient = await simulate_turn(state)
+        state = decay_memories(state)
+
+        # Generate fade framing
+        fade_text = await generate_memory_fade(state)
+
+        if state.run_status == "ended":
+            erasure_text = await generate_erasure(state)
+            trigger_log = await _check_and_record_illustration_trigger(
+                state, parsed=parsed,
+            )
+            turn_cost_usd = _finalize_turn_cost(state, bucket)
             await save_session(state)
             pv = build_player_view(state, state.run_id)
-            narrative = build_narrative_output([], parsed, [])
+            narrative = build_narrative_output(ambient, parsed, [], erasure=erasure_text)
             await append_turn_log(
                 run_id=state.run_id, turn_number=state.turn,
                 player_input=text, parsed_action=parsed,
-                ambient_activity=[], npc_responses=[],
+                ambient_activity=ambient, npc_responses=[],
                 state_changes=compute_state_diff(state_before, state.model_dump()),
                 narrative_output=narrative,
                 player_view_snapshot=pv.model_dump(),
+                illustration_trigger=trigger_log,
+                turn_cost_usd=turn_cost_usd,
             )
-            return {
-                "ambient_activity": [],
-                "parsed_action": parsed,
-                "player_view": pv.model_dump(),
-                "npc_responses": [],
-                "death": None,
-                "memory_fade": fade_text,
-            }
+            return {"erasure": erasure_text, "player_view": pv.model_dump()}
 
-    # World keeps moving even after death — run full simulation
-    state, ambient = await simulate_turn(state)
-    state = decay_memories(state)
-
-    # Generate fade framing
-    fade_text = await generate_memory_fade(state)
-
-    if state.run_status == "ended":
-        erasure_text = await generate_erasure(state)
+        trigger_log = await _check_and_record_illustration_trigger(
+            state, parsed=parsed,
+        )
+        turn_cost_usd = _finalize_turn_cost(state, bucket)
         await save_session(state)
         pv = build_player_view(state, state.run_id)
-        narrative = build_narrative_output(ambient, parsed, [], erasure=erasure_text)
+        narrative = build_narrative_output(ambient, parsed, [])
         await append_turn_log(
             run_id=state.run_id, turn_number=state.turn,
             player_input=text, parsed_action=parsed,
@@ -746,28 +1046,17 @@ async def _handle_observation(state: WorldState, text: str) -> dict:
             state_changes=compute_state_diff(state_before, state.model_dump()),
             narrative_output=narrative,
             player_view_snapshot=pv.model_dump(),
+            illustration_trigger=trigger_log,
+            turn_cost_usd=turn_cost_usd,
         )
-        return {"erasure": erasure_text, "player_view": pv.model_dump()}
-
-    await save_session(state)
-    pv = build_player_view(state, state.run_id)
-    narrative = build_narrative_output(ambient, parsed, [])
-    await append_turn_log(
-        run_id=state.run_id, turn_number=state.turn,
-        player_input=text, parsed_action=parsed,
-        ambient_activity=ambient, npc_responses=[],
-        state_changes=compute_state_diff(state_before, state.model_dump()),
-        narrative_output=narrative,
-        player_view_snapshot=pv.model_dump(),
-    )
-    return {
-        "ambient_activity": ambient,
-        "parsed_action": parsed,
-        "player_view": pv.model_dump(),
-        "npc_responses": [],
-        "death": None,
-        "memory_fade": fade_text,
-    }
+        return {
+            "ambient_activity": ambient,
+            "parsed_action": parsed,
+            "player_view": pv.model_dump(),
+            "npc_responses": [],
+            "death": None,
+            "memory_fade": fade_text,
+        }
 
 
 # ------------------------------------------------------------------
@@ -834,8 +1123,68 @@ async def _load_or_404(run_id: str) -> WorldState:
     return state
 
 
+async def _check_and_record_illustration_trigger(
+    state: WorldState,
+    *,
+    parsed: dict | None = None,
+    death_info: dict | None = None,
+    new_divergences: list | None = None,
+) -> dict | None:
+    """Phase 3 Step 3.1 — Stage 6.5 trigger detection.
+
+    Runs at every save-point across the five turn-advancing paths.
+    On fire, appends a minimal entry to state.illustration_triggers_fired
+    and returns the full log dict for turn_logs.illustration_trigger.
+
+    Side effects in this helper:
+      1. state.illustration_triggers_fired.append(...) on fire.
+      2. state.previously_visited_locations = list(state.visited_locations)
+         — ALWAYS, regardless of fire. End-of-turn snapshot so the next
+         turn's first-arrival check has a stable prior state.
+
+    Does NOT call save_session. The caller saves immediately after.
+    """
+    try:
+        witnessed = await compute_witnessed_events_this_turn(state)
+    except Exception as exc:
+        logger.warning("witnessed-events query failed (non-fatal): %s", exc)
+        witnessed = []
+
+    trigger = check_illustration_trigger(
+        state,
+        parsed=parsed,
+        death_info=death_info,
+        new_divergences=new_divergences,
+        witnessed_events_this_turn=witnessed,
+    )
+
+    log_dict: dict | None = None
+    if trigger is not None:
+        state.illustration_triggers_fired.append({
+            "turn": state.turn,
+            "type": trigger.type,
+            "reason": trigger.reason,
+        })
+        log_dict = trigger.log_dict()
+        logger.info(
+            "illustration_trigger fired turn=%d run=%s type=%s tone=%s reason=%s",
+            state.turn, state.run_id, trigger.type, trigger.tone_hint,
+            trigger.reason,
+        )
+
+    # Always snapshot visited_locations for the NEXT turn's first-arrival
+    # check. Mutating outside the trigger branch so the snapshot exists
+    # even on no-fire turns.
+    state.previously_visited_locations = list(state.visited_locations)
+    return log_dict
+
+
 def _schedule_player_consequences(state: WorldState, parsed: dict) -> None:
     """Schedule downstream consequences from a significant player action.
+
+    Dispatch table routes each canonical action_type to specific
+    consequences at sig >= 0.5.  Generic tiers (rumor at 0.6, tension
+    at 0.8) layer on top for ALL types.
 
     Writes directly to state.consequence_queue (in-memory).
     """
@@ -843,27 +1192,22 @@ def _schedule_player_consequences(state: WorldState, parsed: dict) -> None:
     target = parsed.get("target")
     sig = parsed.get("significance_score", 0.5)
     player_loc = state.player.location
+    player_name = state.player.name
+    era_desc = parsed.get("era_description", "something noteworthy")
 
-    if action_type in ("betray", "attack", "threaten", "steal"):
-        target_npc = next(
-            (n for n in state.npcs if target and target.lower() in n.name.lower()),
-            None,
-        )
-        if target_npc:
-            state.consequence_queue.append(ScheduledConsequence(
-                trigger_turn=state.turn + 1,
-                target_type="location", target_id=target_npc.location,
-                effect_type="tension_shift",
-                effect_payload={"delta": 1},
-            ))
+    # --- Per-type specific consequences (sig >= 0.5) ---
+    handler = _CONSEQUENCE_DISPATCH.get(action_type)
+    if handler is not None:
+        handler(state, action_type, target, sig, player_loc, player_name, era_desc)
 
+    # --- Generic graduated tiers (all types) ---
     if sig >= 0.6:
         state.consequence_queue.append(ScheduledConsequence(
             trigger_turn=state.turn + 2,
             target_type="location", target_id=player_loc,
             effect_type="rumor",
             effect_payload={
-                "rumor_text": f"People talk about what {state.player.name} did — {parsed.get('era_description', 'something noteworthy')}.",
+                "rumor_text": f"People talk about what {player_name} did — {era_desc}.",
             },
         ))
 
@@ -875,17 +1219,191 @@ def _schedule_player_consequences(state: WorldState, parsed: dict) -> None:
             effect_payload={"delta": 1},
         ))
 
-    if action_type in ("trade", "negotiate") and sig >= 0.5:
-        state.consequence_queue.append(ScheduledConsequence(
-            trigger_turn=state.turn + 3,
-            target_type="location", target_id=player_loc,
-            effect_type="event_spawn",
-            effect_payload={
-                "description": f"The consequences of {state.player.name}'s {action_type} continue to unfold.",
-                "location": player_loc,
-                "action_type": "ambient",
-            },
-        ))
+
+def _find_target_npc(state: WorldState, target: str):
+    """Resolve a target string to an NPC, or None."""
+    if not target:
+        return None
+    target_lower = target.lower()
+    return next(
+        (n for n in state.npcs if target_lower in n.name.lower()),
+        None,
+    )
+
+
+def _cq_rumor_fallback(state, player_loc, player_name, era_desc):
+    """Target-miss fallback: a rumor at player location.
+
+    Replaces (does not stack with) the target-dependent specific
+    consequence when the target string doesn't resolve to an NPC.
+    Same density shape as the petition/hoard handlers.
+    """
+    state.consequence_queue.append(ScheduledConsequence(
+        trigger_turn=state.turn + 2,
+        target_type="location", target_id=player_loc,
+        effect_type="rumor",
+        effect_payload={
+            "rumor_text": f"People talk about what {player_name} did — {era_desc}.",
+        },
+    ))
+
+
+def _cq_hostile(state, action_type, target, sig, player_loc, player_name, era_desc):
+    """attack, threaten, steal: tension at target NPC's location.
+
+    Target-miss fallback: rumor at player location.
+    """
+    target_npc = _find_target_npc(state, target)
+    if target_npc is None:
+        _cq_rumor_fallback(state, player_loc, player_name, era_desc)
+        return
+    state.consequence_queue.append(ScheduledConsequence(
+        trigger_turn=state.turn + 1,
+        target_type="location", target_id=target_npc.location,
+        effect_type="tension_shift",
+        effect_payload={"delta": 1},
+    ))
+
+
+def _cq_betray(state, action_type, target, sig, player_loc, player_name, era_desc):
+    """betray: tension at target location + disposition -1 on target.
+
+    Target-miss fallback: rumor at player location. Inlined (not
+    delegated to _cq_hostile) to avoid double-firing the fallback.
+    """
+    target_npc = _find_target_npc(state, target)
+    if target_npc is None:
+        _cq_rumor_fallback(state, player_loc, player_name, era_desc)
+        return
+    state.consequence_queue.append(ScheduledConsequence(
+        trigger_turn=state.turn + 1,
+        target_type="location", target_id=target_npc.location,
+        effect_type="tension_shift",
+        effect_payload={"delta": 1},
+    ))
+    state.consequence_queue.append(ScheduledConsequence(
+        trigger_turn=state.turn + 1,
+        target_type="npc", target_id=target_npc.id,
+        effect_type="disposition_shift",
+        effect_payload={"delta": -1},
+    ))
+
+
+def _cq_trade(state, action_type, target, sig, player_loc, player_name, era_desc):
+    """trade, negotiate: event_spawn at player location."""
+    state.consequence_queue.append(ScheduledConsequence(
+        trigger_turn=state.turn + 3,
+        target_type="location", target_id=player_loc,
+        effect_type="event_spawn",
+        effect_payload={
+            "description": f"The consequences of {player_name}'s {action_type} continue to unfold.",
+            "location": player_loc,
+            "action_type": "ambient",
+        },
+    ))
+
+
+def _cq_petition(state, action_type, target, sig, player_loc, player_name, era_desc):
+    """petition: rumor — petitions generate talk."""
+    state.consequence_queue.append(ScheduledConsequence(
+        trigger_turn=state.turn + 2,
+        target_type="location", target_id=player_loc,
+        effect_type="rumor",
+        effect_payload={
+            "rumor_text": f"{player_name}'s petition is the talk of {next((l.name for l in state.locations if l.id == player_loc), 'the area')}.",
+        },
+    ))
+
+
+def _cq_fight(state, action_type, target, sig, player_loc, player_name, era_desc):
+    """fight: tension +1 at player location."""
+    state.consequence_queue.append(ScheduledConsequence(
+        trigger_turn=state.turn + 1,
+        target_type="location", target_id=player_loc,
+        effect_type="tension_shift",
+        effect_payload={"delta": 1},
+    ))
+
+
+def _cq_siege(state, action_type, target, sig, player_loc, player_name, era_desc):
+    """siege: tension +1 immediately + trade disruption later."""
+    state.consequence_queue.append(ScheduledConsequence(
+        trigger_turn=state.turn + 1,
+        target_type="location", target_id=player_loc,
+        effect_type="tension_shift",
+        effect_payload={"delta": 1},
+    ))
+    state.consequence_queue.append(ScheduledConsequence(
+        trigger_turn=state.turn + 3,
+        target_type="location", target_id=player_loc,
+        effect_type="trade_disruption",
+        effect_payload={
+            "description": f"The siege disrupts trade at {next((l.name for l in state.locations if l.id == player_loc), 'the area')}.",
+            "delta": 1,
+        },
+    ))
+
+
+def _cq_event_spawn(state, action_type, target, sig, player_loc, player_name, era_desc):
+    """alliance, defend, prevent: neutral event_spawn ripple."""
+    delay = 3 if action_type == "alliance" else 2
+    state.consequence_queue.append(ScheduledConsequence(
+        trigger_turn=state.turn + delay,
+        target_type="location", target_id=player_loc,
+        effect_type="event_spawn",
+        effect_payload={
+            "description": f"The consequences of {player_name}'s actions continue to unfold.",
+            "location": player_loc,
+            "action_type": "ambient",
+        },
+    ))
+
+
+def _cq_hoard(state, action_type, target, sig, player_loc, player_name, era_desc):
+    """hoard: rumor — hoarding is the archetypal gossip trigger."""
+    state.consequence_queue.append(ScheduledConsequence(
+        trigger_turn=state.turn + 2,
+        target_type="location", target_id=player_loc,
+        effect_type="rumor",
+        effect_payload={
+            "rumor_text": f"Someone has been hoarding goods in {next((l.name for l in state.locations if l.id == player_loc), 'the area')}. People are talking.",
+        },
+    ))
+
+
+def _cq_save(state, action_type, target, sig, player_loc, player_name, era_desc):
+    """save: disposition +1 on target NPC — saving creates a bond.
+
+    Target-miss fallback: rumor at player location.
+    """
+    target_npc = _find_target_npc(state, target)
+    if target_npc is None:
+        _cq_rumor_fallback(state, player_loc, player_name, era_desc)
+        return
+    state.consequence_queue.append(ScheduledConsequence(
+        trigger_turn=state.turn + 1,
+        target_type="npc", target_id=target_npc.id,
+        effect_type="disposition_shift",
+        effect_payload={"delta": 1},
+    ))
+
+
+_CONSEQUENCE_DISPATCH: dict[str, callable] = {
+    "betray":    _cq_betray,
+    "attack":    _cq_hostile,
+    "threaten":  _cq_hostile,
+    "steal":     _cq_hostile,
+    "trade":     _cq_trade,
+    "negotiate": _cq_trade,
+    "petition":  _cq_petition,
+    "fight":     _cq_fight,
+    "siege":     _cq_siege,
+    "alliance":  _cq_event_spawn,
+    "defend":    _cq_event_spawn,
+    "prevent":   _cq_event_spawn,
+    "hoard":     _cq_hoard,
+    "save":      _cq_save,
+}
 
 
 async def _check_historical_divergence(state: WorldState, parsed: dict) -> None:
@@ -902,8 +1420,9 @@ async def _check_historical_divergence(state: WorldState, parsed: dict) -> None:
     type_map = {
         "defend": "war", "attack": "war", "fight": "war", "siege": "war",
         "betray": "political", "negotiate": "political", "alliance": "political",
-        "trade": "economic", "hoard": "economic",
-        "prevent": "war", "save": "war", "flee": "war",
+        "petition": "political", "threaten": "political",
+        "trade": "economic", "hoard": "economic", "steal": "economic",
+        "prevent": "war", "save": "war",
     }
     search_type = type_map.get(action_type)
 

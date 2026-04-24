@@ -209,7 +209,7 @@ class TestScheduleCanonicalConsequences:
 class TestGenerateGroundContext:
     @pytest.mark.asyncio
     async def test_fallback_when_no_events_and_no_ollama(self, state_with_events):
-        with patch("backend.hce.chat", side_effect=Exception("no LLM")):
+        with patch("backend.hce.call_llm", side_effect=Exception("no LLM")):
             ctx = await generate_ground_context(state_with_events)
         assert "era_feel" in ctx
         assert "what_character_knows" in ctx
@@ -222,7 +222,7 @@ class TestGenerateGroundContext:
             significance="civilizational", event_type="war",
             affects=["military", "trade", "population"],
         )
-        with patch("backend.hce.chat", side_effect=Exception("no LLM")):
+        with patch("backend.hce.call_llm", side_effect=Exception("no LLM")):
             ctx = await generate_ground_context(state_with_events)
         assert len(ctx["recent_events_known"]) >= 0  # may be 0 if distance too far
         assert isinstance(ctx["local_rumors"], list)

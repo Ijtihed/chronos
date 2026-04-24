@@ -1,0 +1,498 @@
+# Centroids for historical event regions.
+#
+# Used by GET /api/run/{id}/events/visible to place events on the map.
+# Region strings come from the historical_events table (231 distinct
+# strings, 1,569 events). This file hand-maps the common ~50; compound
+# and edge-case strings resolve via the centroids.py normalizer.
+#
+# Schema per entry:
+#   lat, lon         — decimal degrees
+#   radius_km        — approximate half-extent of the region; drives
+#                      the event circle radius on the map
+#   broad            — optional bool. When true (radius_km >= 1000),
+#                      the frontend suppresses the pin at witnessed/
+#                      known tiers and renders only the low-opacity
+#                      circle. A pin at the geographic center of
+#                      something as big as "Mediterranean" is
+#                      meaningless; the circle signals "somewhere in
+#                      this broad area" honestly.
+#   note             — human note for era-sensitive or judgment-call
+#                      entries. Not parsed.
+#
+# For era-ambiguous regions (Byzantine Empire, Italia/Italy, etc.)
+# the centroid reflects the median territorial center. If future
+# ingestion tags each event with a polity+year, revisit with
+# era-keyed sub-entries.
+
+# ───────────────────────────────────────────────────────────────────
+# Top-tier coverage — broad or high-volume regions
+# ───────────────────────────────────────────────────────────────────
+
+Mediterranean:
+  lat: 38.0
+  lon: 18.0
+  radius_km: 2000
+  broad: true
+  note: "Central basin; 429 events. Radius covers Iberia to Levant at ~2000km."
+
+Byzantine Empire:
+  lat: 39.0
+  lon: 32.0
+  radius_km: 1200
+  broad: true
+  note: "Centroid shifted inland from Constantinople to better cover territorial extent across the 1000-year span; still wrong for the 5th century but least-wrong overall."
+
+Balkans:
+  lat: 43.0
+  lon: 21.0
+  radius_km: 500
+
+Europe:
+  lat: 50.0
+  lon: 15.0
+  radius_km: 1800
+  broad: true
+  note: "Very broad; mostly Black Death / late medieval events."
+
+Anatolia:
+  lat: 39.0
+  lon: 33.0
+  radius_km: 500
+
+Scandinavia:
+  lat: 62.0
+  lon: 15.0
+  radius_km: 800
+
+Western Europe:
+  lat: 47.0
+  lon: 5.0
+  radius_km: 800
+
+Levant:
+  lat: 33.0
+  lon: 36.0
+  radius_km: 400
+
+Middle East:
+  lat: 33.0
+  lon: 42.0
+  radius_km: 900
+  broad: true
+
+North Atlantic:
+  lat: 60.0
+  lon: -30.0
+  radius_km: 1500
+  broad: true
+  note: "Viking-era North Atlantic (Iceland, Faroes, Greenland)."
+
+Eastern Europe:
+  lat: 52.0
+  lon: 25.0
+  radius_km: 1000
+  broad: true
+
+Central Asia:
+  lat: 43.0
+  lon: 70.0
+  radius_km: 1200
+  broad: true
+
+Asia:
+  lat: 35.0
+  lon: 90.0
+  radius_km: 2500
+  broad: true
+  note: "Asia as a region string is catch-all; honest representation is a huge circle."
+
+North Africa:
+  lat: 32.0
+  lon: 10.0
+  radius_km: 1000
+  broad: true
+
+Africa:
+  lat: 5.0
+  lon: 20.0
+  radius_km: 2500
+  broad: true
+  note: "Generic Africa; very few events. Sub-Saharan bias since that's what the ingested data covers."
+
+# ───────────────────────────────────────────────────────────────────
+# Core medieval / Roman regions
+# ───────────────────────────────────────────────────────────────────
+
+Italia:
+  lat: 42.5
+  lon: 12.5
+  radius_km: 400
+  note: "Roman Italia; aliased by Italy."
+
+Italy:
+  lat: 42.5
+  lon: 12.5
+  radius_km: 400
+  note: "Medieval Italy; same centroid as Italia."
+
+Holy Roman Empire:
+  lat: 50.0
+  lon: 10.0
+  radius_km: 600
+
+Western Roman Empire:
+  lat: 45.0
+  lon: 5.0
+  radius_km: 1000
+  broad: true
+
+Roman Empire:
+  lat: 41.9
+  lon: 12.5
+  radius_km: 1500
+  broad: true
+  note: "Ambiguous; defaults to Rome-centered pan-Mediterranean."
+
+Gaul:
+  lat: 47.0
+  lon: 2.0
+  radius_km: 600
+
+Francia:
+  lat: 48.0
+  lon: 3.0
+  radius_km: 500
+
+France:
+  lat: 47.0
+  lon: 2.0
+  radius_km: 500
+
+Hispania:
+  lat: 40.0
+  lon: -4.0
+  radius_km: 500
+
+Iberian Peninsula:
+  lat: 40.0
+  lon: -4.0
+  radius_km: 500
+
+Spain:
+  lat: 40.0
+  lon: -4.0
+  radius_km: 500
+
+Portugal:
+  lat: 39.5
+  lon: -8.0
+  radius_km: 250
+
+# ───────────────────────────────────────────────────────────────────
+# British Isles
+# ───────────────────────────────────────────────────────────────────
+
+Britain:
+  lat: 54.0
+  lon: -2.0
+  radius_km: 400
+
+Britannia:
+  lat: 54.0
+  lon: -2.0
+  radius_km: 400
+  note: "Roman Britain; same centroid as Britain."
+
+British Isles:
+  lat: 54.0
+  lon: -3.0
+  radius_km: 500
+
+England:
+  lat: 52.5
+  lon: -1.5
+  radius_km: 300
+
+Scotland:
+  lat: 57.0
+  lon: -4.0
+  radius_km: 250
+
+Wales:
+  lat: 52.5
+  lon: -3.8
+  radius_km: 150
+
+Ireland:
+  lat: 53.0
+  lon: -8.0
+  radius_km: 250
+
+# ───────────────────────────────────────────────────────────────────
+# Eastern Europe + Caucasus
+# ───────────────────────────────────────────────────────────────────
+
+Hungary:
+  lat: 47.0
+  lon: 19.0
+  radius_km: 300
+
+Poland:
+  lat: 52.0
+  lon: 20.0
+  radius_km: 300
+
+Russia:
+  lat: 55.0
+  lon: 40.0
+  radius_km: 1500
+  broad: true
+
+Lithuania:
+  lat: 55.2
+  lon: 24.0
+  radius_km: 200
+
+Moldavia:
+  lat: 47.0
+  lon: 28.0
+  radius_km: 300
+
+Wallachia:
+  lat: 45.0
+  lon: 25.0
+  radius_km: 250
+
+Serbia:
+  lat: 44.0
+  lon: 21.0
+  radius_km: 250
+
+Albania:
+  lat: 41.0
+  lon: 20.0
+  radius_km: 150
+
+Dalmatia:
+  lat: 43.5
+  lon: 17.0
+  radius_km: 200
+
+Pannonia:
+  lat: 46.0
+  lon: 17.0
+  radius_km: 300
+
+Caucasus:
+  lat: 42.5
+  lon: 44.0
+  radius_km: 400
+
+Armenia:
+  lat: 40.0
+  lon: 45.0
+  radius_km: 200
+
+# ───────────────────────────────────────────────────────────────────
+# Near East + Mediterranean specifics
+# ───────────────────────────────────────────────────────────────────
+
+Syria:
+  lat: 35.0
+  lon: 38.0
+  radius_km: 300
+
+Egypt:
+  lat: 27.0
+  lon: 30.0
+  radius_km: 400
+
+Persia:
+  lat: 32.0
+  lon: 53.0
+  radius_km: 700
+
+Arabia:
+  lat: 24.0
+  lon: 45.0
+  radius_km: 800
+
+# ───────────────────────────────────────────────────────────────────
+# Nordic / Baltic
+# ───────────────────────────────────────────────────────────────────
+
+Sweden:
+  lat: 60.0
+  lon: 16.0
+  radius_km: 400
+
+Norway:
+  lat: 62.0
+  lon: 10.0
+  radius_km: 500
+
+Denmark:
+  lat: 56.0
+  lon: 10.0
+  radius_km: 200
+
+Finland:
+  lat: 62.0
+  lon: 26.0
+  radius_km: 500
+
+Estonia:
+  lat: 58.5
+  lon: 25.5
+  radius_km: 150
+
+Gotland:
+  lat: 57.5
+  lon: 18.5
+  radius_km: 60
+
+Baltic region:
+  lat: 57.0
+  lon: 22.0
+  radius_km: 500
+
+Baltic Region:
+  lat: 57.0
+  lon: 22.0
+  radius_km: 500
+  note: "Case variant of 'Baltic region'."
+
+# ───────────────────────────────────────────────────────────────────
+# Italian city-states (Black Death era)
+# ───────────────────────────────────────────────────────────────────
+
+Rome:
+  lat: 41.9
+  lon: 12.5
+  radius_km: 50
+
+Constantinople:
+  lat: 41.0
+  lon: 28.98
+  radius_km: 50
+
+Venice:
+  lat: 45.44
+  lon: 12.34
+  radius_km: 40
+
+Genoa:
+  lat: 44.4
+  lon: 8.9
+  radius_km: 40
+
+Florence:
+  lat: 43.77
+  lon: 11.25
+  radius_km: 30
+
+Moscow:
+  lat: 55.75
+  lon: 37.6
+  radius_km: 80
+
+# ───────────────────────────────────────────────────────────────────
+# German / Central European
+# ───────────────────────────────────────────────────────────────────
+
+Germany:
+  lat: 51.0
+  lon: 10.0
+  radius_km: 400
+
+Switzerland:
+  lat: 46.8
+  lon: 8.0
+  radius_km: 150
+
+Bohemia:
+  lat: 49.8
+  lon: 15.5
+  radius_km: 200
+
+# ───────────────────────────────────────────────────────────────────
+# Far East / elsewhere
+# ───────────────────────────────────────────────────────────────────
+
+China:
+  lat: 35.0
+  lon: 105.0
+  radius_km: 1200
+  broad: true
+
+Ethiopia:
+  lat: 9.0
+  lon: 39.0
+  radius_km: 500
+
+Ottoman Empire:
+  lat: 39.0
+  lon: 32.0
+  radius_km: 1000
+  broad: true
+  note: "Same centroid as late Byzantine Empire; covers core territory."
+
+India:
+  lat: 23.0
+  lon: 80.0
+  radius_km: 1200
+  broad: true
+
+Song Dynasty:
+  lat: 32.0
+  lon: 115.0
+  radius_km: 800
+  note: "Medieval southern China."
+
+Thuringia:
+  lat: 50.9
+  lon: 11.0
+  radius_km: 80
+
+Swiss Confederation:
+  lat: 46.8
+  lon: 8.0
+  radius_km: 150
+  note: "Alias of Switzerland."
+
+Faroe Islands:
+  lat: 62.0
+  lon: -7.0
+  radius_km: 60
+
+Eastern Orthodox Church:
+  lat: 41.0
+  lon: 28.98
+  radius_km: 800
+  broad: true
+  note: "For 'Byzantine Empire and Eastern Orthodox Church' variants."
+
+# ───────────────────────────────────────────────────────────────────
+# Regional sub-strings (for normalization fallback)
+# ───────────────────────────────────────────────────────────────────
+
+Southern France:
+  lat: 44.0
+  lon: 4.0
+  radius_km: 300
+
+Northern Spain:
+  lat: 42.5
+  lon: -5.0
+  radius_km: 300
+
+Southern Italy:
+  lat: 40.5
+  lon: 15.5
+  radius_km: 300
+
+Mezzogiorno:
+  lat: 40.5
+  lon: 15.5
+  radius_km: 300
+  note: "Southern Italy alias."

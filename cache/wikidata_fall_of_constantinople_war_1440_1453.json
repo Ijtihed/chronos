@@ -1,0 +1,47 @@
+[
+  {
+    "qid": "Q103710623",
+    "label": "Battle of Zajk\u00e1ny",
+    "description": "1442 battle",
+    "year": 1442,
+    "location": "Iron Gate of Transylvania Pass",
+    "country": "Kingdom of Hungary",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q103710623",
+    "label": "Battle of Zajk\u00e1ny",
+    "description": "1442 battle",
+    "year": 1442,
+    "location": "Iron Gate of Transylvania Pass",
+    "country": "Principality of Wallachia",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q3339470",
+    "label": "Battle of Ni\u0161",
+    "description": "battle of 1443 between Christian alliance and Ottoman Empire",
+    "year": 1443,
+    "location": "Ni\u0161",
+    "country": "Serbia",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q131583820",
+    "label": "Liberation of Kruj\u00eb",
+    "description": "1443 battle",
+    "year": 1443,
+    "location": "Kruj\u00eb",
+    "country": "Ottoman Empire",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q32832",
+    "label": "Battle of Varna",
+    "description": "1444 battle",
+    "year": 1444,
+    "location": "Varna",
+    "country": "Ottoman Empire",
+    "source_type": "war"
+  }
+]

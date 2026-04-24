@@ -13,6 +13,10 @@ let runId = null;
 let eraKey = null;
 let turnInProgress = false;
 let inputSetup = false;
+let defaultSkipTicks = 7;
+// Set to true when the backend returns 402 cost_cap_hard. Prevents further
+// turn submissions in this session without a page reload / new run.
+let hardCapReached = false;
 
 // ── Screen management ─────────────────────────────────────────────────
 
@@ -40,6 +44,12 @@ function clearRunFromStorage() {
   if (oldId) localStorage.removeItem("chronos_narrative_" + oldId);
   localStorage.removeItem("chronos_run_id");
   localStorage.removeItem("chronos_era_key");
+  const keysToRemove = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key && key.startsWith("chronos_notes_")) keysToRemove.push(key);
+  }
+  keysToRemove.forEach((k) => localStorage.removeItem(k));
 }
 
 function getSavedRun() {
@@ -133,6 +143,7 @@ if (beginAgain) {
 // ── Run lifecycle ─────────────────────────────────────────────────────
 
 async function startNewRun() {
+  hardCapReached = false;
   showScreen("screen-loading");
 
   $("#loading-era-label").textContent = "";
@@ -275,7 +286,143 @@ function updateTopBar() {
     deathInd.classList.add("flex");
     if (deathName) deathName.textContent = `\u2020 ${state.player_name}`;
   }
+
+  updateClock();
+  updateCostIndicator();
 }
+
+// ── LLM provider cost indicator ───────────────────────────────────────
+
+function updateCostIndicator() {
+  if (!state) return;
+  const el = document.getElementById("cost-indicator");
+  const cur = document.getElementById("cost-current");
+  const goal = document.getElementById("cost-goal");
+  if (!el || !cur || !goal) return;
+
+  const costEur = Number(state.cost_eur || 0);
+  const softCap = Number(state.cost_cap_soft_eur || 1.0);
+  const hardCap = Number(state.cost_cap_hard_eur || 2.0);
+  const capState = state.cost_cap_state || "none";
+
+  el.classList.remove("hidden");
+  el.classList.add("flex");
+
+  cur.textContent = `\u20ac${costEur.toFixed(2)}`;
+  goal.textContent = `\u20ac${softCap.toFixed(2)}`;
+
+  el.classList.remove(
+    "cost-warning", "cost-soft-exceeded", "cost-hard-exceeded",
+  );
+  if (capState === "hard" || costEur >= hardCap) {
+    el.classList.add("cost-hard-exceeded");
+  } else if (capState === "soft_crossed" || costEur >= softCap) {
+    el.classList.add("cost-soft-exceeded");
+  } else if (costEur >= softCap * 0.8) {
+    el.classList.add("cost-warning");
+  }
+
+  // Soft-cap banner (show once per run, dismissible via localStorage).
+  const banner = document.getElementById("cost-soft-banner");
+  if (banner && state.run_id) {
+    const dismissKey = `cost_soft_dismissed_${state.run_id}`;
+    const dismissed = localStorage.getItem(dismissKey) === "1";
+    const shouldShow =
+      capState === "soft_crossed" && !dismissed && capState !== "hard";
+    banner.classList.toggle("hidden", !shouldShow);
+    banner.classList.toggle("flex", shouldShow);
+  }
+
+  // Hard-cap overlay.
+  const overlay = document.getElementById("cost-hard-overlay");
+  const overlayText = document.getElementById("cost-hard-overlay-text");
+  if (overlay) {
+    const showHard = capState === "hard";
+    overlay.classList.toggle("hidden", !showHard);
+    overlay.classList.toggle("flex", showHard);
+    if (showHard && overlayText) {
+      overlayText.textContent =
+        `This run has reached \u20ac${costEur.toFixed(2)} (cap \u20ac${hardCap.toFixed(2)}). ` +
+        `Further turns are blocked. You can still read the world and end the run.`;
+    }
+  }
+}
+
+(function initCostBannerHandlers() {
+  document.addEventListener("DOMContentLoaded", () => {
+    const dismiss = document.getElementById("cost-soft-banner-dismiss");
+    if (dismiss) {
+      dismiss.addEventListener("click", () => {
+        const banner = document.getElementById("cost-soft-banner");
+        if (banner) {
+          banner.classList.add("hidden");
+          banner.classList.remove("flex");
+        }
+        if (state && state.run_id) {
+          localStorage.setItem(`cost_soft_dismissed_${state.run_id}`, "1");
+        }
+      });
+    }
+    const hardClose = document.getElementById("cost-hard-overlay-close");
+    if (hardClose) {
+      hardClose.addEventListener("click", () => {
+        const overlay = document.getElementById("cost-hard-overlay");
+        if (overlay) {
+          overlay.classList.add("hidden");
+          overlay.classList.remove("flex");
+        }
+      });
+    }
+    const hardEnd = document.getElementById("cost-hard-overlay-end");
+    if (hardEnd) {
+      hardEnd.addEventListener("click", async () => {
+        if (!runId) { showScreen("screen-start"); return; }
+        try {
+          await fetch(`/api/run/${runId}`, { method: "DELETE" });
+        } catch (_) {}
+        clearRunFromStorage();
+        runId = null;
+        state = null;
+        hardCapReached = false;
+        const overlay = document.getElementById("cost-hard-overlay");
+        if (overlay) { overlay.classList.add("hidden"); overlay.classList.remove("flex"); }
+        showScreen("screen-start");
+        const continueBtn = document.getElementById("btn-continue");
+        if (continueBtn) continueBtn.classList.add("hidden");
+      });
+    }
+  });
+})();
+
+function updateClock() {
+  const clockEl = $("#clock-element");
+  const seasonEl = $("#clock-season");
+  if (!clockEl || !seasonEl || !state) return;
+
+  clockEl.classList.remove("hidden");
+  clockEl.classList.add("flex");
+
+  const year = state.current_year;
+  const turn = state.turn || 0;
+  const weekInYear = (turn % 52) + 1;
+  const seasons = ["winter", "spring", "summer", "autumn"];
+  const season = seasons[Math.floor(((weekInYear - 1) % 52) / 13)];
+
+  seasonEl.textContent = `wk ${weekInYear} \u00b7 ${season}`;
+}
+
+// ── Time scale presets ────────────────────────────────────────────────
+
+(function initTimePresets() {
+  const presets = document.querySelectorAll(".time-preset");
+  presets.forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      presets.forEach(function (b) { b.classList.remove("active-preset"); });
+      btn.classList.add("active-preset");
+      defaultSkipTicks = parseInt(btn.dataset.ticks, 10);
+    });
+  });
+})();
 
 // ── Input handling ────────────────────────────────────────────────────
 
@@ -288,6 +435,7 @@ function setupInput() {
 
   if (input) {
     input.addEventListener("keydown", (e) => {
+      if (hardCapReached) return;
       if (e.key === "Enter" && !turnInProgress && !input.disabled) {
         e.preventDefault();
         submitTurn(input.value.trim());
@@ -296,6 +444,7 @@ function setupInput() {
   }
   if (obsInput) {
     obsInput.addEventListener("keydown", (e) => {
+      if (hardCapReached) return;
       if (e.key === "Enter" && !turnInProgress && !obsInput.disabled) {
         e.preventDefault();
         submitTurn(obsInput.value.trim());
@@ -307,6 +456,8 @@ function setupInput() {
 async function submitTurn(text) {
   if (!text || !runId || turnInProgress) return;
   turnInProgress = true;
+  userScrolledUp = false;
+  cancelActiveStreams();
 
   const input = $("#player-input");
   const obsInput = $("#obs-input");
@@ -338,6 +489,17 @@ async function submitTurn(text) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ player_input: text }),
     });
+    if (res.status === 402) {
+      const body = await res.json().catch(() => ({}));
+      const d = body.detail || {};
+      if (d && d.code === "cost_cap_hard") {
+        hardCapReached = true;
+        if (state) state.cost_cap_state = "hard";
+        updateCostIndicator();
+        block.remove();
+        return;
+      }
+    }
     if (!res.ok)
       throw new Error(
         (await res.json().catch(() => ({}))).detail || `HTTP ${res.status}`
@@ -367,7 +529,7 @@ async function submitTurn(text) {
       typeof ChronosMap !== "undefined" &&
       !$("#map-container").classList.contains("hidden")
     ) {
-      ChronosMap.updateMarkers(state);
+      ChronosMap.refresh(state, runId);
     }
   } catch (e) {
     block.innerHTML =
@@ -376,23 +538,36 @@ async function submitTurn(text) {
   } finally {
     turnInProgress = false;
     if (bottomBar) bottomBar.style.pointerEvents = "";
-    [input, obsInput].forEach((el) => {
-      if (!el) return;
-      el.disabled = false;
-      el.style.pointerEvents = "";
-      el.style.opacity = "";
-    });
-    if (input) input.placeholder = "...";
-    if (obsInput) obsInput.placeholder = "Travel only...";
-    if (state && state.run_status === "active" && input) input.focus();
-    if (state && state.run_status === "dead_observing" && obsInput)
-      obsInput.focus();
+    if (!hardCapReached) {
+      [input, obsInput].forEach((el) => {
+        if (!el) return;
+        el.disabled = false;
+        el.style.pointerEvents = "";
+        el.style.opacity = "";
+      });
+      if (input) input.placeholder = "...";
+      if (obsInput) obsInput.placeholder = "Travel only...";
+      if (state && state.run_status === "active" && input) input.focus();
+      if (state && state.run_status === "dead_observing" && obsInput)
+        obsInput.focus();
+    }
   }
 }
 
+// ── Scroll state ─────────────────────────────────────────────────────
+
+let userScrolledUp = false;
+
 // ── Word-by-word streaming ────────────────────────────────────────────
 
+let streamCancelled = false;
+
+function cancelActiveStreams() {
+  streamCancelled = true;
+}
+
 function streamWords(container, text, msPerWord) {
+  streamCancelled = false;
   return new Promise((resolve) => {
     const words = text.split(/\s+/).filter(Boolean);
     if (!words.length) {
@@ -408,14 +583,17 @@ function streamWords(container, text, msPerWord) {
     });
     let i = 0;
     function tick() {
-      if (i >= spans.length) {
+      if (streamCancelled || i >= spans.length) {
+        spans.forEach((s) => s.classList.add("visible"));
         resolve();
         return;
       }
       spans[i].classList.add("visible");
       i++;
-      const manuscript = $("#manuscript");
-      if (manuscript) manuscript.scrollTop = manuscript.scrollHeight;
+      if (!userScrolledUp) {
+        const manuscript = $("#manuscript");
+        if (manuscript) manuscript.scrollTop = manuscript.scrollHeight;
+      }
       setTimeout(tick, msPerWord);
     }
     tick();
@@ -524,9 +702,14 @@ function showDeathMarker(cause) {
 function enterObservationMode() {
   const bottomBar = $("#bottom-bar");
   const obsSection = $("#obs-input-section");
+  const obsInput = $("#obs-input");
   const manuscript = $("#manuscript");
   if (bottomBar) bottomBar.classList.add("hidden");
   if (obsSection) obsSection.classList.remove("hidden");
+  if (obsInput) {
+    obsInput.disabled = false;
+    obsInput.placeholder = "YOU ARE DEAD \u00b7 TRAVEL ONLY";
+  }
   if (manuscript) manuscript.classList.add("observation-muted");
 }
 
@@ -558,11 +741,11 @@ function showErasure(text) {
   setTimeout(() => {
     if (erasureText) erasureText.textContent = text;
     if (content) content.classList.add("visible");
-  }, 10000 + 4000);
+  }, 8000);
 
   setTimeout(() => {
     if (restart) restart.classList.add("visible");
-  }, 10000 + 4000 + 4000);
+  }, 8000 + 5000);
 }
 
 // ── Hamburger menu ────────────────────────────────────────────────────
@@ -707,12 +890,19 @@ function completeProgressBar() {
 
   var debounce = null;
   var pendingText = "";
+  // Bug 3 (option b): remember the selection's end position by
+  // Node + offset so we can recompute a live viewport rect at
+  // click time, even if the manuscript scrolled in between.
+  var pendingEndNode = null;
+  var pendingEndOffset = 0;
 
   function hideAll() {
     tooltip.style.display = "none";
     ctxBtn.style.display = "none";
     ctxPanel.style.display = "none";
     pendingText = "";
+    pendingEndNode = null;
+    pendingEndOffset = 0;
   }
 
   document.addEventListener("mousedown", function (e) {
@@ -734,6 +924,41 @@ function completeProgressBar() {
     return ms && ms.contains(el);
   }
 
+  // Bug 2: for multi-line selections, range.getBoundingClientRect()
+  // returns one huge bbox spanning all lines. Use the LAST rect from
+  // getClientRects() — the end of the selection, which is where the
+  // user's cursor finished. Single-line selections return one rect
+  // and behave unchanged. Falls back to the bbox if empty.
+  function getAnchorRect(range) {
+    var rects = range.getClientRects();
+    if (rects && rects.length > 0) return rects[rects.length - 1];
+    return range.getBoundingClientRect();
+  }
+
+  // Bug 3 (option b): reconstruct a live viewport rect from the
+  // saved end Node + offset. Returns null if the node is no longer
+  // in the document (e.g. manuscript re-rendered).
+  function liveRectFromSavedPoint() {
+    if (!pendingEndNode || !document.contains(pendingEndNode)) return null;
+    try {
+      var r = document.createRange();
+      r.setStart(pendingEndNode, pendingEndOffset);
+      r.setEnd(pendingEndNode, pendingEndOffset);
+      var liveRect = r.getBoundingClientRect();
+      r.detach && r.detach();
+      // A collapsed range at end-of-line can return a zero-size
+      // rect; that's fine for anchoring — it has a valid top/left.
+      return liveRect;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function rectOnScreen(rect) {
+    if (!rect) return false;
+    return rect.top < window.innerHeight && rect.bottom > 0;
+  }
+
   function positionAt(el, rect, maxW) {
     var left = Math.min(
       rect.left + rect.width / 2 - 40,
@@ -744,6 +969,13 @@ function completeProgressBar() {
     el.style.top = rect.top - el.offsetHeight - 8 + "px";
     if (parseInt(el.style.top) < 40) {
       el.style.top = rect.bottom + 8 + "px";
+    }
+    // Bug 1: clamp to viewport bottom as well as top. Handles the
+    // edge case where both above AND below cause overflow — pin to
+    // viewport bottom rather than running off.
+    var topNum = parseInt(el.style.top);
+    if (topNum + el.offsetHeight > window.innerHeight - 8) {
+      el.style.top = window.innerHeight - el.offsetHeight - 8 + "px";
     }
   }
 
@@ -756,7 +988,7 @@ function completeProgressBar() {
     if (!inManuscript(sel.anchorNode)) return;
 
     var range = sel.getRangeAt(0);
-    var rect = range.getBoundingClientRect();
+    var rect = getAnchorRect(range);
     var hasSpaces = text.includes(" ");
 
     if (!hasSpaces && text.length <= 30) {
@@ -792,6 +1024,10 @@ function completeProgressBar() {
     } else if (hasSpaces && text.length >= 10) {
       tooltip.style.display = "none";
       pendingText = text.substring(0, 500);
+      // Bug 3: remember the selection end point so we can recompute
+      // a live rect at click time.
+      pendingEndNode = range.endContainer;
+      pendingEndOffset = range.endOffset;
       ctxBtn.style.display = "block";
       positionAt(ctxBtn, rect, 120);
     }
@@ -799,19 +1035,27 @@ function completeProgressBar() {
 
   ctxBtn.addEventListener("click", async function () {
     if (!pendingText || !runId) return;
-    var rect = {
-      left: parseInt(ctxBtn.style.left),
-      top: parseInt(ctxBtn.style.top),
-      width: 80,
-      height: 20,
-      bottom: parseInt(ctxBtn.style.top) + 28,
-    };
+
+    // Bug 3: prefer a freshly-computed rect from the saved end
+    // point. If the content has scrolled out of view or the node
+    // has been detached, fall back to the button's current
+    // position (the pre-Fix-5 behavior).
+    var panelRect = liveRectFromSavedPoint();
+    if (!rectOnScreen(panelRect)) {
+      panelRect = {
+        left: parseInt(ctxBtn.style.left),
+        top: parseInt(ctxBtn.style.top),
+        width: 80,
+        height: 20,
+        bottom: parseInt(ctxBtn.style.top) + 28,
+      };
+    }
 
     ctxBtn.style.display = "none";
     ctxPanel.innerHTML =
       '<span class="ctx-loading">Searching the archives\u2026</span>';
     ctxPanel.style.display = "block";
-    positionAt(ctxPanel, rect, 380);
+    positionAt(ctxPanel, panelRect, 380);
 
     try {
       var res = await fetch("/api/run/" + runId + "/context", {
@@ -827,8 +1071,10 @@ function completeProgressBar() {
         "The archives offer no further illumination on this matter.";
     }
     ctxPanel.style.display = "block";
-    positionAt(ctxPanel, rect, 380);
+    positionAt(ctxPanel, panelRect, 380);
     pendingText = "";
+    pendingEndNode = null;
+    pendingEndOffset = 0;
   });
 })();
 
@@ -841,12 +1087,18 @@ function completeProgressBar() {
 
   ms.addEventListener("scroll", function () {
     var gap = ms.scrollHeight - ms.scrollTop - ms.clientHeight;
-    if (gap > 200) btn.classList.remove("hidden");
-    else btn.classList.add("hidden");
+    if (gap > 200) {
+      btn.classList.remove("hidden");
+      userScrolledUp = true;
+    } else {
+      btn.classList.add("hidden");
+      userScrolledUp = false;
+    }
   });
 
   btn.addEventListener("click", function () {
     ms.scrollTo({ top: ms.scrollHeight, behavior: "smooth" });
+    userScrolledUp = false;
   });
 })();
 
@@ -857,13 +1109,34 @@ function completeProgressBar() {
   const popup = $("#skip-popup");
   if (!btn || !popup) return;
 
-  btn.addEventListener("click", (e) => {
+  let longPressTimer = null;
+
+  btn.addEventListener("mousedown", (e) => {
     e.stopPropagation();
-    popup.classList.toggle("hidden");
+    longPressTimer = setTimeout(() => {
+      longPressTimer = null;
+      popup.classList.toggle("hidden");
+    }, 400);
+  });
+
+  btn.addEventListener("mouseup", (e) => {
+    if (longPressTimer) {
+      clearTimeout(longPressTimer);
+      longPressTimer = null;
+      popup.classList.add("hidden");
+      executeSkip(defaultSkipTicks);
+    }
+  });
+
+  btn.addEventListener("mouseleave", () => {
+    if (longPressTimer) {
+      clearTimeout(longPressTimer);
+      longPressTimer = null;
+    }
   });
 
   document.addEventListener("click", (e) => {
-    if (!popup.classList.contains("hidden") && !popup.contains(e.target) && e.target !== btn) {
+    if (!popup.classList.contains("hidden") && !popup.contains(e.target) && e.target !== btn && !btn.contains(e.target)) {
       popup.classList.add("hidden");
     }
   });
@@ -910,6 +1183,17 @@ async function executeSkip(ticks) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ticks }),
     });
+    if (res.status === 402) {
+      const body = await res.json().catch(() => ({}));
+      const d = body.detail || {};
+      if (d && d.code === "cost_cap_hard") {
+        hardCapReached = true;
+        if (state) state.cost_cap_state = "hard";
+        updateCostIndicator();
+        block.remove();
+        return;
+      }
+    }
     if (!res.ok)
       throw new Error(
         (await res.json().catch(() => ({}))).detail || `HTTP ${res.status}`
@@ -931,7 +1215,7 @@ async function executeSkip(ticks) {
       typeof ChronosMap !== "undefined" &&
       !$("#map-container").classList.contains("hidden")
     ) {
-      ChronosMap.updateMarkers(state);
+      ChronosMap.refresh(state, runId);
     }
   } catch (e) {
     block.innerHTML =
@@ -941,7 +1225,7 @@ async function executeSkip(ticks) {
     turnInProgress = false;
     if (bottomBar) bottomBar.style.pointerEvents = "";
     if (skipBtn) skipBtn.style.pointerEvents = "";
-    if (input) {
+    if (!hardCapReached && input) {
       input.disabled = false;
       input.style.pointerEvents = "";
       input.style.opacity = "";
@@ -950,6 +1234,101 @@ async function executeSkip(ticks) {
     }
   }
 }
+
+// ── Notes panel ───────────────────────────────────────────────────────
+
+(function initNotesPanel() {
+  const btn = $("#btn-notes");
+  const overlay = $("#notes-overlay");
+  const panel = $("#notes-panel");
+  const textarea = $("#notes-textarea");
+  const header = $("#notes-header");
+  const closeBtn = $("#notes-close-btn");
+  const timestampBtn = $("#notes-timestamp-btn");
+  const pinBtn = $("#notes-pin-btn");
+  if (!btn || !panel || !textarea) return;
+
+  let saveDebounce = null;
+
+  function notesKey() {
+    if (!runId || !state) return null;
+    return `chronos_notes_${runId}_${state.player_name || "unknown"}`;
+  }
+
+  function loadNotes() {
+    const key = notesKey();
+    if (!key) return;
+    textarea.value = localStorage.getItem(key) || "";
+  }
+
+  function saveNotes() {
+    const key = notesKey();
+    if (!key) return;
+    localStorage.setItem(key, textarea.value);
+  }
+
+  function openNotes() {
+    if (!state || !runId) return;
+    if (header) header.textContent = `Notes \u2014 ${state.player_name || "Unknown"}`;
+    loadNotes();
+    overlay.classList.remove("hidden");
+    panel.classList.remove("hidden");
+    setTimeout(() => textarea.focus(), 100);
+  }
+
+  function closeNotes() {
+    saveNotes();
+    overlay.classList.add("hidden");
+    panel.classList.add("hidden");
+  }
+
+  btn.addEventListener("click", openNotes);
+  if (closeBtn) closeBtn.addEventListener("click", closeNotes);
+  if (overlay) overlay.addEventListener("click", closeNotes);
+
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && !panel.classList.contains("hidden")) {
+      closeNotes();
+    }
+  });
+
+  textarea.addEventListener("input", function () {
+    clearTimeout(saveDebounce);
+    saveDebounce = setTimeout(saveNotes, 500);
+  });
+
+  if (timestampBtn) {
+    timestampBtn.addEventListener("click", function () {
+      if (!state) return;
+      const year = state.current_year || "???";
+      const turn = state.turn || 0;
+      const seasons = ["Winter", "Spring", "Summer", "Autumn"];
+      const weekInYear = (turn % 52) + 1;
+      const season = seasons[Math.floor(((weekInYear - 1) % 52) / 13)];
+      const stamp = `[${season} ${year} AD] `;
+      const pos = textarea.selectionStart;
+      const before = textarea.value.substring(0, pos);
+      const after = textarea.value.substring(pos);
+      textarea.value = before + stamp + after;
+      textarea.selectionStart = textarea.selectionEnd = pos + stamp.length;
+      textarea.focus();
+      saveNotes();
+    });
+  }
+
+  if (pinBtn) {
+    pinBtn.addEventListener("click", function () {
+      const pos = textarea.selectionStart;
+      const before = textarea.value.substring(0, pos);
+      const after = textarea.value.substring(pos);
+      const pin = "\u25C6 ";
+      textarea.value = before + pin + after;
+      textarea.selectionStart = textarea.selectionEnd = pos + pin.length;
+      textarea.focus();
+      saveNotes();
+    });
+  }
+})();
 
 // ── Utility ───────────────────────────────────────────────────────────
 

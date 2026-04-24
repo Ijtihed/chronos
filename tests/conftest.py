@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 from typing import AsyncGenerator
 
 import httpx
@@ -49,31 +48,7 @@ async def client() -> AsyncGenerator[httpx.AsyncClient, None]:
         yield c
 
 
-async def ollama_reachable() -> bool:
-    try:
-        async with httpx.AsyncClient(timeout=3.0) as c:
-            resp = await c.get("http://localhost:11434/api/tags")
-            return resp.status_code == 200
-    except Exception:
-        return False
-
-
-_ollama_up = None
-
-
 def pytest_configure(config):
     config.addinivalue_line(
-        "markers", "live: requires a running Ollama instance"
+        "markers", "live: requires a live Gemini API key"
     )
-
-
-def pytest_collection_modifyitems(config, items):
-    global _ollama_up
-    if _ollama_up is None:
-        _ollama_up = asyncio.get_event_loop().run_until_complete(ollama_reachable())
-
-    if not _ollama_up:
-        skip = pytest.mark.skip(reason="Ollama not reachable")
-        for item in items:
-            if "live" in item.keywords:
-                item.add_marker(skip)

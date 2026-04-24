@@ -1,0 +1,965 @@
+[
+  {
+    "qid": "Q136451000",
+    "label": "Chem River Battle",
+    "description": "13th-century battle",
+    "year": 1300,
+    "location": "Emba River",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q48699050",
+    "label": "Dispute between Darnhall and Vale Royal Abbey",
+    "description": "English medieval regional feud",
+    "year": 1300,
+    "location": "",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q106214458",
+    "label": "Piberer Pfarrerstreit",
+    "description": "Conflict over the appointment of a pastor for the parish of Piber (1264-1268)",
+    "year": 1300,
+    "location": "Piber",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q11949537",
+    "label": "Siege of Messina",
+    "description": "1300 siege",
+    "year": 1300,
+    "location": "Messina",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q11908737",
+    "label": "Battle of Gagliano",
+    "description": "1300 battle",
+    "year": 1300,
+    "location": "Gagliano Castelferrato",
+    "country": "Italy",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q4872078",
+    "label": "Battle of Ponza",
+    "description": "1300 naval battle",
+    "year": 1300,
+    "location": "Ponza",
+    "country": "Italy",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q109567674",
+    "label": "Battle of Landskrona",
+    "description": "1301 battle",
+    "year": 1301,
+    "location": "Nyenschantz",
+    "country": "Russia",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q134978563",
+    "label": "Siege of Messina",
+    "description": "1301 siege",
+    "year": 1301,
+    "location": "Messina",
+    "country": "Kingdom of Sicily",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q39088281",
+    "label": "Alauddin Khilji's conquest of Ranthambore",
+    "description": "1301 siege",
+    "year": 1301,
+    "location": "Ranthambore Fort",
+    "country": "India",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q108677762",
+    "label": "Siege of Pavia",
+    "description": "1302 siege",
+    "year": 1302,
+    "location": "Pavia",
+    "country": "Kingdom of Italy",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q44732",
+    "label": "Battle of the Golden Spurs",
+    "description": "1302 battle between Flamish citizens and the king",
+    "year": 1302,
+    "location": "Kortrijk",
+    "country": "Belgium",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q1509619",
+    "label": "Battle of Bapheus",
+    "description": "1302 Ottoman-Byzantine military engagement",
+    "year": 1302,
+    "location": "Bithynia",
+    "country": "Turkey",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q1414195",
+    "label": "Battle of Dimbos",
+    "description": "1303 battle",
+    "year": 1303,
+    "location": "",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q125463561",
+    "label": "Battle of Aleppo",
+    "description": "1303 battle",
+    "year": 1303,
+    "location": "Aleppo",
+    "country": "Syria",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q130317008",
+    "label": "Battle of Vashlovani",
+    "description": "1303 battle",
+    "year": 1303,
+    "location": "Vashlovani",
+    "country": "Kingdom of Georgia",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q48724683",
+    "label": "Siege of Chittorgarh",
+    "description": "1303 battle between the Delhi Sultanate and the Guhila Dynasty",
+    "year": 1303,
+    "location": "Chittorgarh Fort",
+    "country": "India",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q1613521",
+    "label": "Battle of Roslin",
+    "description": "1303 battle",
+    "year": 1303,
+    "location": "Roslin",
+    "country": "Kingdom of Scotland",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q2092043",
+    "label": "Battle of Arques",
+    "description": "1303 battle in France",
+    "year": 1303,
+    "location": "Arques",
+    "country": "France",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q18002248",
+    "label": "Siege of Maastricht",
+    "description": "1303 siege",
+    "year": 1303,
+    "location": "Wyck",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q3636400",
+    "label": "Battle of the Cyzicus",
+    "description": "1303 battle",
+    "year": 1303,
+    "location": "Kap\u0131da\u011f Peninsula",
+    "country": "Turkey",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q2094999",
+    "label": "Battle of Skafida",
+    "description": "1304 battle",
+    "year": 1304,
+    "location": "Sozopol",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q2888767",
+    "label": "Action at Happrew",
+    "description": "1304 battle of the First War of Scottish Independence",
+    "year": 1304,
+    "location": "Peebles",
+    "country": "Kingdom of Scotland",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q113468818",
+    "label": "Salt War",
+    "description": "Military conflict",
+    "year": 1304,
+    "location": "",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q112503182",
+    "label": "Battle of Senice",
+    "description": "1304 battle",
+    "year": 1304,
+    "location": "Senica",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q18008019",
+    "label": "Siege of Magnesia ad Sipylum",
+    "description": "1304 siege",
+    "year": 1304,
+    "location": "Magnesia ad Sipylum",
+    "country": "Turkey",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q113411070",
+    "label": "Q113411070",
+    "description": "",
+    "year": 1304,
+    "location": "",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q2007565",
+    "label": "Battle of Mons-en-P\u00e9v\u00e8le",
+    "description": "1304 battle of the Franco-Flemish War",
+    "year": 1304,
+    "location": "Mons-en-P\u00e9v\u00e8le",
+    "country": "France",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q11908741",
+    "label": "Battle of Cibistra",
+    "description": "1304 battle",
+    "year": 1304,
+    "location": "Heraclea Cybistra",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q4677177",
+    "label": "Action at Earnside",
+    "description": "14th-century skirmish in Scotland",
+    "year": 1304,
+    "location": "",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q11908736",
+    "label": "Battle of Gallipoli",
+    "description": "1305 battle",
+    "year": 1305,
+    "location": "Gelibolu",
+    "country": "Byzantine Empire",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q8243989",
+    "label": "Battle of Apros",
+    "description": "1305 battle",
+    "year": 1305,
+    "location": "Apros",
+    "country": "Turkey",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q4870295",
+    "label": "Battle of Amroha",
+    "description": "1305 battle in India",
+    "year": 1305,
+    "location": "Amroha",
+    "country": "India",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q4870837",
+    "label": "Battle of Dalrigh",
+    "description": "1306 Scottish battle",
+    "year": 1306,
+    "location": "Dalrigh",
+    "country": "Kingdom of Scotland",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q24963774",
+    "label": "Battle of Ravi",
+    "description": "1306 battle in India",
+    "year": 1306,
+    "location": "Ravi River",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q104381988",
+    "label": "Siege of Aranda",
+    "description": "1306 siege",
+    "year": 1306,
+    "location": "Aranda de Duero",
+    "country": "Crown of Castile",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q1968883",
+    "label": "Battle of Methven",
+    "description": "1306 fought by Robert the Bruce",
+    "year": 1306,
+    "location": "Perth",
+    "country": "Kingdom of Scotland",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q11908738",
+    "label": "Battle of Gallipoli",
+    "description": "1306 battle",
+    "year": 1306,
+    "location": "Gelibolu",
+    "country": "Byzantine Empire",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q126723090",
+    "label": "Battle of Irtysh river",
+    "description": "",
+    "year": 1306,
+    "location": "",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q11908791",
+    "label": "Battle of Mont Hemus",
+    "description": "1306 battle",
+    "year": 1306,
+    "location": "Haemus Mons",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q135447244",
+    "label": "Siege of Anazarba",
+    "description": "1307 siege",
+    "year": 1307,
+    "location": "Anazarbus",
+    "country": "Ilkhanate",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q4872609",
+    "label": "Battle of Turnberry",
+    "description": "1307 battle during the First War of Scottish Independence",
+    "year": 1307,
+    "location": "",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q4871581",
+    "label": "Battle of Loch Ryan",
+    "description": "1307 battle of the Scottish Wars of Independence",
+    "year": 1307,
+    "location": "",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q4871112",
+    "label": "Battle of Glen Trool",
+    "description": "1307 battle",
+    "year": 1307,
+    "location": "Glen Trool",
+    "country": "Kingdom of Scotland",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q4590555",
+    "label": "Battle of Loudoun Hill",
+    "description": "1307 Medieval battle",
+    "year": 1307,
+    "location": "Loudoun Hill",
+    "country": "Kingdom of Scotland",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q2237003",
+    "label": "Battle of Lucka",
+    "description": "1307 battle",
+    "year": 1307,
+    "location": "Lucka",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q4872393",
+    "label": "Battle of Slioch",
+    "description": "1307 minor skirmish in the First War of Scottish Independence",
+    "year": 1307,
+    "location": "Drumblade",
+    "country": "Kingdom of Scotland",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q3636244",
+    "label": "Battle of the Pass of Brander",
+    "description": "battle between Robert the Bruce and the MacDougalls of Argyll in 1308",
+    "year": 1308,
+    "location": "Bridge of Awe",
+    "country": "Kingdom of Scotland",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q39088724",
+    "label": "Siege of Siwana",
+    "description": "1308 siege in India",
+    "year": 1308,
+    "location": "Siwana",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q131151125",
+    "label": "Ilkhanate campaign to Bithynia",
+    "description": "1308 military campaign",
+    "year": 1308,
+    "location": "Bithynia",
+    "country": "Ottoman Empire",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q4871281",
+    "label": "Battle of Inverurie",
+    "description": "1308 battle in the Wars of Scottish Independence",
+    "year": 1308,
+    "location": "Oldmeldrum",
+    "country": "Kingdom of Scotland",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q4872998",
+    "label": "Battle of the River Dee",
+    "description": "1308 battle in Scotland",
+    "year": 1308,
+    "location": "",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q333023",
+    "label": "Teutonic takeover of Danzig",
+    "description": "1308 event in European history",
+    "year": 1308,
+    "location": "",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q12001391",
+    "label": "Battle of Oslo 1308",
+    "description": "1308 battle",
+    "year": 1308,
+    "location": "",
+    "country": "Norway",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q11949527",
+    "label": "Siege of Ceuta",
+    "description": "1309 siege",
+    "year": 1309,
+    "location": "Ceuta under Muslim rule",
+    "country": "Spain",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q18415359",
+    "label": "Siege of Lyon",
+    "description": "siege of Lyon, France in 1310",
+    "year": 1310,
+    "location": "Lyon",
+    "country": "France",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q18415359",
+    "label": "Siege of Lyon",
+    "description": "siege of Lyon, France in 1310",
+    "year": 1310,
+    "location": "Lyon",
+    "country": "Holy Roman Empire",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q2064142",
+    "label": "Battle of Halmyros",
+    "description": "1311 battle in present-day Greece",
+    "year": 1311,
+    "location": "Almyros",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q12678149",
+    "label": "Battle of Wop\u0142awki",
+    "description": "1311 battle in Poland",
+    "year": 1311,
+    "location": "",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q28555185",
+    "label": "Battle of Amorgos",
+    "description": "1312 naval battle",
+    "year": 1312,
+    "location": "Amorgos",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q1265867",
+    "label": "Battle of Gallipoli",
+    "description": "1312 battle",
+    "year": 1312,
+    "location": "Gallipoli",
+    "country": "Turkey",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q181293",
+    "label": "Battle of Rozgony",
+    "description": "1312 battle",
+    "year": 1312,
+    "location": "Rozhanovce",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q9173149",
+    "label": "Battle of K\u0142eckiem (1313)",
+    "description": "1313 battle",
+    "year": 1313,
+    "location": "",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q111599031",
+    "label": "Battle of R\u00f6cklinge backe",
+    "description": "1313 battle",
+    "year": 1313,
+    "location": "",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q125898094",
+    "label": "Battle of Gaggiano",
+    "description": "",
+    "year": 1313,
+    "location": "Gaggiano",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q877777",
+    "label": "Battle of Gammelsdorf",
+    "description": "1313 battle",
+    "year": 1313,
+    "location": "Gammelsdorf",
+    "country": "Germany",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q111211628",
+    "label": "Siege of Oujda",
+    "description": "1314 siege",
+    "year": 1314,
+    "location": "Oujda",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q7510352",
+    "label": "Siege of Roxburgh Castle",
+    "description": "1314 Siege of Roxburgh Castle during the First War of Scottish Independence",
+    "year": 1314,
+    "location": "Roxburgh Castle",
+    "country": "Kingdom of England",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q20104831",
+    "label": "Battle of Glarentza",
+    "description": "1315 battle",
+    "year": 1315,
+    "location": "Glarentza",
+    "country": "Greece",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q7443529",
+    "label": "Second Siege of Gibraltar",
+    "description": "1315",
+    "year": 1315,
+    "location": "Gibraltar",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q7509932",
+    "label": "Siege of Christmemel",
+    "description": "1315 siege",
+    "year": 1315,
+    "location": "Christmemel",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q15277671",
+    "label": "Siege of Carlisle",
+    "description": "1315 siege of the First War of Scottish Independence",
+    "year": 1315,
+    "location": "Carlisle",
+    "country": "Kingdom of England",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q108612749",
+    "label": "Siege of Pavia",
+    "description": "1315 siege",
+    "year": 1315,
+    "location": "Pavia",
+    "country": "Italy",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q65128501",
+    "label": "Battle of Ponte San Pietro",
+    "description": "1315 battle",
+    "year": 1315,
+    "location": "Ponte San Pietro",
+    "country": "Italy",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q126120057",
+    "label": "Battle of Scrivia",
+    "description": "",
+    "year": 1315,
+    "location": "",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q109065541",
+    "label": "Battle of Hol\u00ed\u010d",
+    "description": "1315 battle",
+    "year": 1315,
+    "location": "Hol\u00ed\u010d Castle",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q4871762",
+    "label": "Battle of Moiry Pass",
+    "description": "1315 battle in Ireland",
+    "year": 1315,
+    "location": "Moyry Pass",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q4870784",
+    "label": "Battle of Connor",
+    "description": "1315 battle",
+    "year": 1315,
+    "location": "Kells",
+    "country": "Gaelic Ireland",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q946298",
+    "label": "Battle of Montecatini",
+    "description": "1315 battle",
+    "year": 1315,
+    "location": "Montecatini Terme",
+    "country": "Italy",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q4871410",
+    "label": "Battle of Kells",
+    "description": "1315 Irish battle",
+    "year": 1315,
+    "location": "Kells",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q326989",
+    "label": "Battle of Morgarten",
+    "description": "1315 battle during the creation of the Swiss Confederacy",
+    "year": 1315,
+    "location": "Ober\u00e4geri",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q4872388",
+    "label": "Battle of Skaithmuir",
+    "description": "1316 skirmish of the First War of Scottish Independence",
+    "year": 1316,
+    "location": "Coldstream",
+    "country": "Kingdom of Scotland",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q12880452",
+    "label": "Battle of Chalandritsa",
+    "description": "1316 battle",
+    "year": 1316,
+    "location": "Chalandritsa",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q16329384",
+    "label": "Siege of Chalandritsa",
+    "description": "1316 siege",
+    "year": 1316,
+    "location": "Chalandritsa",
+    "country": "Greece",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q4872391",
+    "label": "Battle of Skerries",
+    "description": "1316 battle in Skerries, County Kildare",
+    "year": 1316,
+    "location": "",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q17515504",
+    "label": "Battle of Picotin",
+    "description": "1316 battle between Achaea and Majorca",
+    "year": 1316,
+    "location": "Elis",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q3817235",
+    "label": "Battle of Manolada",
+    "description": "1316 battle",
+    "year": 1316,
+    "location": "Manolada",
+    "country": "Greece",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q2236911",
+    "label": "Battle of Gransee",
+    "description": "1316 battle in Germany",
+    "year": 1316,
+    "location": "",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q4141460",
+    "label": "Second Battle of Athenry",
+    "description": "1316 battle of the Bruce Campaign in Ireland",
+    "year": 1316,
+    "location": "Athenry",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q4871604",
+    "label": "Battle of Lough Raska",
+    "description": "battle in Ireland, 1317",
+    "year": 1317,
+    "location": "County Clare",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q19389234",
+    "label": "Battle of Norrmalm",
+    "description": "1317 battle",
+    "year": 1317,
+    "location": "",
+    "country": "Sweden",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q2374296",
+    "label": "Siege of Sittard",
+    "description": "1318",
+    "year": 1318,
+    "location": "Sittard",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q48734863",
+    "label": "Siege of Warangal, 1318",
+    "description": "1318 siege",
+    "year": 1318,
+    "location": "Hanamkonda district",
+    "country": "India",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q112503114",
+    "label": "Battle of \u017datce",
+    "description": "1318 battle",
+    "year": 1318,
+    "location": "Bl\u0161any",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q112503114",
+    "label": "Battle of \u017datce",
+    "description": "1318 battle",
+    "year": 1318,
+    "location": "Bl\u0161any",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q5036988",
+    "label": "Capture of Berwick",
+    "description": "1318 siege of Berwick in the First War of Scottish Independence",
+    "year": 1318,
+    "location": "Berwick-upon-Tweed",
+    "country": "Kingdom of England",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q4870943",
+    "label": "Battle of Dysert O'Dea",
+    "description": "battle between the Irish and the Normans in 1318",
+    "year": 1318,
+    "location": "O'Dea Castle",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q2011697",
+    "label": "Battle of Faughart",
+    "description": "1318 battle",
+    "year": 1318,
+    "location": "Faughart",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q80214622",
+    "label": "Siege of Berwick",
+    "description": "1319 siege of the town of Berwick, England",
+    "year": 1319,
+    "location": "Berwick-upon-Tweed",
+    "country": "Kingdom of England",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q5803812",
+    "label": "Battle of the Vega of Granada",
+    "description": "1319 battle",
+    "year": 1319,
+    "location": "Pinos Puente",
+    "country": "Spain",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q16207122",
+    "label": "Battle of Chios",
+    "description": "1319 naval battle",
+    "year": 1319,
+    "location": "Chios",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q4871832",
+    "label": "Battle of Myton",
+    "description": "1319 battle in the First Scottish War of Independence",
+    "year": 1319,
+    "location": "Myton-on-Swale",
+    "country": "Kingdom of England",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q117032108",
+    "label": "Battle of Rhodes",
+    "description": "1320 naval battle",
+    "year": 1320,
+    "location": "Rhodes",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q1786470",
+    "label": "Battle on the Irpin River",
+    "description": "Semi-legendary, supposed 1320s battle between Lithuania and Kiev",
+    "year": 1320,
+    "location": "Belgorod Kievsky",
+    "country": "Ukraine",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q96373271",
+    "label": "Battle of Saraswati",
+    "description": "battle fought fought between two factions of the Delhi Sultanate on the Delhi-Dipalpur route in 1320",
+    "year": 1320,
+    "location": "",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q3920750",
+    "label": "Battle of Medininkai",
+    "description": "battle in 1320 between the Teutonic Knights and the Grand Duchy of Lithuania",
+    "year": 1320,
+    "location": "Varniai",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q96373251",
+    "label": "Battle of Lahrawat",
+    "description": "battle fought between two factions of the Delhi Sultanate in 1320",
+    "year": 1320,
+    "location": "",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q60524445",
+    "label": "Battle of Saint George",
+    "description": "1320 Part of the Byzantine\u2013Frankish conflicts of the Frankokratia",
+    "year": 1320,
+    "location": "",
+    "country": "",
+    "source_type": "war"
+  }
+]

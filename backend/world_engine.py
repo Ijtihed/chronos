@@ -12,7 +12,11 @@
 Stages 1-4 run inside simulate_turn(). Stages 5-7 are in main.py.
 The world advances whether or not the player acts.
 
-Model tier: LOCAL — lightweight per-NPC autonomous actions via Ollama.
+Model tier: QUALITY for active NPCs, player skip-turn, and arrival
+catch-up (all use prompts/autonomous_action.md — prose-critical, the
+player reads these directly). FAST (Ollama) for offscreen NPCs via
+prompts/autonomous_action_light.md — one-sentence ambient activity
+where model fidelity matters less than cost, fired many times per turn.
 """
 
 from __future__ import annotations
@@ -28,7 +32,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from pydantic import ValidationError
 
-from backend.llm import chat, load_prompt
+from backend.llm_provider import call_llm, load_prompt
 from backend.llm_schemas import (
     AutonomousActionResponse,
     NPCEffect,
@@ -184,12 +188,22 @@ async def simulate_turn(state: WorldState) -> Tuple[WorldState, List[dict]]:
     """
     new = state.model_copy(deep=True)
     new.turn += 1
-    new.current_year = int(
+    new.current_year = round(
         new.era.year_start + new.turn * new.era.years_per_turn
     )
 
     if new.player.location not in new.visited_locations:
         new.visited_locations.append(new.player.location)
+
+    # --- STAGE 0: Refresh ground context if stale ---
+    if new.ground_context_stale:
+        try:
+            from backend.hce import generate_ground_context
+            new.ground_context = await generate_ground_context(new)
+            new.ground_context_stale = False
+            logger.info("Ground context refreshed at turn %d", new.turn)
+        except Exception as exc:
+            logger.warning("Ground context refresh failed, will retry next turn: %s", exc)
 
     # --- STAGE 1: Structural drift (no LLM) ---
     tick_tension(new)
@@ -234,11 +248,17 @@ async def _npc_light_action(npc: NPC, state: WorldState) -> dict:
         era_description=state.era.description,
         character_disposition=npc.disposition,
         dominant_need=dominant.replace("_", " "),
+        current_activity=npc.current_activity or f"Going about duties as a {npc.role}.",
         local_tension=npc_loc.political_tension,
     )
 
     try:
-        raw = await chat(prompt, json_mode=True)
+        raw, _ = await call_llm(
+            prompt,
+            tier="fast",
+            schema=AutonomousActionResponse,
+            call_site="autonomous_action_light",
+        )
         return AutonomousActionResponse.model_validate(json.loads(raw)).model_dump()
     except (json.JSONDecodeError, ValidationError, Exception):
         return autonomous_action_default(npc.name).model_dump()
@@ -293,6 +313,7 @@ async def _run_npc_actions(state: WorldState) -> List[dict]:
     for npc, result in zip(active_sample, active_results):
         npc.last_simulated_turn = state.turn
         opp_type = choose_autonomous_action(npc, state_snapshot)
+        opp_text = _resolve_opportunity_text(npc, opp_type, state_snapshot)
         if isinstance(result, dict):
             action_desc = result.get("action", f"{npc.name} goes about their day.")
             visible_activity.append({
@@ -301,7 +322,7 @@ async def _run_npc_actions(state: WorldState) -> List[dict]:
                 "npc_role": npc.role,
                 "activity": action_desc,
                 "interacts_with": result.get("interacts_with"),
-                "opportunity": opp_type,
+                "opportunity": opp_text,
             })
             all_actions.append((npc, opp_type, result))
 
@@ -323,6 +344,11 @@ async def _run_npc_actions(state: WorldState) -> List[dict]:
                 target=result.get("interacts_with"),
                 location=npc.location,
             ))
+            new_act = result.get("new_activity", "")
+            if new_act:
+                npc.current_activity = new_act
+            elif not npc.current_activity:
+                npc.current_activity = result.get("action", "")
             effect = _to_npc_effect(npc, result)
             apply_npc_effect(state, effect)
 
@@ -360,6 +386,7 @@ async def player_skip_turn(state: WorldState) -> dict:
         character_disposition=state.player.disposition,
         dominant_need="getting through the day",
         urgent_needs="nothing urgent",
+        current_activity="Waiting and watching.",
         chosen_opportunity="daily life",
         what_character_knows=_format_ground_context_field(gc, "what_character_knows", "What anyone in your position would know."),
         local_rumors=_format_ground_context_field(gc, "local_rumors", "Nothing specific."),
@@ -374,7 +401,12 @@ async def player_skip_turn(state: WorldState) -> dict:
     )
 
     try:
-        raw = await chat(prompt, json_mode=True)
+        raw, _ = await call_llm(
+            prompt,
+            tier="quality",
+            schema=AutonomousActionResponse,
+            call_site="autonomous_action.player_skip",
+        )
         data = AutonomousActionResponse.model_validate(json.loads(raw))
     except (json.JSONDecodeError, ValidationError, Exception):
         data = autonomous_action_default(state.player.name)
@@ -411,6 +443,26 @@ def _format_ground_context_field(gc: dict, field: str, fallback: str) -> str:
     return str(val)
 
 
+def _resolve_opportunity_text(npc: NPC, opp_type: str, state: WorldState) -> str:
+    """Pick an era-specific opportunity description for this NPC's archetype.
+    Falls back to the generic opportunity type string."""
+    try:
+        from backend.eras import ALL_ERAS
+        era_key = state.era.name.lower().replace(" ", "_").replace("fall_of_", "fall_of_")
+        for key, cfg in ALL_ERAS.items():
+            if cfg["name"] == state.era.name:
+                era_key = key
+                break
+        era_config = ALL_ERAS.get(era_key, {})
+        era_opps = era_config.get("npc_opportunities", {})
+        archetype_opps = era_opps.get(npc.archetype, [])
+        if archetype_opps:
+            return random.choice(archetype_opps)
+    except Exception:
+        pass
+    return opp_type.replace("_", " ")
+
+
 async def _npc_autonomous_action(npc: NPC, state: WorldState, nearby_npcs: List[NPC]) -> dict:
     from backend.npc_personality import get_dominant_need
 
@@ -428,6 +480,7 @@ async def _npc_autonomous_action(npc: NPC, state: WorldState, nearby_npcs: List[
     ) or "no one"
 
     opp_type = choose_autonomous_action(npc, state)
+    opp_text = _resolve_opportunity_text(npc, opp_type, state)
 
     gc = state.ground_context or {}
     prompt = Template(raw_template).safe_substitute(
@@ -437,7 +490,8 @@ async def _npc_autonomous_action(npc: NPC, state: WorldState, nearby_npcs: List[
         character_disposition=npc.disposition,
         dominant_need=get_dominant_need(npc.needs).replace("_", " "),
         urgent_needs=_format_urgent_needs(npc),
-        chosen_opportunity=opp_type.replace("_", " "),
+        current_activity=npc.current_activity or f"Going about duties as a {npc.role}.",
+        chosen_opportunity=opp_text,
         what_character_knows=_format_ground_context_field(gc, "what_character_knows", "What anyone in your position would know."),
         local_rumors=_format_ground_context_field(gc, "local_rumors", "Nothing specific."),
         other_npcs_here=other_names,
@@ -451,7 +505,12 @@ async def _npc_autonomous_action(npc: NPC, state: WorldState, nearby_npcs: List[
     )
 
     try:
-        raw = await chat(prompt, json_mode=True)
+        raw, _ = await call_llm(
+            prompt,
+            tier="quality",
+            schema=AutonomousActionResponse,
+            call_site="autonomous_action.active",
+        )
         return AutonomousActionResponse.model_validate(json.loads(raw)).model_dump()
     except (json.JSONDecodeError, ValidationError, Exception):
         return autonomous_action_default(npc.name).model_dump()
@@ -550,6 +609,7 @@ async def generate_arrival_catchup(
             character_disposition=npc.disposition,
             dominant_need=get_dominant_need(npc.needs).replace("_", " "),
             urgent_needs=_format_urgent_needs(npc),
+            current_activity=npc.current_activity or f"Going about duties as a {npc.role}.",
             chosen_opportunity=opp_type.replace("_", " "),
             what_character_knows=_format_ground_context_field(gc, "what_character_knows", "What anyone in your position would know."),
             local_rumors=_format_ground_context_field(gc, "local_rumors", "Nothing specific."),
@@ -563,7 +623,12 @@ async def generate_arrival_catchup(
             player_name=state.player.name,
         )
         try:
-            raw = await chat(prompt, json_mode=True)
+            raw, _ = await call_llm(
+                prompt,
+                tier="quality",
+                schema=AutonomousActionResponse,
+                call_site="autonomous_action.arrival_catchup",
+            )
             data = AutonomousActionResponse.model_validate(json.loads(raw))
             return data.action or f"{npc.name} is here."
         except Exception:

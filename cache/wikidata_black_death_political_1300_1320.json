@@ -1,0 +1,20 @@
+[
+  {
+    "qid": "Q4573051",
+    "label": "H\u00e5tuna games",
+    "description": "1306 conflict between King Birger of Sweden and his brothers",
+    "year": 1306,
+    "location": "",
+    "country": "Sweden",
+    "source_type": "political"
+  },
+  {
+    "qid": "Q3686843",
+    "label": "Tiepolo conspiracy",
+    "description": "1310 coup attempt in Venice, Italy",
+    "year": 1310,
+    "location": "Rialto",
+    "country": "Republic of Venice",
+    "source_type": "political"
+  }
+]

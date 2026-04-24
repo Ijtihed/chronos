@@ -1,0 +1,29 @@
+[
+  {
+    "qid": "Q105591033",
+    "label": "1328 Norcia earthquake",
+    "description": "The 1328 earthquake in Norcia, Italy, caused substantial damage, including the destruction of buildings and structures in the region.",
+    "year": 1328,
+    "location": "",
+    "country": "Italy",
+    "source_type": "natural_disaster"
+  },
+  {
+    "qid": "Q135011940",
+    "label": "Q135011940",
+    "description": "",
+    "year": 1330,
+    "location": "",
+    "country": "Kingdom of Navarre",
+    "source_type": "natural_disaster"
+  },
+  {
+    "qid": "Q130514891",
+    "label": "1333 flood of Florence",
+    "description": "",
+    "year": 1333,
+    "location": "Florence",
+    "country": "Italy",
+    "source_type": "natural_disaster"
+  }
+]

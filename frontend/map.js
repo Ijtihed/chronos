@@ -12,12 +12,40 @@ const ChronosMap = (function () {
   let borderLayer = null;
   let playerMarker = null;
   let npcMarkers = [];
+  let eventLayer = null;
   let isVisible = false;
   let initialized = false;
   let currentEraKey = null;
   let currentRunId = null;
   let perceptionCache = {};
   let regionCache = {};
+
+  // Event-type colors — must stay in sync with the 8 types in
+  // historical_events.type. Keys match DB values exactly.
+  const EVENT_TYPE_COLORS = {
+    war: "#dc2626",
+    epidemic: "#16a34a",
+    famine: "#ea580c",
+    political: "#2563eb",
+    religious: "#9333ea",
+    economic: "#ca8a04",
+    natural_disaster: "#78350f",
+    cultural: "#71717a",
+  };
+
+  function _tierOpacity(tier) {
+    if (tier === "witnessed" || tier === "known") return 1.0;
+    if (tier === "rumor_reliable") return 0.7;
+    if (tier === "rumor_unreliable") return 0.4;
+    return 0.3;
+  }
+
+  function _tierFillOpacity(tier, broad) {
+    // Broad regions (>=1000km radius) get near-transparent fill —
+    // they cover large areas and shouldn't obscure smaller events.
+    var base = broad ? 0.05 : 0.15;
+    return _tierOpacity(tier) * base;
+  }
 
   function init() {
     if (initialized) return;
@@ -223,6 +251,19 @@ const ChronosMap = (function () {
       npcMarkers.push(km);
     }
 
+    // Anonymous dots for unvisited locations with NPCs
+    var unvisited = pv.unvisited_npc_counts || [];
+    for (var u = 0; u < unvisited.length; u++) {
+      var uv = unvisited[u];
+      if (!uv.lat || !uv.lon) continue;
+      var uvm = L.marker([uv.lat, uv.lon], {
+        icon: makeIcon("marker-unvisited", 5),
+        zIndexOffset: 100,
+        interactive: false,
+      }).addTo(map);
+      npcMarkers.push(uvm);
+    }
+
     if (playerLoc && playerLoc.lat) {
       map.setView([playerLoc.lat, playerLoc.lon], map.getZoom(), {
         animate: true,
@@ -363,6 +404,143 @@ const ChronosMap = (function () {
     }
   }
 
+  // ── Event markers ─────────────────────────────────────────────────
+  //
+  // Rendered as a dedicated L.layerGroup so we can clearLayers()
+  // between turns without touching player/NPC markers.
+  //
+  // Design:
+  //   witnessed / known (not broad)  -> pin + filled circle, full opacity
+  //   witnessed                       -> pin has a small white dot overlay
+  //                                      (marker-event-witnessed class)
+  //                                      indicating "you were here"
+  //   known or rumor_* (broad region) -> NO pin; circle only. A pin
+  //                                      at the center of something
+  //                                      as big as "Mediterranean" is
+  //                                      meaningless; the circle
+  //                                      honestly signals diffuseness.
+  //   rumor_reliable                  -> plain circle, 70% opacity
+  //   rumor_unreliable                -> plain circle, 40% opacity, dashed
+  //
+  // Color by event type from EVENT_TYPE_COLORS.
+
+  function updateEventMarkers(events) {
+    if (!map) return;
+    if (!eventLayer) {
+      eventLayer = L.layerGroup().addTo(map);
+    }
+    eventLayer.clearLayers();
+    if (!events || !events.length) return;
+    for (var i = 0; i < events.length; i++) {
+      _addEventMarker(events[i]);
+    }
+  }
+
+  function _addEventMarker(ev) {
+    if (typeof ev.lat !== "number" || typeof ev.lon !== "number") return;
+    var color = EVENT_TYPE_COLORS[ev.type] || "#71717a";
+    var isKnownTier = ev.tier === "witnessed" || ev.tier === "known";
+    var isWitnessed = ev.tier === "witnessed";
+    var opacity = _tierOpacity(ev.tier);
+    var fillOpacity = _tierFillOpacity(ev.tier, !!ev.broad);
+
+    var circleOpts = {
+      color: color,
+      weight: 1.2,
+      opacity: opacity,
+      fillColor: color,
+      fillOpacity: fillOpacity,
+    };
+    if (ev.tier === "rumor_unreliable") {
+      circleOpts.dashArray = "4,4";
+    }
+
+    var circle = L.circle([ev.lat, ev.lon], Object.assign(
+      { radius: (ev.radius_km || 200) * 1000 },
+      circleOpts,
+    )).addTo(eventLayer);
+
+    // Pin at center only when: (a) known-tier AND (b) region is
+    // not broad. Broad regions render as circles only.
+    if (isKnownTier && !ev.broad) {
+      var iconClass = "marker-event marker-event-" + (ev.type || "cultural");
+      if (isWitnessed) iconClass += " marker-event-witnessed";
+      var pin = L.marker([ev.lat, ev.lon], {
+        icon: makeIcon(iconClass, 12),
+        zIndexOffset: 200,
+      }).addTo(eventLayer);
+      pin.bindTooltip(_eventTooltip(ev), {
+        direction: "top",
+        offset: [0, -8],
+        className: "npc-tooltip",
+      });
+      (function (evRef) {
+        pin.on("click", function () { _showEventPanel(evRef); });
+      })(ev);
+    } else {
+      // Clickable circle for broad or rumor-tier events.
+      (function (evRef) {
+        circle.on("click", function () { _showEventPanel(evRef); });
+      })(ev);
+    }
+  }
+
+  function _eventTooltip(ev) {
+    var year = ev.year + " AD";
+    var type = (ev.type || "").toUpperCase();
+    return (
+      '<span style="font-size:11px;color:#d4d4d8;">' + year + " — " + type + "</span>" +
+      '<br><span style="font-size:9px;color:#a1a1aa;">' + _esc(ev.summary.substring(0, 80)) + "</span>"
+    );
+  }
+
+  async function _loadEventsForRun(runId) {
+    if (!runId) return;
+    try {
+      var res = await fetch("/api/run/" + runId + "/events/visible");
+      if (!res.ok) return;
+      var data = await res.json();
+      // Guard against stale fetches across run switches.
+      if (data.era_key && currentEraKey && data.era_key !== currentEraKey) {
+        return;
+      }
+      updateEventMarkers(data.events || []);
+    } catch (e) {
+      console.warn("events/visible fetch failed:", e);
+    }
+  }
+
+  function _showEventPanel(ev) {
+    // Reuse the region panel DOM — same container, different content.
+    // Region click handlers bind no state; simply re-rendering the
+    // body with event-shaped data is safe.
+    var panel = document.getElementById("region-panel");
+    var overlay = document.getElementById("region-overlay");
+    var title = document.getElementById("region-panel-title");
+    var body = document.getElementById("region-panel-body");
+    if (!panel || !body) return;
+
+    if (title) title.textContent = ev.year + " AD — " + (ev.region || "unknown region");
+
+    // Tier is implicit from the marker the user just clicked for
+    // known/witnessed — we omit it. Show "RUMORED" only for rumor
+    // tiers where the uncertainty matters to the reader.
+    var metaParts = [];
+    if (ev.type) metaParts.push(ev.type.toUpperCase().replace(/_/g, " "));
+    if (ev.significance) metaParts.push(ev.significance.toUpperCase());
+    if (ev.tier === "rumor_reliable" || ev.tier === "rumor_unreliable") {
+      metaParts.push("RUMORED");
+    }
+    var meta = metaParts.join(" • ");
+
+    var h = '<div class="region-section-label event-meta">' + _esc(meta) + "</div>";
+    h += '<p class="region-fact">' + _esc(ev.summary) + "</p>";
+
+    body.innerHTML = h;
+    panel.classList.remove("hidden");
+    if (overlay) overlay.classList.remove("hidden");
+  }
+
   function show(playerView, eraKey, runId) {
     var container = document.getElementById("map-container");
     if (!container) return;
@@ -383,6 +561,7 @@ const ChronosMap = (function () {
     if (playerView) {
       updateMarkers(playerView);
     }
+    _loadEventsForRun(currentRunId);
   }
 
   function hide() {
@@ -399,12 +578,23 @@ const ChronosMap = (function () {
     }
   }
 
+  // Combined refresh: player/NPC markers plus event markers.
+  // Callers use this from the per-turn hooks in app.js so the map
+  // stays consistent without duplicating the fetch call everywhere.
+  function refresh(playerView, runIdArg) {
+    if (runIdArg) currentRunId = runIdArg;
+    if (playerView) updateMarkers(playerView);
+    _loadEventsForRun(currentRunId);
+  }
+
   return {
     init: init,
     show: show,
     hide: hide,
     toggle: toggle,
     updateMarkers: updateMarkers,
+    updateEventMarkers: updateEventMarkers,
+    refresh: refresh,
     isVisible: function () {
       return isVisible;
     },

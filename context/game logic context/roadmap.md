@@ -79,12 +79,12 @@ The **full path** from browser → backend → action representation → world m
 
 ### Success criteria
 
-- [ ] A full run can complete from character generation to erasure without soft-locks
-- [ ] At least 3 different eras produce runs that feel historically distinct
-- [ ] NPC perspectives feel distinct from each other (archetype, social position, bias are evident)
-- [ ] The player can type anything — the game handles it without breaking
-- [ ] Only genuinely affected NPCs react to any given action (not everyone nearby)
-- [ ] The death + memory fade mechanic lands emotionally — the ending feels like erasure, not a game over screen
+- [x] A full run can complete from character generation to erasure without soft-locks
+- [x] At least 3 different eras produce runs that feel historically distinct
+- [x] NPC perspectives feel distinct from each other (archetype, social position, bias are evident)
+- [x] The player can type anything — the game handles it without breaking
+- [x] Only genuinely affected NPCs react to any given action (not everyone nearby)
+- [x] The death + memory fade mechanic lands emotionally — the ending feels like erasure, not a game over screen
 
 ### Definition of success
 
@@ -158,29 +158,32 @@ The **map is authoritative** for place: player marker, NPC markers, and **histor
 
 ---
 
-## PHASE 2.5 -- Map Intelligence + Historical Context Engine
+## PHASE 2.5 -- Map Intelligence + Historical Context Engine (COMPLETE)
 
 **Goal:** The map becomes a knowledge surface. Clicking a region shows what the character knows and has heard. Significant events appear on the map, filtered by character awareness. The Historical Context Engine (Events DB + Ground Context Generator) ships as the data backbone.
 
+**Status (2026-04-21):** COMPLETE. All five success criteria met. Events DB, ground context, region knowledge on click, loading screen from Events DB, time-skip UI, word definitions overlay, event markers on map, and historical divergence detection all shipped. One carryover from criterion 5: divergence is visible in state but not yet propagated to NPC POVs or narrative text (see open-questions.md, "Divergence visibility to NPCs and narrative").
+
 ### What exists at the end of this phase
 
-- **HCE Events DB** -- a SQLite table of canonical historical events indexed by year and region, populated by a build-time script from Wikipedia + structured datasets. One DB covers all eras. At least 20-40 events per era within a 50-year window of each run's start year.
+- **HCE Events DB** -- a SQLite table of canonical historical events indexed by year and region, populated by a build-time script from Wikipedia + Wikidata + structured datasets. One DB covers all eras. **Current coverage:** Fall of Constantinople 875, Roman Late Empire 303, Viking Age 152, Crusader States 237, Black Death 182 — **1,749 total events** across all 5 starter eras. Build script defines 43 era windows covering 0–2000 AD for future expansion.
 - **Ground Context Generator** -- at run initialization, generates a GroundContext object (era_feel, what_your_character_knows, local_rumors, material_conditions) from the Events DB + RAG corpus. Injected into world state and NPC prompts.
 - **Region knowledge endpoint** -- GET /api/run/{id}/region/{polity_name} returns character-filtered knowledge (known facts + rumors) for any region the player clicks on the map. Generated on demand via local LLM, cached per region per turn.
-- **Event markers on map** -- significant events (sieges, plagues, armies) appear as visual markers on the Leaflet map, filtered by character awareness. Sources: HCE Events DB (canonical) + world engine (gameplay events).
-- **Event markers on map (deferred)** -- Map markers for historical and game events filtered through the Knowledge Matrix. Only events the character plausibly knows about. Styled by type (war/epidemic/famine/political/religious) and significance. Rumored events shown dimmer. Requires a new GET /api/run/{id}/map-events backend endpoint. Deferred from Phase 2.5 — build after region knowledge and loading screen are stable.
+- **Event markers on map** -- GET `/api/run/{run_id}/events/visible` returns events filtered through the Knowledge Matrix (only events the character plausibly knows about) with coordinates resolved via a hand-curated centroid YAML (`backend/geo/region_centroids.yaml`) and a compound-string normalizer. 97.2% of the 1,569 canonical events resolve to a centroid. Rendering: witnessed and known tiers use a colored pin plus a circle (witnessed gets a small white dot overlay); rumor_reliable and rumor_unreliable tiers render as plain circles at reduced opacity with a dashed border for unreliable; broad regions (≥1000 km radius) render as circles only, no pin. Color mapping: war red, epidemic green, famine orange, political blue, religious purple, economic yellow, natural_disaster brown, cultural grey.
 - **Knowledge awareness model** -- determines what a character knows about a region based on: distance, archetype/social class, trade routes, NPC-sourced info, and era common knowledge.
 - **Historical divergence tracking** -- game-generated events marked canonical: false in the Events DB. When player actions contradict canonical history, subsequent canonical events flagged as superseded.
-- **Build-time agent** -- scripts/build_events_db.py populates the Events DB per era from Wikipedia + structured sources via local LLM.
+- **Build-time agent** -- scripts/build_events_db.py populates the Events DB per era from Wikipedia + Wikidata + structured sources via local LLM.
+- **Time-skip UI** -- frontend button in the bottom bar for triggering POST /api/run/{id}/skip. Ships the time-acceleration feature that was backend-only in Phase 1.
+- **Loading screen from Events DB** -- era preview endpoint (POST /api/run/preview) returns loading_events drawn from the Events DB, replacing the hardcoded per-era config data from Phase 1.
 - **Word definitions overlay** -- highlighting any word in the narrative shows a dictionary definition as a small popup. Uses a dictionary API (not LLM), instant response. Reading aid for era-specific language, titles, and concepts.
 
 ### Success criteria
 
-- [ ] Events DB has 20+ events per era within 50-year window of run start
-- [ ] Region knowledge on click feels character-appropriate -- a farmer knows less than a scholar
-- [ ] Event markers appear only for events the character is plausibly aware of
-- [ ] Ground context at run start makes NPC voices more grounded and era-specific than Phase 1
-- [ ] Historical divergence: player actions that contradict canonical events produce coherent (not contradictory) NPC responses
+- [x] Events DB has 20+ events per era within 50-year window of run start — all 5 eras far exceed 20 (minimum 152 for Viking Age)
+- [x] Region knowledge on click feels character-appropriate -- a farmer knows less than a scholar
+- [x] Event markers appear only for events the character is plausibly aware of — shipped via Knowledge Matrix filtering in `/api/run/{id}/events/visible` with centroid resolution at 97.2% coverage
+- [x] Ground context at run start makes NPC voices more grounded and era-specific than Phase 1
+- [x] Historical divergence: player actions that contradict canonical events produce coherent (not contradictory) NPC responses — **met in plumbing, narrative carryover.** Divergence detection fires end-to-end, writes to `state.historical_divergences`, and invalidates queued canonical consequences. NPC POV and narrative propagation is deferred to a future phase (see open-questions.md, "Divergence visibility to NPCs and narrative")
 
 ### Definition of success
 
@@ -236,9 +239,15 @@ The map is no longer just geography -- it is **the character's understanding of 
 5. **UX** — Narrative readable **without** scrolling past image; image load failure **must not** block text (error state).
 6. **Cost / latency** — Log generation time + \$ per run; stays within project budget assumptions (see **MODEL TIER POLICY** for LLM; diffusion budget set at Phase 3 kickoff).
 
-### Technical note (to be decided at build time)
+### Technical note (candidate selected 2026-04-22, not yet integrated)
 
-The diffusion model provider and whether generation is local or via API is an open decision. Evaluate Stable Diffusion (local), ComfyUI (local pipeline), and available API options at the time this phase begins. The prompt construction strategy — how world state translates into a coherent image prompt — is the core design challenge of this phase and should be prototyped before full integration.
+The provider decision has been narrowed by a POC in `scripts/imagegen_poc/` (run 2026-04-22). Candidate: `mflux` on Apple Silicon with FLUX.2 Klein 9B distilled, 4 steps, Q8 quantization. Measured at ~60 seconds per image at 1024x1024 on M4 Max 64 GB, with zero content filter and $0 per-run cost. All 10 CHRONOS scene types generated successfully.
+
+This is a **soft-lock**, not a final commit. Final commitment happens at Phase 3 integration kickoff because production integration can reveal issues invisible to a 10-image POC: concurrent load with active Ollama NPC inference, seed stability, memory pressure, etc.
+
+Named fallback if integration reveals blocking issues: `fal.ai` Flux 2 Dev API at ~$0.025 per image. A full run of ~6 images costs ~$0.15 via fallback. This violates the local-first principle but stays within acceptable cost bounds.
+
+Design rules for CHRONOS imagery (POV, honest bodies, prompt template, style) are documented in [visuals.md](visuals.md). Refer to that doc when constructing the trigger pipeline and prompt templates at Phase 3 kickoff.
 
 ---
 
@@ -314,34 +323,61 @@ All **20** era buckets are **playable** with ingested corpus + smoke-tested arch
 
 ## MODEL TIER POLICY (Agreed — applies to all phases)
 
-**Principle:** Frontier models are a last resort, not a default. A run should cost cents, not dollars.
+**Principle:** Local-first. Frontier is used only where NPC voice fidelity directly affects the player experience. A run should cost cents, not dollars.
 
-**Local only (Ollama):**
+### FAST tier — local Ollama
 
-- NPC POV generation — highest volume call, local model is sufficient
-- Autonomous character behavior on skipped turns
-- Narrative layer updates each turn
-- Run initialization (character backstory, NPC seeding)
-- Memory decay descriptions
-- Historical consequence generation (RAG retrieval + local reasoning)
-- HCE ground context generation at run init
-- HCE region knowledge generation on map hover/click
+Every short / structured / high-volume call runs locally on Ollama. Behavior is preserved exactly across the 2026-04-23 two-tier migration.
+
+- `action_parser` — NL → structured JSON action
+- `autonomous_action_light` — one-sentence offscreen NPC activity
+- `death_check` — short structured JSON
+- `region_knowledge` — one-line map-click note
+- `npc_perception` — one-line NPC hover note
+- `historical_context` — 2-3 sentence passage explainer (map/text highlight)
+- `memory_fade` — one-sentence fade framing each observation turn
 - Events DB population (build-time script, not runtime)
 - Embeddings for vector DB (`nomic-embed-text`, free, local)
 
-**Frontier model (haiku/mini tier only — cheapest available):**
+### QUALITY tier — Google Gemini 3.1 Flash-Lite (`gemini-3-1-flash-lite`)
 
-- IO layer: parsing player natural language input into a structured action — one small call per turn, ~200 tokens, fractions of a cent
-- That's it. Nothing else goes to frontier unless local consistently and demonstrably fails at a specific task, tested explicitly.
+Approved frontier calls. Model fidelity matters to what the player reads. Each call goes through `backend/llm_provider.py::call_llm(tier="quality")` and falls back to Ollama when Gemini is unavailable or the circuit breaker is open.
 
-**Recommended local models:**
+- `npc_pov` — NPC reactions to player actions (highest-impact prose in the game)
+- `autonomous_action` — full NPC autonomous actions (active tier, player skip-turn, arrival catch-up)
+- `character_gen` — player + 8-15 NPCs at run start (concurrency capped by semaphore)
+- `ground_context` — HCE ground context at run start and on arrival
+- `erasure` — final narrative passage when the run ends (fires exactly once per run)
 
-- `llama3.1:70b` — preferred when hardware supports it (48GB+ RAM). Richer NPC voices, more historically grounded responses. Auto-selected if available locally.
-- `llama3.1:8b` — minimum viable model. Works on 16GB. Default fallback.
-- `mistral:7b` — fast, good for high-volume per-turn calls
-- `nomic-embed-text` — embeddings, completely free
+### Fallback + resilience
 
-**Cost target:** $0.10–0.30 per run maximum. If a run exceeds this, the architecture is wrong.
+Quality-tier calls fall through to Ollama when:
+
+- `GEMINI_API_KEY` is unset
+- `CHRONOS_FORCE_FAST_TIER=1` (dev flag)
+- the Gemini circuit breaker is open (3 failures in 60s → 5 minutes open; in-process, ephemeral across restarts)
+- a single Gemini call raises (fallback happens immediately and the failure counts toward the circuit)
+
+### Current runtime status (2026-04-23)
+
+Two-tier provider active. Primary quality call is `gemini-3-1-flash-lite` at $0.25/M input, $1.50/M output. Local Ollama serves every fast-tier call and every quality-tier call when Gemini is unavailable. The migration replaced the previous Ollama-only architecture because 70b auto-selection on capable hardware produced ~6 min per turn, blocking playtest-driven iteration (Step 3.1 log review, Phase 3 development).
+
+### Per-run cost ceiling
+
+- **€0.31 median per run** (estimate; to be confirmed by live smoke test)
+- **€1.00 soft cap** — UI banner, dismissible, once per run; turns continue
+- **€2.00 hard cap** — turn endpoints reject further advances with `402` + `code: cost_cap_hard`; player can still observe the world and end the run manually
+
+Internal accounting is USD (Gemini bills USD). EUR is rendered via `config.USD_TO_EUR` (default 0.92, update from ECB reference rate periodically; if EUR/USD moves by ±5%, recompute caps or switch accounting to USD).
+
+### Recommended local models (fast tier)
+
+- `llama3.1:8b` — default. Minimum viable, works on 16GB.
+- `llama3.1:70b` — auto-selected when available. Richer NPC voices in fallback scenarios (Gemini down).
+- `mistral:7b` — alt fast model for extremely high-volume turns.
+- `nomic-embed-text` — embeddings, completely free.
+
+Override the auto-selection via `CHRONOS_FAST_MODEL` env var.
 
 ---
 
@@ -359,6 +395,20 @@ A single-player, turn-based historical simulation. You are assigned a random min
 - Diffusion-generated scene illustrations for major moments
 - Full era coverage: post 0 AD, 20 era buckets minimum
 
+**Current stack (as built through Phase 2.5):**
+
+| Layer | Technology | Notes |
+|-------|-----------|-------|
+| Frontend | Vanilla JS + HTML + Tailwind CSS (CDN) | No framework |
+| Map | Leaflet 2D + GeoJSON | Natural Earth coastlines + aourednik historical borders |
+| Backend | FastAPI + Uvicorn | Python 3.11 |
+| Database | SQLite (WAL mode, aiosqlite) | Sessions, Events DB, turn logs (with `turn_cost_usd`), consequence queue |
+| Embeddings | ChromaDB + nomic-embed-text | Local, free |
+| LLM (quality tier) | Gemini 3.1 Flash-Lite via `google-genai` | $0.25/$1.50 per M input/output tokens; npc_pov, autonomous_action, character_gen, ground_context, erasure |
+| LLM (fast tier) | llama3.1:8b (auto 70b) via Ollama | action_parser, autonomous_action_light, death_check, region_knowledge, npc_perception, historical_context, memory_fade |
+| LLM fallback | Ollama | Quality-tier calls route to Ollama when Gemini is unreachable, key is missing, or the circuit breaker is open |
+| Cost ceiling | €1.00 soft / €2.00 hard per run | Tracked in USD, displayed in EUR; persisted in `WorldState.cumulative_cost_usd` and `turn_logs.turn_cost_usd` |
+
 ---
 
 ## OPEN QUESTIONS THAT AFFECT THE ROADMAP
@@ -366,7 +416,7 @@ A single-player, turn-based historical simulation. You are assigned a random min
 > These must be resolved before the phase they impact begins.
 
 - **Session length target** — affects pacing design in Phase 5. A 30-minute run and a multi-day run are fundamentally different.
-- **Diffusion model provider** — affects Phase 3 architecture. Resolve at Phase 3 kickoff.
+- **Diffusion model provider** — affects Phase 3 architecture. Candidate selected 2026-04-22 (mflux + FLUX.2 Klein 9B distilled, POC in `scripts/imagegen_poc/`). Final commit at Phase 3 kickoff. See [visuals.md](visuals.md) and Phase 3 Technical note.
 - **NPC relationship graph granularity** — affects Phase 5 scope significantly. Resolve before Phase 5 begins.
 
 ---
@@ -449,6 +499,37 @@ Use this shape:
   - Region knowledge on hover and event markers deferred to Phase 2.5 (HCE dependency).
   - Terrain view deferred to future phase (see open questions).
   - Border accuracy gaps documented in frontend/geo/sources.md (48-year gap for Black Death, 53-year for Constantinople).
+
+### Phase 2.5
+
+- **Completed:** 2026-04-21 (partial 2026-04-10, closed 2026-04-21)
+- **Success criteria:** 5 of 5 met; criterion 5 met in plumbing with narrative propagation as carryover.
+  - *Events DB coverage:* Met — 1,569 canonical events across 5 eras, minimum 152 per era (Viking Age), all far exceed the 20-event threshold.
+  - *Region knowledge:* Met — endpoint returns character-filtered content, archetype affects output.
+  - *Event markers:* Met — GET `/api/run/{id}/events/visible` ships Knowledge Matrix filtering and centroid resolution; frontend renders with type/tier-appropriate treatment. 97.2% of events resolve to a centroid.
+  - *Ground context quality:* Met — NPC voices reference era-specific material conditions and rumors from Events DB.
+  - *Historical divergence:* Met in plumbing. Detection fires end-to-end (verified by integration test against Sack of Rome 410), `state.historical_divergences` records the event, queued canonical consequences are invalidated. NPC POV and narrative do not yet read the divergence signal (new open question).
+- **Planned vs actual:**
+  - *Time-skip UI:* Added to frontend bottom bar — not originally in Phase 2.5 plan but fills the Phase 1 carryover.
+  - *Loading screen events:* Preview endpoint now draws from Events DB instead of hardcoded config.
+  - *Word definitions overlay:* Shipped.
+  - *Event markers on map:* Shipped. Originally deferred pending coordinate resolution, closed in Fix 6 via centroid YAML + normalizer.
+- **Closure pass (2026-04-21) — Fixes 1-6:**
+  - *Fix 1:* Action parser canonical vocabulary. 17-type routing contract between parser and downstream. In-code ALIASES map normalizes known LLM synonym drift (inquiry → speak, barter → trade, etc.). Player-facing freedom unchanged.
+  - *Fix 2:* Consequence dispatch refactor. If/elif chain replaced by dispatch table; every canonical action type at significance ≥ 0.5 now schedules at least one specific consequence. New `backend/event_vocab.py` centralizes event-type frozensets used by `npc_personality._detect_opportunities` and `world_events` rules. Divergence type_map expanded to cover 14 of 17 action types (speak, flee, other intentionally excluded).
+  - *Fix 3:* `prompts/action_parser.md` constrained to canonical vocabulary with three few-shot examples. Live test assertion relaxed from exact-string match to structural invariant (conversational phrasings never route to hostile / travel / inaction).
+  - *Fix 4:* Divergence verified end-to-end via integration test against Sack of Rome 410. Target-miss fallback added to hostile / betray / save handlers (rumor at player location, turn+2) so target-less high-significance actions never silently no-op. Two new open questions surfaced: narrative propagation and supersession strictness.
+  - *Fix 5:* Word definitions overlay polish. Bottom-edge clamp in `positionAt()`, last-rect anchoring for multi-line selections via `range.getClientRects()`, captured-endpoint fallback for scroll-aware context panel positioning via live Node+offset reconstruction.
+  - *Fix 6:* Event markers on map. `backend/geo/region_centroids.yaml` hand-curated centroid table, `backend/geo/centroids.py` loader with normalization fallback, GET `/api/run/{id}/events/visible` endpoint with Knowledge Matrix filtering, frontend renderer with type color / tier opacity / witnessed indicator / broad-region circle-only treatment. 97.2% region coverage (86.9% exact, 10.3% normalized, 2.8% dropped long-tail).
+- **Carryover:**
+  - ~~Ground context is static for the full run.~~ **Resolved** 2026-04-20.
+  - ~~Event marker coordinate resolution unresolved.~~ **Resolved** 2026-04-21 (Fix 6).
+  - ~~Word definitions overlay not started.~~ **Resolved** (shipped during Phase 2.5, polished 2026-04-21 Fix 5).
+  - **New carryover (2026-04-21):** Divergence visibility to NPCs and narrative layer. Detection fires, state records, queue invalidates. POV prompts and narrative text do not yet see the divergence signal. Future narrative-propagation work.
+  - **New carryover (2026-04-21):** Stage 2 supersession validation strictness. `_validate_consequence` accepts/rejects on shallow target-exists checks; deeper world-state divergence (e.g., "the siege you prevented no longer applies as a consequence source") is not modeled. Resolve alongside narrative propagation.
+  - **New carryover (2026-04-21):** Prompt coverage gap. Fix 1 and 3 hardened only `prompts/action_parser.md`. The other ~10 prompts were never audited for similar vocabulary / output-shape drift resistance.
+  - **New carryover (2026-04-21):** Byzantine Empire centroid is era-ambiguous. Current YAML entry is median-period (39.0°N, 32.0°E, 1200 km radius); geographically wrong for 5th-century events. Future ingestion with era-keyed centroid sub-entries would fix this.
+  - **New carryover (2026-04-21):** `polity_context` column in `historical_events` is architecturally planned as a centroid-resolution fallback but NULL across all 1,569 rows. Dead code path until future ingestion populates it.
 
 ### Phase 3
 

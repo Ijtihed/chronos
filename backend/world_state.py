@@ -96,6 +96,7 @@ class NPC(BaseModel):
     needs_history: List[Dict] = Field(default_factory=list)
     last_simulated_turn: int = 0
     emotional_state: str = ""
+    current_activity: str = ""
 
 
 class Event(BaseModel):
@@ -139,8 +140,29 @@ class WorldState(BaseModel):
     turn: int = 0
     visited_locations: List[str] = Field(default_factory=list)
     ground_context: Optional[Dict] = None
+    ground_context_stale: bool = False
     historical_divergences: List[Dict] = Field(default_factory=list)
     consequence_queue: List[ScheduledConsequence] = Field(default_factory=list)
+    # Phase 3 scene-illustration trigger audit (Step 3.1).
+    # Entries: {"turn": int, "type": str, "reason": str}.
+    # Detection is idempotent: presence of an entry suppresses re-fire.
+    illustration_triggers_fired: List[Dict] = Field(default_factory=list)
+    # Snapshot of visited_locations from the END of the previous turn.
+    # Used to detect first-arrival at a new location this turn without
+    # racing the in-turn mutation of visited_locations itself.
+    previously_visited_locations: List[str] = Field(default_factory=list)
+    # LLM provider cost tracking. Accumulated across all call_llm
+    # invocations made during a turn via the track_turn_cost() bucket.
+    # USD is authoritative; EUR conversion happens at render time using
+    # config.USD_TO_EUR. Persisted with the session JSON.
+    cumulative_cost_usd: float = 0.0
+    # Cap state machine:
+    #   "none"          -> under the soft cap
+    #   "soft_crossed"  -> >= soft cap (EUR 1.00 default); banner shown
+    #                      in frontend, dismissible; turns still advance
+    #   "hard"          -> >= hard cap (EUR 2.00 default); further turn
+    #                      advancement is blocked by the API
+    cost_cap_state: str = "none"
 
 
 # ---------------------------------------------------------------------------

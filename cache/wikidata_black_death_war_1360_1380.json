@@ -1,0 +1,740 @@
+[
+  {
+    "qid": "Q111207698",
+    "label": "Tlemcen campaign (1360)",
+    "description": "1360 military campaign",
+    "year": 1360,
+    "location": "",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q97166023",
+    "label": "Siege of Vesoul",
+    "description": "1360 siege",
+    "year": 1360,
+    "location": "Vesoul",
+    "country": "County of Burgundy",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q11908795",
+    "label": "Battle of B\u00f4ne",
+    "description": "1360 naval battle",
+    "year": 1360,
+    "location": "Annaba",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q624937",
+    "label": "Battle of Visby",
+    "description": "1361 battle fought in the town of Visby on the island of Gotland, Sweden between the forces of Danish king Valdemar IV and Gutnish country yeomen",
+    "year": 1361,
+    "location": "Visby",
+    "country": "Sweden",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q4871565",
+    "label": "Battle of Linuesa",
+    "description": "1361 battle of the Reconquista",
+    "year": 1361,
+    "location": "Huesa",
+    "country": "Spain",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q38009174",
+    "label": "Siege of Calatayud",
+    "description": "1362 siege",
+    "year": 1362,
+    "location": "Calatayud",
+    "country": "Kingdom of Aragon",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q16840426",
+    "label": "Battle of Guadix",
+    "description": "1362 battle in Spain",
+    "year": 1362,
+    "location": "Guadix",
+    "country": "Spain",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q690573",
+    "label": "Battle of Brignais",
+    "description": "1362 battle in France",
+    "year": 1362,
+    "location": "Brignais",
+    "country": "France",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q3503678",
+    "label": "Battle of Helsingborg",
+    "description": "1362 Danish victory",
+    "year": 1362,
+    "location": "\u00d8resund",
+    "country": "Sweden",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q4871542",
+    "label": "Battle of Launac",
+    "description": "1362 battle",
+    "year": 1362,
+    "location": "Launac",
+    "country": "France",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q21659758",
+    "label": "Battle of the Stone Bridge",
+    "description": "1363 battle",
+    "year": 1363,
+    "location": "Khatlon Province",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q18008327",
+    "label": "Siege of Teruel",
+    "description": "siege in 1363",
+    "year": 1363,
+    "location": "Teruel",
+    "country": "Spain",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q85859814",
+    "label": "Battle of Solara",
+    "description": "1363 battle",
+    "year": 1363,
+    "location": "Solara",
+    "country": "Italy",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q2888239",
+    "label": "Battle of Canturino",
+    "description": "1363 battle",
+    "year": 1363,
+    "location": "Novara",
+    "country": "Italy",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q4844238",
+    "label": "Battle of S\u0131rp S\u0131nd\u0131\u011f\u0131",
+    "description": "1364 battle from the Serbian\u2013Ottoman Wars",
+    "year": 1364,
+    "location": "Maritsa",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q11949569",
+    "label": "Siege of Valencia",
+    "description": "1364 siege",
+    "year": 1364,
+    "location": "Valencia",
+    "country": "Spain",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q3485938",
+    "label": "Siege of Mantes",
+    "description": "1364 siege",
+    "year": 1364,
+    "location": "Mantes-la-Jolie",
+    "country": "France",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q2602904",
+    "label": "Battle of Cocherel",
+    "description": "1364 battle",
+    "year": 1364,
+    "location": "Hardencourt-Cocherel",
+    "country": "France",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q2259031",
+    "label": "Battle of Cascina",
+    "description": "1364 battle between Pisa and Florence",
+    "year": 1364,
+    "location": "Cascina",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q1062615",
+    "label": "Battle of Auray",
+    "description": "1364 battle of the War of the Breton Succession",
+    "year": 1364,
+    "location": "Auray",
+    "country": "France",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q4087347",
+    "label": "Battle near the Shishevsky Forest",
+    "description": "1365 battle of Ryazan and Kozelsk against Golden Horde",
+    "year": 1365,
+    "location": "Q47045772",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q10671354",
+    "label": "Battle of Gataskogen",
+    "description": "",
+    "year": 1365,
+    "location": "",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q19848817",
+    "label": "Battle of the Mire",
+    "description": "1365 battle between Ilyas Khoja and alliance of Tamerlane and Hussein",
+    "year": 1365,
+    "location": "Tashkent",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q19848817",
+    "label": "Battle of the Mire",
+    "description": "1365 battle between Ilyas Khoja and alliance of Tamerlane and Hussein",
+    "year": 1365,
+    "location": "Chirchiq",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q516507",
+    "label": "Reconquest of Gallipoli",
+    "description": "1366 middle ages battle",
+    "year": 1366,
+    "location": "Gallipoli",
+    "country": "Turkey",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q4087351",
+    "label": "Battle of the Pyana River",
+    "description": "1367 battle of Nizhny Novgorod-Suzdal and Golden Horde",
+    "year": 1367,
+    "location": "",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q124201592",
+    "label": "Battle of Cairo",
+    "description": "1367 rebellion in the Egyptian Sultanate",
+    "year": 1367,
+    "location": "Cairo",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q17625790",
+    "label": "Battle of Inglesmendi",
+    "description": "1367 battle",
+    "year": 1367,
+    "location": "Ari\u00f1iz/Ar\u00ed\u00f1ez",
+    "country": "Spain",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q1631158",
+    "label": "Battle of N\u00e1jera",
+    "description": "1367 battle",
+    "year": 1367,
+    "location": "N\u00e1jera",
+    "country": "Crown of Castile",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q2237474",
+    "label": "Battle of Dinklar",
+    "description": "battle in 1367",
+    "year": 1367,
+    "location": "Schellerten",
+    "country": "Germany",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q134238623",
+    "label": "Battle of Tripoli",
+    "description": "1367 battle",
+    "year": 1367,
+    "location": "Tripoli",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q17217882",
+    "label": "Battle of Urushi-gawa",
+    "description": "1368 battle",
+    "year": 1368,
+    "location": "Urushikawa",
+    "country": "Japan",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q65128550",
+    "label": "Siege of Moscow",
+    "description": "1368 siege",
+    "year": 1368,
+    "location": "Moscow",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q21236159",
+    "label": "Battle of Santa Ana",
+    "description": "1368",
+    "year": 1368,
+    "location": "Q3652008",
+    "country": "Italy",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q4871483",
+    "label": "Battle of Kosovo",
+    "description": "14th century Serbian conflict",
+    "year": 1369,
+    "location": "Zve\u010dan",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q11949561",
+    "label": "Siege of Seville",
+    "description": "1369 siege",
+    "year": 1369,
+    "location": "Seville",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q131753582",
+    "label": "Siege of Mon\u00e7\u00e3o",
+    "description": "1369 siege",
+    "year": 1369,
+    "location": "Mon\u00e7\u00e3o",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q922200",
+    "label": "Battle of Montiel",
+    "description": "1369 battle in La Mancha, Castile",
+    "year": 1369,
+    "location": "Montiel",
+    "country": "Spain",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q7509853",
+    "label": "Siege of Balkh",
+    "description": "1370 Timurid conquest of the city of Balkh",
+    "year": 1370,
+    "location": "Balkh",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q124833240",
+    "label": "Siege of Vesoul",
+    "description": "1370 siege",
+    "year": 1370,
+    "location": "Vesoul",
+    "country": "County of Burgundy",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q76713152",
+    "label": "Siege of Casale Montferrato",
+    "description": "1370 siege",
+    "year": 1370,
+    "location": "Casale Monferrato",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q558503",
+    "label": "Battle of Rudau",
+    "description": "1370 battle",
+    "year": 1370,
+    "location": "Melnikowo",
+    "country": "Russia",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q558503",
+    "label": "Battle of Rudau",
+    "description": "1370 battle",
+    "year": 1370,
+    "location": "Melnikowo",
+    "country": "Russia",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q111211177",
+    "label": "Capture of Tlemcen",
+    "description": "1370 battle",
+    "year": 1370,
+    "location": "Tlemcen",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q7510196",
+    "label": "Siege of Limoges",
+    "description": "1370 sack",
+    "year": 1370,
+    "location": "Limoges",
+    "country": "France",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q2889660",
+    "label": "Battle of Pontvallain",
+    "description": "1370 battle in the Hundred Years' War",
+    "year": 1370,
+    "location": "Pontvallain",
+    "country": "France",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q130682761",
+    "label": "Battle of Porto de Bois",
+    "description": "1371 battle",
+    "year": 1371,
+    "location": "Porto de Bois",
+    "country": "Kingdom of Galicia",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q833210",
+    "label": "Battle of Baesweiler",
+    "description": "1371 battle",
+    "year": 1371,
+    "location": "Baesweiler",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q939570",
+    "label": "Battle of Maritsa",
+    "description": "battle that took place at the Maritsa River near the village of Chernomen on September 26, 1371",
+    "year": 1371,
+    "location": "Ormenio",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q56063201",
+    "label": "Battle of Skornishchevo",
+    "description": "1371 battle",
+    "year": 1371,
+    "location": "",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q4870937",
+    "label": "Battle of Duns",
+    "description": "1372 battle",
+    "year": 1372,
+    "location": "Duns",
+    "country": "Kingdom of Scotland",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q48760228",
+    "label": "Siege of Guernesey",
+    "description": "1372 siege",
+    "year": 1372,
+    "location": "Guernsey",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q518005",
+    "label": "Battle of La Rochelle",
+    "description": "1372 naval battle",
+    "year": 1372,
+    "location": "La Rochelle",
+    "country": "France",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q2441849",
+    "label": "Siege of Venlo",
+    "description": "assault in 1373",
+    "year": 1373,
+    "location": "Venlo",
+    "country": "Netherlands",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q56254481",
+    "label": "Battle of Lisbon",
+    "description": "1373 naval battle",
+    "year": 1373,
+    "location": "Lisbon",
+    "country": "Portugal",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q24289588",
+    "label": "Battle of Chiset",
+    "description": "1373 battle during the Hundred Years' War",
+    "year": 1373,
+    "location": "Chiz\u00e9",
+    "country": "France",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q2889377",
+    "label": "Battle of Montichiari",
+    "description": "1373 religious war",
+    "year": 1373,
+    "location": "Montichiari",
+    "country": "Italy",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q113514678",
+    "label": "Battle of Leveste",
+    "description": "1373 battle",
+    "year": 1373,
+    "location": "",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q18003278",
+    "label": "Siege of Bayonne",
+    "description": "1374 siege",
+    "year": 1374,
+    "location": "Bayonne",
+    "country": "Kingdom of England",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q30622039",
+    "label": "Battle of Gardiki",
+    "description": "c. 1375 battle",
+    "year": 1375,
+    "location": "Gardiki Castle, Arcadia",
+    "country": "Despotate of the Morea",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q124260231",
+    "label": "Fall of Sis",
+    "description": "Egyptian capture of the Armenian capital",
+    "year": 1375,
+    "location": "Sis",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q22975368",
+    "label": "Battle of Hongsan",
+    "description": "1376 battle",
+    "year": 1376,
+    "location": "Buyeo County",
+    "country": "Goryeo",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q134388378",
+    "label": "Battle of Sauran",
+    "description": "1376 battle",
+    "year": 1376,
+    "location": "Sawran",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q4375099",
+    "label": "Muscovite\u2013Volga Bulgars war",
+    "description": "1376 war between Muscovy and Bulgar Ulus (Qashan Principality, under Mamai's control)",
+    "year": 1376,
+    "location": "",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q30923771",
+    "label": "Battle of Vijaya",
+    "description": "1377 battle",
+    "year": 1377,
+    "location": "",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q136753967",
+    "label": "Battle of Reutlingen",
+    "description": "battle on 14 May 1377",
+    "year": 1377,
+    "location": "Reutlingen",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q4087354",
+    "label": "Battle on Pyana River",
+    "description": "1377 battle",
+    "year": 1377,
+    "location": "Pyana",
+    "country": "Russia",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q124842767",
+    "label": "Battle of Melrose",
+    "description": "",
+    "year": 1378,
+    "location": "Melrose",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q615922",
+    "label": "Battle of the Vozha River",
+    "description": "1378 middle ages battle",
+    "year": 1378,
+    "location": "Ryazan Oblast",
+    "country": "Russia",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q138863129",
+    "label": "Siege of Urgench",
+    "description": "1379 siege",
+    "year": 1379,
+    "location": "Konye-Urgench",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q11621574",
+    "label": "Battle of Minobaru",
+    "description": "1379 battle",
+    "year": 1379,
+    "location": "",
+    "country": "Japan",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q11621574",
+    "label": "Battle of Minobaru",
+    "description": "1379 battle",
+    "year": 1379,
+    "location": "",
+    "country": "Japan",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q2889262",
+    "label": "Battle of Marino",
+    "description": "1379 battle",
+    "year": 1379,
+    "location": "Marino",
+    "country": "Italy",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q2265550",
+    "label": "Battle of Pola",
+    "description": "1379 naval battle",
+    "year": 1379,
+    "location": "",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q11688129",
+    "label": "Battle of Pula",
+    "description": "1379 naval battle in the 14th century",
+    "year": 1379,
+    "location": "Adriatic Sea",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q681702",
+    "label": "Battle of S\u00f6renberg",
+    "description": "1380 battle",
+    "year": 1380,
+    "location": "S\u00f6renberg",
+    "country": "Switzerland",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q700880",
+    "label": "Battle of Dubravnica",
+    "description": "1380 battle",
+    "year": 1380,
+    "location": "",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q12625832",
+    "label": "Battle of Hwangsan",
+    "description": "battle in September 1380 (the 6th year of King U's reign) in which Lee Seong-gye and others won a major victory over Japanese pirates at Hwangsan (\u8352\u5c71: \u9ec3\u5c71) near Jiri Mountain in Jeolla-do.",
+    "year": 1380,
+    "location": "Namwon",
+    "country": "Goryeo",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q21060379",
+    "label": "Battle of Jinpo",
+    "description": "1380 naval battle",
+    "year": 1380,
+    "location": "Geum River",
+    "country": "Goryeo",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q4870733",
+    "label": "Battle of Chioggia",
+    "description": "1380 naval battle",
+    "year": 1380,
+    "location": "Chioggia",
+    "country": "",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q1979678",
+    "label": "Battle of Arum",
+    "description": "1380 battle",
+    "year": 1380,
+    "location": "Arum",
+    "country": "Netherlands",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q210354",
+    "label": "Battle of Kulikovo",
+    "description": "1380 battle between Russian principalities and Golden Horde",
+    "year": 1380,
+    "location": "Kulikovo Field",
+    "country": "Grand Principality of Moscow",
+    "source_type": "war"
+  }
+]

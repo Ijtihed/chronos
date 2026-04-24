@@ -178,5 +178,104 @@
     "type": "natural_disaster",
     "affects": ["agriculture", "population"],
     "wikidata_qid": null
+  },
+  {
+    "year": 804,
+    "region": "Scandinavia",
+    "event": "Charlemagne's Frankish armies force the Saxons across the Elbe into final submission. Danish king Godfred fortifies the Danevirke wall in response, fearing the Franks will push north.",
+    "significance": "regional",
+    "type": "war",
+    "affects": ["military", "political_stability"],
+    "wikidata_qid": null
+  },
+  {
+    "year": 808,
+    "region": "Scandinavia",
+    "event": "King Godfred of Denmark destroys the Slavic trading town of Reric and forcibly relocates its merchants to Hedeby to strengthen his own port.",
+    "significance": "regional",
+    "type": "economic",
+    "affects": ["trade", "population"],
+    "wikidata_qid": null
+  },
+  {
+    "year": 862,
+    "region": "Eastern Europe",
+    "event": "Rurik and his Varangian warriors establish themselves at Novgorod. The Rus begin to dominate the river trade routes south to Constantinople.",
+    "significance": "civilizational",
+    "type": "political",
+    "affects": ["trade", "political_stability", "military"],
+    "wikidata_qid": null
+  },
+  {
+    "year": 866,
+    "region": "Britannia",
+    "event": "The Great Heathen Army captures York. The Archbishop is killed. Norse Jorvik begins as a Viking stronghold in northern England.",
+    "significance": "regional",
+    "type": "war",
+    "affects": ["military", "religion", "political_stability"],
+    "wikidata_qid": null
+  },
+  {
+    "year": 950,
+    "region": "Scandinavia",
+    "event": "Harald Bluetooth consolidates power over Denmark and southern Norway. Rival jarls who resist are killed or exiled. A unified Danish kingdom emerges.",
+    "significance": "regional",
+    "type": "political",
+    "affects": ["political_stability", "military"],
+    "wikidata_qid": null
+  },
+  {
+    "year": 958,
+    "region": "Scandinavia",
+    "event": "The flow of Arab silver along the Volga trade route slows to a trickle as the Samanid dynasty weakens. Norse merchants at Birka and Hedeby feel the squeeze — prices for furs collapse.",
+    "significance": "regional",
+    "type": "economic",
+    "affects": ["trade"],
+    "wikidata_qid": null
+  },
+  {
+    "year": 991,
+    "region": "Britannia",
+    "event": "Battle of Maldon. Viking raiders defeat the English. King Æthelred pays 10,000 pounds of silver in Danegeld — the first of many such payments that drain English wealth.",
+    "significance": "regional",
+    "type": "war",
+    "affects": ["military", "trade"],
+    "wikidata_qid": "Q478553"
+  },
+  {
+    "year": 995,
+    "region": "Scandinavia",
+    "event": "Olaf Tryggvason seizes the Norwegian throne and begins converting the country to Christianity by force. Temples are burned. Those who resist are mutilated or killed.",
+    "significance": "regional",
+    "type": "religious",
+    "affects": ["religion", "political_stability"],
+    "wikidata_qid": null
+  },
+  {
+    "year": 999,
+    "region": "North Atlantic",
+    "event": "Leif Eriksson sails west from Greenland and reaches a forested coastline he calls Vinland. The Norse have found North America, though they do not know what it is.",
+    "significance": "civilizational",
+    "type": "cultural",
+    "affects": ["trade", "population"],
+    "wikidata_qid": "Q208154"
+  },
+  {
+    "year": 1002,
+    "region": "Britannia",
+    "event": "St Brice's Day massacre. King Æthelred orders all Danes in England killed. The slaughter includes women and children. It does not stop the raids.",
+    "significance": "regional",
+    "type": "war",
+    "affects": ["population", "political_stability"],
+    "wikidata_qid": "Q1411571"
+  },
+  {
+    "year": 1008,
+    "region": "Scandinavia",
+    "event": "Olof Skötkonung of Sweden accepts baptism, the first Swedish king to do so. Pagan worship continues openly in Uppsala despite the royal conversion.",
+    "significance": "regional",
+    "type": "religious",
+    "affects": ["religion", "political_stability"],
+    "wikidata_qid": null
   }
 ]

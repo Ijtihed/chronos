@@ -1,0 +1,38 @@
+[
+  {
+    "qid": "Q4817327",
+    "label": "Battle of \u00c7amurlu",
+    "description": "1413 internal battle of the Ottoman Empire Interregnum",
+    "year": 1413,
+    "location": "Samokov",
+    "country": "Bulgaria",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q137205376",
+    "label": "Battle of Karaburun",
+    "description": "1416 battle",
+    "year": 1416,
+    "location": "Karaburun district",
+    "country": "Ottoman Empire",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q137380181",
+    "label": "Battle of Manisa",
+    "description": "1416 battle",
+    "year": 1416,
+    "location": "Manisa",
+    "country": "Ottoman Empire",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q137393345",
+    "label": "Battle of Thessalonica",
+    "description": "1416 battle",
+    "year": 1416,
+    "location": "Thessaloniki",
+    "country": "Ottoman Empire",
+    "source_type": "war"
+  }
+]

@@ -1,0 +1,56 @@
+[
+  {
+    "qid": "Q137393467",
+    "label": "Battle of Ulubad",
+    "description": "1422 battle",
+    "year": 1422,
+    "location": "Lake Uluabat",
+    "country": "Ottoman Empire",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q137427251",
+    "label": "Battle of Gallipoli",
+    "description": "1422 battle",
+    "year": 1422,
+    "location": "Gallipoli",
+    "country": "Ottoman Empire",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q700886",
+    "label": "Siege of Constantinople",
+    "description": "1422 siege",
+    "year": 1422,
+    "location": "Constantinople",
+    "country": "Byzantine Empire",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q700886",
+    "label": "Siege of Constantinople",
+    "description": "1422 siege",
+    "year": 1422,
+    "location": "Constantinople",
+    "country": "Ottoman Empire",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q137460687",
+    "label": "Battle of \u0130znik",
+    "description": "1423 battle",
+    "year": 1423,
+    "location": "\u0130znik",
+    "country": "Ottoman Empire",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q2890722",
+    "label": "Battle of the Echinades",
+    "description": "1427 fought between the Byzantines and the fleet of Carlo I Tocco",
+    "year": 1427,
+    "location": "Echinades",
+    "country": "Greece",
+    "source_type": "war"
+  }
+]

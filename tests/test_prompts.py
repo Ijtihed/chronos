@@ -3,7 +3,7 @@
 from pathlib import Path
 from string import Template
 
-from backend.llm import load_prompt
+from backend.llm_provider import load_prompt
 from backend.world_state import (
     build_story_summary,
     create_initial_state,
@@ -93,6 +93,7 @@ class TestNpcPovPrompt:
             npc_disposition=npc.disposition,
             dominant_need="duty",
             urgent_needs="nothing urgent",
+            current_activity=getattr(npc, "current_activity", "") or "Patrolling the walls.",
             relationship_to_player=npc.relationship_to_player,
             player_name=state.player.name,
             era_description=state.era.description,

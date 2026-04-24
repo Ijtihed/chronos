@@ -1,0 +1,29 @@
+[
+  {
+    "qid": "Q488995",
+    "label": "Wihwado Retreat",
+    "description": "1388 retreat of Goryeo's general Yi Seong-gye",
+    "year": 1388,
+    "location": "Kaesong",
+    "country": "Goryeo",
+    "source_type": "political"
+  },
+  {
+    "qid": "Q624181",
+    "label": "First Princes' Rebellion",
+    "description": "event in Korean history (1398)",
+    "year": 1398,
+    "location": "",
+    "country": "Joseon",
+    "source_type": "political"
+  },
+  {
+    "qid": "Q624222",
+    "label": "Second Princes' Rebellion",
+    "description": "event in Korean history (1400)",
+    "year": 1400,
+    "location": "",
+    "country": "Joseon",
+    "source_type": "political"
+  }
+]

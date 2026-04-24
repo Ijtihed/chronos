@@ -1,0 +1,38 @@
+[
+  {
+    "qid": "Q51715279",
+    "label": "1361 Apulia earthquake",
+    "description": "July 1361 earthquake in Apulia, Italy",
+    "year": 1361,
+    "location": "",
+    "country": "Kingdom of Naples",
+    "source_type": "natural_disaster"
+  },
+  {
+    "qid": "Q18008332",
+    "label": "Q18008332",
+    "description": "",
+    "year": 1373,
+    "location": "",
+    "country": "Principality of Catalonia",
+    "source_type": "natural_disaster"
+  },
+  {
+    "qid": "Q18008332",
+    "label": "Q18008332",
+    "description": "",
+    "year": 1373,
+    "location": "",
+    "country": "Kingdom of Aragon",
+    "source_type": "natural_disaster"
+  },
+  {
+    "qid": "Q136768040",
+    "label": "1377 London riots",
+    "description": "",
+    "year": 1377,
+    "location": "London",
+    "country": "Kingdom of England",
+    "source_type": "natural_disaster"
+  }
+]

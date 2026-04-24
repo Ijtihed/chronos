@@ -1,6 +1,7 @@
 """Parse player natural language into a structured action via LLM.
 
-Model tier: LOCAL (Ollama) — frontier stub.
+Model tier: FAST (Ollama). Short, highly structured JSON; cheap to run
+locally and never the quality bottleneck.
 """
 
 from __future__ import annotations
@@ -12,7 +13,7 @@ from string import Template
 
 from pydantic import ValidationError
 
-from backend.llm import chat, load_prompt
+from backend.llm_provider import call_llm, load_prompt
 from backend.llm_schemas import ActionParserResponse, action_parser_default
 from backend.world_state import (
     WorldState,
@@ -25,6 +26,136 @@ from backend.world_state import (
 logger = logging.getLogger("chronos.action_parser")
 
 _TEMPLATE_PATH = Path(__file__).resolve().parent.parent / "prompts" / "action_parser.md"
+
+# ---------------------------------------------------------------------------
+# Action-type normalization
+#
+# llama3.1:8b returns free-form action_type labels.  Downstream code in
+# world_state.apply_action, _apply_target_fallback, _schedule_player_
+# consequences, and _check_historical_divergence branches on exact
+# canonical values.  ALIASES maps known LLM drift variants to those
+# canonical types so routing works regardless of the synonym the model
+# picks.  Unknown values pass through with a debug log.
+#
+# Canonical vocabulary (from audit of backend/):
+#   speak, trade, petition, threaten, betray, attack, steal, negotiate,
+#   defend, fight, siege, alliance, hoard, prevent, save, flee, other
+# ---------------------------------------------------------------------------
+
+ALIASES: dict[str, str] = {
+    # → speak
+    "inquiry":     "speak",
+    "ask":         "speak",
+    "question":    "speak",
+    "interrogate": "speak",
+    "converse":    "speak",
+    "talk":        "speak",
+    "discuss":     "speak",
+    "chat":        "speak",
+    "convince":    "speak",
+    "persuade":    "speak",
+    "warn":        "speak",
+    # → trade
+    "barter":      "trade",
+    "buy":         "trade",
+    "sell":        "trade",
+    "exchange":    "trade",
+    "purchase":    "trade",
+    # → petition
+    "request":     "petition",
+    "appeal":      "petition",
+    "plead":       "petition",
+    "beg":         "petition",
+    "supplicate":  "petition",
+    "entreat":     "petition",
+    # → threaten
+    "intimidate":  "threaten",
+    "menace":      "threaten",
+    "coerce":      "threaten",
+    # → betray
+    "deceive":     "betray",
+    "double-cross":"betray",
+    "backstab":    "betray",
+    # → attack
+    "assault":     "attack",
+    "strike":      "attack",
+    "hit":         "attack",
+    "combat":      "attack",
+    "kill":        "attack",
+    "murder":      "attack",
+    "slay":        "attack",
+    # → steal
+    "rob":         "steal",
+    "loot":        "steal",
+    "pilfer":      "steal",
+    "pickpocket":  "steal",
+    "thieve":      "steal",
+    # → negotiate
+    "bargain":     "negotiate",
+    "diplomacy":   "negotiate",
+    "parley":      "negotiate",
+    "mediate":     "negotiate",
+    "broker":      "negotiate",
+    # → defend
+    "protect":     "defend",
+    "guard":       "defend",
+    "shield":      "defend",
+    "fortify":     "defend",
+    # → fight
+    "battle":      "fight",
+    "clash":       "fight",
+    "duel":        "fight",
+    "skirmish":    "fight",
+    # → siege
+    "besiege":     "siege",
+    "blockade":    "siege",
+    "encircle":    "siege",
+    # → alliance
+    "pact":        "alliance",
+    "ally":        "alliance",
+    "unite":       "alliance",
+    "coalition":   "alliance",
+    # → hoard
+    "stockpile":   "hoard",
+    "stash":       "hoard",
+    "accumulate":  "hoard",
+    # → prevent
+    "stop":        "prevent",
+    "block":       "prevent",
+    "intervene":   "prevent",
+    "thwart":      "prevent",
+    "avert":       "prevent",
+    # → save
+    "rescue":      "save",
+    # → flee
+    "escape":      "flee",
+    "run":         "flee",
+    "retreat":     "flee",
+    "withdraw":    "flee",
+    "desert":      "flee",
+}
+
+
+def normalize_action_type(raw: str) -> str:
+    """Map a free-form action_type to its canonical form.
+
+    Lookup is case-insensitive.  Unknown values pass through unchanged
+    with a debug-level log so new drift patterns surface in telemetry.
+    """
+    key = raw.strip().lower()
+    canonical = ALIASES.get(key)
+    if canonical is not None:
+        return canonical
+    if key not in _CANONICAL_TYPES:
+        logger.debug("action_type passthrough (no alias): %r", key)
+    return key
+
+
+_CANONICAL_TYPES = frozenset({
+    "speak", "trade", "petition", "threaten", "betray", "attack",
+    "steal", "negotiate", "defend", "fight", "siege", "alliance",
+    "hoard", "prevent", "save", "flee", "other",
+})
 
 
 async def parse_action(player_input: str, state: WorldState) -> dict:
@@ -59,9 +190,16 @@ async def parse_action(player_input: str, state: WorldState) -> dict:
     )
 
     try:
-        raw = await chat(prompt, json_mode=True)
+        raw, _ = await call_llm(
+            prompt,
+            tier="fast",
+            schema=ActionParserResponse,
+            call_site="action_parser",
+        )
         parsed = ActionParserResponse.model_validate(json.loads(raw))
-        return parsed.model_dump()
+        result = parsed.model_dump()
+        result["action_type"] = normalize_action_type(result["action_type"])
+        return result
     except (json.JSONDecodeError, ValidationError) as exc:
         logger.warning("Action parser validation failed: %s", exc)
         return _fallback(player_input, state, str(exc))

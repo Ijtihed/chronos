@@ -1,0 +1,29 @@
+[
+  {
+    "qid": "Q767844",
+    "label": "Siege of Constantinople",
+    "description": "1203 siege",
+    "year": 1203,
+    "location": "Constantinople",
+    "country": "Byzantine Empire",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q1750892",
+    "label": "Siege of Constantinople",
+    "description": "1204 siege",
+    "year": 1204,
+    "location": "Constantinople",
+    "country": "Byzantine Empire",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q1750892",
+    "label": "Siege of Constantinople",
+    "description": "1204 siege",
+    "year": 1204,
+    "location": "Constantinople",
+    "country": "Latin Empire",
+    "source_type": "war"
+  }
+]

@@ -5,3 +5,8 @@ __pycache__/
 venv/
 .pytest_cache/
 data/
+
+# scripts/imagegen_poc — local image generation POC (scratch-space)
+scripts/imagegen_poc/out/
+scripts/imagegen_poc/__pycache__/
+scripts/imagegen_poc/.venv/

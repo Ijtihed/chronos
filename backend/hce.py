@@ -22,7 +22,7 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import ValidationError
 
-from backend.llm import chat, load_prompt
+from backend.llm_provider import call_llm, load_prompt
 from backend.llm_schemas import GroundContextResponse
 from backend.persistence import query_historical_events
 from backend.player_knowledge import (
@@ -41,24 +41,26 @@ _EVENT_WINDOW_YEARS = 50
 
 
 async def generate_ground_context(state: WorldState) -> Dict[str, Any]:
-    """Generate ground-level context for the run's starting moment.
+    """Generate ground-level context for the current moment.
 
-    Queries Events DB, filters through Knowledge Matrix, passes known +
-    rumor events to LLM, returns a GroundContext dict attached to state.
+    Queries Events DB using the current year (not just era start), filters
+    through Knowledge Matrix, passes known + rumor events to LLM, returns
+    a GroundContext dict. Called at run init and whenever ground_context_stale
+    is set (location change, significant world event).
     """
-    year_start = state.era.year_start
+    current_year = state.current_year or state.era.year_start
     region = state.era.region
 
     raw_events = await query_historical_events(
-        year_start=year_start - _EVENT_WINDOW_YEARS,
-        year_end=year_start + 5,
+        year_start=current_year - _EVENT_WINDOW_YEARS,
+        year_end=current_year + 5,
         region=region,
     )
 
     if not raw_events:
         raw_events = await query_historical_events(
-            year_start=year_start - _EVENT_WINDOW_YEARS,
-            year_end=year_start + 5,
+            year_start=current_year - _EVENT_WINDOW_YEARS,
+            year_end=current_year + 5,
         )
 
     filtered = filter_historical_events(raw_events, state)
@@ -90,7 +92,12 @@ async def generate_ground_context(state: WorldState) -> Dict[str, Any]:
     )
 
     try:
-        raw_response = await chat(prompt, json_mode=True)
+        raw_response, _ = await call_llm(
+            prompt,
+            tier="quality",
+            schema=GroundContextResponse,
+            call_site="ground_context",
+        )
         parsed = json.loads(raw_response)
         context = GroundContextResponse.model_validate(parsed)
         return context.model_dump()

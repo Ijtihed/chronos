@@ -1,0 +1,20 @@
+[
+  {
+    "qid": "Q101279639",
+    "label": "Constantinople earthquake of 447",
+    "description": "7.3-magnitude earthquake that struck \u0130stanbul in northwestern Turkey on January 26, 447",
+    "year": 447,
+    "location": "",
+    "country": "Turkey",
+    "source_type": "natural_disaster"
+  },
+  {
+    "qid": "Q101279639",
+    "label": "Constantinople earthquake of 447",
+    "description": "7.3-magnitude earthquake that struck \u0130stanbul in northwestern Turkey on January 26, 447",
+    "year": 447,
+    "location": "",
+    "country": "Byzantine Empire",
+    "source_type": "natural_disaster"
+  }
+]

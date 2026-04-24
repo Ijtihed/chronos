@@ -149,8 +149,25 @@
     <!-- Top Bar -->
     <header id="top-bar"
       class="fixed top-0 w-full h-10 bg-black/90 backdrop-blur-sm flex items-center px-5 z-[300] border-b border-white/5">
-      <div class="flex-1 flex items-center min-w-0">
+      <div class="flex-1 flex items-center min-w-0 gap-4">
         <span id="top-bar-info" class="text-[10px] uppercase tracking-wide text-white/25 truncate">411 AD &middot; Mediolanum</span>
+        <div id="clock-element" class="hidden items-center gap-3 shrink-0">
+          <span class="text-white/8 select-none">&middot;</span>
+          <span id="clock-season" class="text-[9px] uppercase tracking-[0.12em] text-white/20"></span>
+          <div id="time-presets" class="flex items-center gap-1">
+            <button class="time-preset text-[8px] uppercase tracking-[0.1em] text-white/15 hover:text-white/40 transition-colors cursor-pointer px-1 py-0.5 rounded" data-scale="hrs" data-ticks="1">hrs</button>
+            <button class="time-preset text-[8px] uppercase tracking-[0.1em] text-white/15 hover:text-white/40 transition-colors cursor-pointer px-1 py-0.5 rounded" data-scale="days" data-ticks="3">days</button>
+            <button class="time-preset text-[8px] uppercase tracking-[0.1em] text-white/30 hover:text-white/40 transition-colors cursor-pointer px-1 py-0.5 rounded active-preset" data-scale="wks" data-ticks="7">wks</button>
+            <button class="time-preset text-[8px] uppercase tracking-[0.1em] text-white/15 hover:text-white/40 transition-colors cursor-pointer px-1 py-0.5 rounded" data-scale="mos" data-ticks="30">mos</button>
+          </div>
+        </div>
+      </div>
+      <div id="cost-indicator"
+           class="hidden items-center gap-1 mx-3 shrink-0 text-[10px] uppercase tracking-[0.12em] text-white/40"
+           title="LLM provider cost for this run (EUR)">
+        <span id="cost-current">&euro;0.00</span>
+        <span class="text-white/15">/</span>
+        <span id="cost-goal" class="text-white/20">&euro;1.00</span>
       </div>
       <div id="death-indicator" class="hidden items-center gap-2 mx-4 shrink-0">
         <span class="status-dot status-dot-critical status-dot-sm"></span>
@@ -165,6 +182,39 @@
         <span id="hamburger-close-icon" class="hidden text-white/30 hover:text-white/60 text-sm">&#x2715;</span>
       </button>
     </header>
+
+    <!-- Cost-cap banner (soft cap, dismissible once per run) -->
+    <div id="cost-soft-banner"
+         class="hidden fixed top-10 left-1/2 -translate-x-1/2 z-[310]
+                bg-amber-950/90 border border-amber-500/30 text-amber-200
+                text-[11px] tracking-wide px-4 py-2 rounded-sm shadow-lg
+                backdrop-blur-sm flex items-center gap-3">
+      <span id="cost-soft-banner-text">Cost for this run has crossed &euro;1.00. The game will continue; you can end the run from the menu to stop accruing cost.</span>
+      <button id="cost-soft-banner-dismiss"
+              class="text-amber-200/60 hover:text-amber-100 uppercase tracking-[0.15em] text-[9px] px-2 py-1 border border-amber-500/20 rounded-sm cursor-pointer">
+        Continue
+      </button>
+    </div>
+
+    <!-- Hard-cap overlay (blocks further turn advances) -->
+    <div id="cost-hard-overlay"
+         class="hidden fixed inset-0 z-[320] bg-black/80 backdrop-blur-sm flex items-center justify-center">
+      <div class="max-w-md mx-auto p-8 border border-red-500/30 bg-black/95 rounded-sm text-center">
+        <div class="text-[10px] uppercase tracking-[0.2em] text-red-400/80 mb-3">Cost cap reached</div>
+        <p id="cost-hard-overlay-text" class="text-sm text-white/70 leading-relaxed mb-5">The per-run cost has reached the hard cap. The game can no longer advance turns on this run.</p>
+        <p class="text-xs text-white/40 mb-6">You can still read the world and inspect NPCs. To start a new run, end this one first.</p>
+        <div class="flex items-center justify-center gap-4">
+          <button id="cost-hard-overlay-end"
+                  class="text-[10px] uppercase tracking-[0.15em] text-red-400/80 hover:text-red-300 border border-red-500/30 hover:border-red-400/50 px-4 py-2 rounded-sm cursor-pointer transition-colors">
+            End run
+          </button>
+          <button id="cost-hard-overlay-close"
+                  class="text-[10px] uppercase tracking-[0.15em] text-white/35 hover:text-white/60 border border-white/10 px-4 py-2 rounded-sm cursor-pointer transition-colors">
+            Dismiss
+          </button>
+        </div>
+      </div>
+    </div>
 
     <!-- Scroll-to-bottom button -->
     <button id="btn-scroll-bottom"
@@ -262,8 +312,10 @@
         <!-- Observation Input (in-manuscript, post-death) -->
         <div id="obs-input-section" class="hidden mt-16 mb-24">
           <div class="relative">
-            <input id="obs-input" type="text" placeholder="Travel only..."
-              class="w-full bg-black/40 py-3 px-4 text-[11px] text-red-400/50 uppercase tracking-widest placeholder:text-red-400/20 focus:outline-none border border-red-500/10 rounded-md">
+            <input id="obs-input" type="text" disabled
+              placeholder="YOU ARE DEAD &middot; TRAVEL ONLY"
+              class="w-full bg-black/40 py-3 px-4 text-[11px] uppercase tracking-widest focus:outline-none border rounded-md input-dead"
+              style="color: #5a2e2e; border-color: rgba(90,46,46,0.2);">
           </div>
           <div class="flex justify-between mt-2 px-1">
             <span class="text-[9px] text-white/15 uppercase tracking-wider">Ghost state: travel only</span>
@@ -281,6 +333,13 @@
     <footer id="bottom-bar"
       class="fixed bottom-0 w-full h-14 bg-black/90 backdrop-blur-sm z-[100] flex justify-center items-center px-4 border-t border-white/5">
       <div class="max-w-2xl w-full flex items-center gap-2">
+        <button id="btn-notes" title="Notes"
+          class="shrink-0 w-8 h-8 flex items-center justify-center rounded-md border border-white/6 text-white/20 hover:text-white/50 hover:border-white/15 transition-all duration-200 cursor-pointer text-[9px] uppercase tracking-[0.1em]">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <path d="M3 2h8v10H3z" stroke="currentColor" stroke-width="1.2"/>
+            <path d="M5 5h4M5 7h4M5 9h2" stroke="currentColor" stroke-width="0.8" stroke-linecap="round"/>
+          </svg>
+        </button>
         <div class="relative group flex-1">
           <input id="player-input" type="text" autocomplete="off" placeholder="..."
             class="w-full bg-transparent py-2.5 px-4 text-xs text-white/70 placeholder-white/10 focus:ring-0 focus:outline-none transition-colors player-input-field rounded-md"
@@ -392,6 +451,32 @@
     <button class="region-close">&#x2715;</button>
     <div class="region-header" id="region-panel-title"></div>
     <div id="region-panel-body"></div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════════ -->
+  <!-- NOTES OVERLAY                                                    -->
+  <!-- ════════════════════════════════════════════════════════════════ -->
+  <div id="notes-overlay" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-[400]"></div>
+  <div id="notes-panel" class="hidden fixed inset-x-0 top-10 bottom-0 z-[410] flex justify-center items-start pt-12 pb-8 px-4">
+    <div class="notes-card w-full max-w-lg bg-black/95 border border-white/8 rounded-lg flex flex-col" style="max-height: calc(100vh - 120px);">
+      <div class="flex items-center justify-between px-5 py-3 border-b border-white/5 shrink-0">
+        <span id="notes-header" class="text-[10px] uppercase tracking-[0.15em] text-white/30 font-medium"></span>
+        <div class="flex items-center gap-2">
+          <button id="notes-timestamp-btn" title="Insert timestamp"
+            class="text-[9px] uppercase tracking-[0.1em] text-white/20 hover:text-white/50 transition-colors cursor-pointer px-2 py-1 rounded border border-white/6 hover:border-white/15">
+            date
+          </button>
+          <button id="notes-pin-btn" title="Pin this section"
+            class="text-[9px] uppercase tracking-[0.1em] text-white/20 hover:text-white/50 transition-colors cursor-pointer px-2 py-1 rounded border border-white/6 hover:border-white/15">
+            &#x25C6;
+          </button>
+          <button id="notes-close-btn" class="text-white/20 hover:text-white/50 transition-colors cursor-pointer text-sm px-1">&times;</button>
+        </div>
+      </div>
+      <textarea id="notes-textarea"
+        class="flex-1 w-full bg-transparent text-sm text-white/60 leading-relaxed p-5 resize-none focus:outline-none custom-scroll placeholder-white/10"
+        placeholder="Write anything. The world won't wait for you."></textarea>
+    </div>
   </div>
 
   <!-- ════════════════════════════════════════════════════════════════ -->

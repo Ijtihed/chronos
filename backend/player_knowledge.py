@@ -62,6 +62,13 @@ _ARCHETYPE_TIERS: Dict[str, str] = {
     "fisherman": "low",
     "civilian": "low",
     "refugee": "low",
+    "freed_slave": "low",
+    "orphan": "low",
+    "captive": "low",
+    "outcast": "low",
+    "mystic": "medium",
+    "storyteller": "medium",
+    "pilgrim": "medium",
 }
 
 _TENSION_SIMPLIFIED = {
@@ -108,7 +115,7 @@ _REGION_TO_LOCATION_HINTS: Dict[str, List[str]] = {
     "balkans": ["adrianople"],
     "mediterranean": ["constantinople", "galata"],
     "levant": ["acre", "tyre", "jaffa"],
-    "italia": ["ariminum", "ravenna", "mediolanum"],
+    "italia": ["ariminum", "ravenna", "mediolanum", "firenze", "siena"],
     "scandinavia": ["kaupang", "hedeby", "birka"],
     "wallachia": ["adrianople"],
     "moldavia": ["adrianople"],
@@ -132,6 +139,19 @@ _REGION_TO_LOCATION_HINTS: Dict[str, List[str]] = {
     "ravenna": ["ravenna"],
     "ariminum": ["ariminum"],
     "mediolanum": ["mediolanum"],
+    # Black Death era
+    "firenze": ["firenze"],
+    "florence": ["firenze"],
+    "siena": ["siena"],
+    "avignon": ["avignon"],
+    "marseille": ["marseille"],
+    "tuscany": ["firenze", "siena"],
+    "northern italy": ["firenze", "siena"],
+    "provence": ["avignon", "marseille"],
+    "france": ["avignon", "marseille"],
+    "southern france": ["avignon", "marseille"],
+    "frankia": ["avignon", "marseille"],
+    "europa": ["firenze", "siena", "avignon", "marseille"],
 }
 
 
@@ -417,10 +437,21 @@ class PlayerView(BaseModel):
     npcs_here: List[VisibleNPCHere]
     npcs_known: List[VisibleNPCKnown]
 
+    unvisited_npc_counts: List[Dict[str, Any]] = Field(default_factory=list)
+
     confirmed_events: List[VisibleEvent]
     rumors: List[Rumor]
 
     historical_events: List[HistoricalEventView] = Field(default_factory=list)
+
+    # LLM cost tracking (see backend/llm_provider.py + backend/world_state.py).
+    # USD is authoritative; frontend converts to EUR via config.USD_TO_EUR
+    # supplied as cost_eur / cost_cap_soft_eur / cost_cap_hard_eur.
+    cost_usd: float = 0.0
+    cost_eur: float = 0.0
+    cost_cap_state: str = "none"
+    cost_cap_soft_eur: float = 1.0
+    cost_cap_hard_eur: float = 2.0
 
 
 # ---------------------------------------------------------------------------
@@ -506,6 +537,17 @@ def build_player_view(
                 last_known_location=loc_name,
             ))
 
+    # --- Unvisited location NPC counts (for anonymous map dots) ---
+    unvisited_npc_counts: List[Dict[str, Any]] = []
+    unvisited_loc_ids = {loc.id for loc in state.locations} - visited_set - {state.player.location}
+    for loc in state.locations:
+        if loc.id in unvisited_loc_ids and loc.lat and loc.lon:
+            count = sum(1 for npc in state.npcs if npc.location == loc.id)
+            if count > 0:
+                unvisited_npc_counts.append({
+                    "lat": loc.lat, "lon": loc.lon, "count": count,
+                })
+
     # --- World events (confirmed: current + visited locations) ---
     confirmed_events: List[VisibleEvent] = []
     for ev in state.events:
@@ -540,6 +582,9 @@ def build_player_view(
     if historical_events_raw:
         hist_events = filter_historical_events(historical_events_raw, state)
 
+    from backend import config as _config  # avoid import cycle at module load
+
+    cost_usd = float(getattr(state, "cumulative_cost_usd", 0.0) or 0.0)
     return PlayerView(
         run_id=run_id,
         run_status=state.run_status,
@@ -559,7 +604,13 @@ def build_player_view(
         known_locations=known_locations,
         npcs_here=npcs_here,
         npcs_known=npcs_known,
+        unvisited_npc_counts=unvisited_npc_counts,
         confirmed_events=confirmed_events,
         rumors=rumors,
         historical_events=hist_events,
+        cost_usd=cost_usd,
+        cost_eur=cost_usd * _config.USD_TO_EUR,
+        cost_cap_state=getattr(state, "cost_cap_state", "none") or "none",
+        cost_cap_soft_eur=_config.COST_CAP_SOFT_EUR,
+        cost_cap_hard_eur=_config.COST_CAP_HARD_EUR,
     )

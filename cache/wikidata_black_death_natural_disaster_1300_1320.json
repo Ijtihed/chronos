@@ -1,0 +1,20 @@
+[
+  {
+    "qid": "Q1485683",
+    "label": "1303 Crete earthquake",
+    "description": "Earthquake (8 August 1303)",
+    "year": 1303,
+    "location": "",
+    "country": "",
+    "source_type": "natural_disaster"
+  },
+  {
+    "qid": "Q24231977",
+    "label": "1303 Hongdong earthquake",
+    "description": "earthquake in northern China (25 September 1303)",
+    "year": 1303,
+    "location": "",
+    "country": "People's Republic of China",
+    "source_type": "natural_disaster"
+  }
+]

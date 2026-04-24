@@ -18,7 +18,7 @@ from string import Template
 
 from pydantic import ValidationError
 
-from backend.llm import chat, load_prompt
+from backend.llm_provider import call_llm, load_prompt
 from backend.llm_schemas import (
     DEATH_CHECK_SAFE,
     DeathCheckResponse,
@@ -104,7 +104,12 @@ async def _llm_death_check(state: WorldState, action: dict) -> dict:
     )
 
     try:
-        raw = await chat(prompt, json_mode=True)
+        raw, _ = await call_llm(
+            prompt,
+            tier="fast",
+            schema=DeathCheckResponse,
+            call_site="death_check",
+        )
         return DeathCheckResponse.model_validate(json.loads(raw)).model_dump()
     except (json.JSONDecodeError, ValidationError) as exc:
         logger.warning("Death check validation failed: %s", exc)
@@ -198,7 +203,11 @@ async def generate_memory_fade(state: WorldState) -> str:
             year=state.current_year or state.era.year_start,
             memory_summary=_build_memory_summary(state),
         )
-        text = await chat(prompt)
+        text, _ = await call_llm(
+            prompt,
+            tier="fast",
+            call_site="memory_fade",
+        )
         if leaks_raw_numbers(text):
             text = scrub_leaked_numbers(text)
         return text.strip().split("\n")[0][:200]
@@ -225,7 +234,14 @@ async def generate_erasure(state: WorldState) -> str:
     )
 
     try:
-        text = await chat(prompt)
+        # Erasure is the emotional climax of every run — QUALITY tier.
+        # Fires exactly once per run; cost is negligible, narrative
+        # fidelity matters.
+        text, _ = await call_llm(
+            prompt,
+            tier="quality",
+            call_site="erasure",
+        )
         if leaks_raw_numbers(text):
             logger.warning("Erasure text leaked raw numbers, scrubbing")
             text = scrub_leaked_numbers(text)

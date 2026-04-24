@@ -33,7 +33,7 @@ from backend.persistence import (
     insert_historical_event,
     query_historical_events,
 )
-from backend.llm import chat
+from backend.llm_provider import call_llm  # noqa: F401 — reserved for future use
 
 logging.basicConfig(
     level=logging.INFO,
@@ -631,7 +631,15 @@ async def _structure_events_with_llm(
     )
 
     try:
-        raw_response = await chat(prompt, json_mode=True, model="llama3.1:8b")
+        # Build-time script — always local (fast tier). Override model
+        # via CHRONOS_FAST_MODEL env var if you need a different Ollama
+        # target than the auto-selected one.
+        raw_response, _ = await call_llm(
+            prompt,
+            tier="fast",
+            json_mode=True,
+            call_site="build_events_db",
+        )
         parsed = json.loads(raw_response)
         if isinstance(parsed, dict) and "events" in parsed:
             parsed = parsed["events"]

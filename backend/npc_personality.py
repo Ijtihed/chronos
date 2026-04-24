@@ -420,8 +420,10 @@ def _detect_opportunities(npc: NPC, state) -> List[str]:
     if any(n.archetype in ("noble",) for n in nearby_npcs):
         opportunities.append("wealthy_patron_present")
 
+    from backend.event_vocab import EPIDEMIC_TYPES, RELIGIOUS_EVENT_TYPES
+
     has_sick = any(
-        e.action_type in ("epidemic", "plague", "sickness")
+        e.action_type in EPIDEMIC_TYPES
         and e.location == npc.location
         for e in state.events
     )
@@ -429,7 +431,7 @@ def _detect_opportunities(npc: NPC, state) -> List[str]:
         opportunities.append("sick_community_member")
 
     has_religious = any(
-        e.action_type in ("religious_event", "religious_gathering")
+        e.action_type in RELIGIOUS_EVENT_TYPES
         and e.location == npc.location
         and e.turn >= state.turn - 2
         for e in state.events

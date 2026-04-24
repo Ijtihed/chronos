@@ -1,5 +1,5 @@
 ---
-description: CHRONOS model tiers — local-first (Ollama), minimal frontier; justify every LLM call
+description: CHRONOS model policy — all-Gemini provider; NoOp fallback on failure; hard cost caps enforced at every turn-advancing endpoint
 alwaysApply: true
 ---
 
@@ -7,19 +7,57 @@ alwaysApply: true
 
 The full policy lives in `context/game logic context/roadmap.md` under **MODEL TIER POLICY**. Treat it as binding for every **LLM / embedding** integration, not a preference.
 
-## Before writing any LLM or embedding call
+## All-Gemini runtime (migration 2026-04-23)
 
-1. **State the tier:** local (Ollama) vs frontier — and **why** this call belongs there.
-2. **Frontier:** If the call is not “IO layer: natural language → structured action,” you must **explain why local is insufficient for this specific task** (with an explicit test or failure mode). If you cannot justify it, **default to local**.
-3. **User review:** **Never introduce a new frontier call** without **flagging it for the user’s review first** (in addition to the prompt-template review in `chronos-ai-dev-protocol.mdc`).
+**All LLM calls → Google Gemini (`CHRONOS_GEMINI_MODEL`, default `gemini-2.5-flash-lite`).**
 
-## Phase 0 (current roadmap baseline)
+The historic fast/quality tier split has been retired. Ollama is no longer used.
+The `tier` parameter on `call_llm` is accepted for backward compat but is a no-op.
 
-- **Frontier (only if user approves the call):** parsing player input → structured action — small, cheap call (~200 tokens), haiku/mini tier only.
-- **Local (Ollama) for everything else:** NPC POV / responses, world-state narrative updates, any generation beyond the action parser.
-- **Default local model:** `llama3.1:8b`.
-- **Embeddings:** `nomic-embed-text` (local), if/when embeddings are used.
+Call sites (all now route to Gemini):
+- `action_parser` — NL → structured action, strict JSON
+- `autonomous_action_light` — 1-sentence offscreen NPC activity
+- `autonomous_action` — full NPC autonomous actions
+- `death_check` — short structured JSON
+- `region_knowledge` — one-line map-click note
+- `npc_perception` — one-line NPC hover note
+- `historical_context` — 2-3 sentence passage explainer
+- `memory_fade` — one-sentence fade framing
+- `npc_pov` — NPC reactions to player actions
+- `character_gen` — player + NPCs at run start (8-15 concurrent, rate-limited via semaphore)
+- `ground_context` — HCE run-start + refresh
+- `erasure` — the final narrative passage when the run ends (fires exactly once)
+
+**NoOp fallback.** When Gemini is unavailable:
+- `GEMINI_API_KEY` is unset → ERROR log; all calls return `("...", cost=$0)`
+- the Gemini circuit breaker is open (3 failures in 60s → 5 minutes open) → WARNING log
+- a single Gemini call raises after retries → WARNING log; circuit records the failure
+
+The NoOp response keeps turns alive on transient failures. The player sees degraded prose ("...") rather than a 500 error. Circuit breaker prevents cascading failures.
+
+## Per-run cost ceiling
+
+- **~€0.022 median per 10-turn run** (gemini-2.5-flash-lite at $0.10/$0.40 per M in/out)
+- **€1.00 soft cap** — UI banner, dismissible, once per run; turns continue
+- **€2.00 hard cap** — ALL turn-advancing endpoints reject further advances with `402` + `code: cost_cap_hard`; applies to `/turn`, `/skip`, AND `/turn` with `dead_observing` status (observation mode still burns tokens); player can still read the world and end the run manually via `DELETE /api/run/{id}`
+
+Internal accounting is USD (Gemini bills USD). EUR conversion happens at render time via `config.USD_TO_EUR`. The cap *values* are in EUR — forex drift shifts the real cap silently; see the TODO on `USD_TO_EUR` in `backend/config.py`.
+
+## Before writing any LLM call
+
+1. **All calls go to Gemini.** The `tier` parameter is a deprecated no-op — don't add new `tier` routing logic.
+2. **New call sites:** adding a new `call_llm` call is a design decision. Flag it for user review before merge. Estimate its per-run cost contribution.
+3. **Use `call_site="..."`.** This is how `track_turn_cost()` warnings identify uncovered endpoints.
+
+## Concurrency
+
+`GEMINI_MAX_CONCURRENT_CEILING = 20` (hard constant, cannot be exceeded by env var).
+`CHRONOS_GEMINI_MAX_CONCURRENT` default is `15`. Paid tier (300 RPM) absorbs this comfortably.
+
+## Embeddings
+
+`nomic-embed-text` (local), if/when embeddings are used.
 
 ## Cost and architecture
 
-If design would push **per-run cost** above **$0.10–0.30** as described in `roadmap.md`, **surface it** — the architecture is wrong for project policy.
+If a change would push per-run cost above the **€1.00 soft cap** or **€2.00 hard cap**, **surface it** — the architecture is wrong for project policy. The all-Gemini migration target is ~€0.022 median per 10-turn run, well below the €0.31 roadmap target.

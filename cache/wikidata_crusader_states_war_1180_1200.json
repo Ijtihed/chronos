@@ -1,0 +1,56 @@
+[
+  {
+    "qid": "Q2889511",
+    "label": "Battle of Nicom\u00e9die",
+    "description": "1182 battle",
+    "year": 1182,
+    "location": "Nicomedia",
+    "country": "Byzantine Empire",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q131766055",
+    "label": "Almohad naval campaign against Byzantium",
+    "description": "1190 naval campaign",
+    "year": 1190,
+    "location": "Aegean Sea",
+    "country": "Byzantine Empire",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q105652480",
+    "label": "Battle of Serres",
+    "description": "1195 battle",
+    "year": 1195,
+    "location": "",
+    "country": "Byzantine Empire",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q105652480",
+    "label": "Battle of Serres",
+    "description": "1195 battle",
+    "year": 1195,
+    "location": "",
+    "country": "Second Bulgarian Empire",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q3622249",
+    "label": "Battle of Serres",
+    "description": "battle in 1196 in the Balkans",
+    "year": 1196,
+    "location": "Serres",
+    "country": "Bulgaria",
+    "source_type": "war"
+  },
+  {
+    "qid": "Q3622249",
+    "label": "Battle of Serres",
+    "description": "battle in 1196 in the Balkans",
+    "year": 1196,
+    "location": "Serres",
+    "country": "Byzantine Empire",
+    "source_type": "war"
+  }
+]

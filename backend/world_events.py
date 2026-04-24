@@ -95,10 +95,12 @@ def _check_tension_spread(loc: Location, state: WorldState) -> Optional[dict]:
 
 
 def _check_food_shortage_rumor(loc: Location, state: WorldState) -> Optional[ScheduledConsequence]:
+    from backend.event_vocab import FAMINE_TYPES
+
     if state.turn <= 5:
         return None
     has_famine = any(
-        e.action_type == "famine" and e.location == loc.id
+        e.action_type in FAMINE_TYPES and e.location == loc.id
         for e in state.events
     )
     if not has_famine:
@@ -116,8 +118,10 @@ def _check_food_shortage_rumor(loc: Location, state: WorldState) -> Optional[Sch
 
 
 def _check_siege_trade_disruption(loc: Location, state: WorldState) -> Optional[ScheduledConsequence]:
+    from backend.event_vocab import SIEGE_TYPES
+
     has_siege = any(
-        e.action_type == "siege" and e.location == loc.id
+        e.action_type in SIEGE_TYPES and e.location == loc.id
         for e in state.events
     )
     if not has_siege or state.turn <= 3:
@@ -184,10 +188,12 @@ def tick_world_events(state: WorldState) -> WorldState:
         evt = _check_armed_skirmish(loc, state)
         if evt:
             state.events.append(evt)
+            state.ground_context_stale = True
 
         evt = _check_civilian_unrest(loc, state)
         if evt:
             state.events.append(evt)
+            state.ground_context_stale = True
 
         spread = _check_tension_spread(loc, state)
         if spread:
