@@ -151,6 +151,13 @@ Current starter set (Phase 1): Roman Late Empire (~410), Viking Age (~870), Crus
 
 **NPC-to-NPC social graph:** NPCs interact with each other every turn and name interaction partners, but there is no persistent NPC-to-NPC relationship data structure. NPC-on-NPC opinions, alliances, and rivalries are not tracked in structured state. This is a Phase 5 feature (see roadmap.md). The Information Provenance Graph depends on this graph existing.
 
+**NPC memory pipeline (current as of 2026-04-27):** Player-NPC history is tracked across several fields, but only some surface to the LLM. The pipeline went through two iterations: the first injection (verbatim NPC POVs as `$prior_player_interactions`) caused self-plagiarism. Change 3 replaced it with a structured log.
+
+- `npc.player_interactions` -- structured log of `{turn, year, action_type, intent}` records, capped at 5. Written by `_update_npc_memory` when the player targets or impacts the NPC. The last 3 entries are injected into both `npc_pov.md` and `npc_addressed.md` as `$player_actions_toward_you`. This is what the LLM actually sees as "history with the player."
+- `npc.memory_of_player` -- float 0-1.0, incremented on direct interaction (+0.15) and proximity (+0.05). Surfaced as `$memory_level` (vivid > 0.7, faint > 0.3, barely below). Also drives memory decay during observation mode.
+- `npc.stored_povs` -- last 10 NPC POV strings. **No longer injected into any prompt.** Retained as a session-level history record; the only active reader is `player_knowledge.build_player_view` which exposes the last entry as `VisibleNPCHere.last_pov` for the perception view (currently unread by the frontend; effectively dead at the read end). Could be retired or reduced.
+- `npc.relationship_to_player` -- a free-text string set once at character_gen and never updated by any code path. Still injected into both POV prompts. Drift between this static line and the evolving structured log is a known coherence issue.
+
 ## What makes each run unique
 
 - The era is random

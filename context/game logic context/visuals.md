@@ -71,7 +71,9 @@ Scene illustrations are reserved for moments of narrative weight. Standard trigg
 1. **Run start.** Who the character is and where they are, as the first image of the run.
 2. **Character death.** The moment the character dies, first-person from the viewer's own body.
 3. **Erasure.** The final memory-fade moment, the viewer fading from the world.
-4. **Two or three major narrative moments across the run body.** Candidates: a decisive player action, a first encounter with a major NPC, witnessing a historical catastrophe the character is present for.
+4. **Two or three major narrative moments across the run body.** Candidates: a decisive player action, a first encounter with a major NPC (Addressed mode first contact with a significant character), witnessing a historical catastrophe the character is present for.
+
+The character-study framing (2026-04-27) reinforces the existing trigger set. First conversations with named NPCs in Addressed mode are candidate trigger moments -- the image shows the other person's face and context, from the player's POV. Introspective turns ("I sit with this a while," "I think about what happened") are also candidate moments if the narrative has sufficient weight. The honest-bodies rule still applies: character descriptions in image prompts are based on role, archetype, and era context, not hero-trope defaults.
 
 Typical run produces 5 to 6 images. Uneventful runs may produce as few as 3 (start, death, erasure). Exceptionally eventful runs rarely exceed 8. Triggers are gated on narrative weight, not turn count.
 

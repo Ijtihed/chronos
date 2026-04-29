@@ -8,6 +8,8 @@ The NPCs are not supporting cast. They are the simulation. They are autonomous a
 
 The player embodies one perspective within this simulation. What you see is filtered through who that person is — their social class, their knowledge, their biases. Your actions are real and have consequences, but the world does not revolve around you. Sometimes nobody cares what you did. Sometimes your grain deal changes the course of a siege. It depends on where you are, who you are, and what's happening around you.
 
+When you speak directly to someone, they reply to you. That is not the same as the world revolving around you -- it is the basic social contract of being a person among people. What the world does not do is treat your presence as significant by default. NPCs have their own lives, preoccupations, and problems. If you walk into a room and say nothing, they go on about their day.
+
 Every run is unique. The world map is shared, but the borders, factions, characters, and political context are seeded fresh each time from a random historical period.
 
 ## The player's role

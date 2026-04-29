@@ -87,6 +87,37 @@ The language adapts to the era and character naturally — a Roman centurion doe
 
 This applies to all NPC output: POV reactions, autonomous activity narration, and perception text.
 
+**NPC voice grounding (current as of 2026-04-27):** Several context signals feed each NPC POV call:
+
+1. **Player actions toward this NPC** -- a structured log of the last 3 things the player did to or said to this specific NPC, injected as `$player_actions_toward_you`. Each entry is `{turn, year, action_type, intent}` -- a record of what the PLAYER did, NOT the NPC's prior output. Earlier we injected the NPC's last 3 POVs verbatim (`$prior_player_interactions`); that caused the NPC to plagiarize its own grounding details turn after turn (wet boots, repeated quotes). The structured log replaced that pipeline in Change 3.
+
+2. **Memory level** -- prose label derived from `npc.memory_of_player` float (`vivid` / `faint` / `barely remember them`). Injected as `$memory_level`.
+
+3. **Current preoccupation** -- a thematic concern from a per-archetype pool, rotated every 6 turns, injected as `$current_preoccupation`. Gives the NPC something to be thinking about that evolves over a multi-year run instead of repeating one fixed concern.
+
+4. **This-turn scene context** -- the other NPCs' ambient actions at the player's location this turn, injected as `$this_turn_events` (capped at 4 entries, the NPC's own action excluded). Each NPC's reaction can reference what is happening in the shared scene without a dedicated weaving call.
+
+5. **Already-used grounding details** -- a run-level "do not reuse" list of sensory phrases extracted from past POVs (capped at 30, FIFO eviction), injected as `$already_used_details`. Prevents Gemini from latching onto the same wet boot or King-Harald aphorism across turns.
+
+**Addressed mode vs Ambient mode (as of 2026-04-27):** When the player's action
+targets a specific NPC by name and that NPC is at the player's location, that NPC
+enters Addressed mode. All other NPCs at the location stay in Ambient mode.
+
+- **Addressed mode** (`prompts/npc_addressed.md`): the NPC responds directly to
+  the player -- `reply` (1-2 sentences spoken at the player) plus `internal`
+  (1 sentence private thought, optional). The player's verbatim input is surfaced
+  in the prompt as `$player_action_description`. Speech acts ("said to you: '...'")
+  and physical acts ("did X to you") use the same template, distinguished by the
+  variable value. Net new LLM calls per turn: zero -- replaces the Ambient call
+  that would have fired for that NPC.
+
+- **Ambient mode** (`prompts/npc_pov.md`): the NPC reacts privately to the turn's
+  events from their own perspective. They may reference what happened nearby but
+  are not obligated to address the player. This is the default for all NPCs when
+  no specific target is named.
+
+This is "narrative cohesion via shared context," not a true scene-weaver. A dedicated scene-weaver call -- one LLM pass assembling the turn's events into a coherent paragraph -- was identified in the 2026-04-24 playtest audit as the architecturally correct long-term fix but is deferred. Cost and design scope need review before adding a new call site.
+
 ## NPC perception
 
 When the player focuses on an NPC (hovering on the map or encountering them in the narrative), they see their character's **subjective impression** of that person. This is not a stat sheet. It is what the player character thinks and feels about them, colored by:

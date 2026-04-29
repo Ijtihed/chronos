@@ -40,6 +40,6 @@
 | `prompts/` | LLM prompt templates — design artifacts, reviewed separately from code | 11 |
 | `scripts/` | Build-time tools (`build_events_db.py`) | 1 |
 | `seeds/` | Backbone event seed files per era (JSON) | 5 |
-| `tests/` | Automated test suite (unit, integration with mocked LLM, live with Ollama) | 24 |
+| `tests/` | Automated test suite (unit, integration with mocked LLM, live with Gemini API) | ~33 |
 | `data/` | Runtime data (SQLite DB, Chroma embeddings) — **gitignored**, generated locally | — |
 | `.cursor/rules/` | AI collaborator rules: design constraints, dev protocol, roadmap gates, model tier policy | 6 |

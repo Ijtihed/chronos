@@ -323,61 +323,67 @@ All **20** era buckets are **playable** with ingested corpus + smoke-tested arch
 
 ## MODEL TIER POLICY (Agreed — applies to all phases)
 
-**Principle:** Local-first. Frontier is used only where NPC voice fidelity directly affects the player experience. A run should cost cents, not dollars.
+**Principle:** Gemini for all LLM calls. A run should cost cents, not dollars.
 
-### FAST tier — local Ollama
+### All-Gemini runtime (2026-04-23)
 
-Every short / structured / high-volume call runs locally on Ollama. Behavior is preserved exactly across the 2026-04-23 two-tier migration.
+The historic fast/quality tier split has been retired. Ollama is no longer used at runtime.
+All call sites route to `call_llm()` which dispatches to Gemini
+(`CHRONOS_GEMINI_MODEL`, default `gemini-3-flash-preview`).
 
-- `action_parser` — NL → structured JSON action
-- `autonomous_action_light` — one-sentence offscreen NPC activity
-- `death_check` — short structured JSON
-- `region_knowledge` — one-line map-click note
-- `npc_perception` — one-line NPC hover note
-- `historical_context` — 2-3 sentence passage explainer (map/text highlight)
-- `memory_fade` — one-sentence fade framing each observation turn
-- Events DB population (build-time script, not runtime)
-- Embeddings for vector DB (`nomic-embed-text`, free, local)
+The `tier` parameter on `call_llm` is accepted for backward compatibility but is a no-op.
+Do not add new `tier` routing logic.
 
-### QUALITY tier — Google Gemini 3.1 Flash-Lite (`gemini-3-1-flash-lite`)
+Call sites:
 
-Approved frontier calls. Model fidelity matters to what the player reads. Each call goes through `backend/llm_provider.py::call_llm(tier="quality")` and falls back to Ollama when Gemini is unavailable or the circuit breaker is open.
+- `action_parser` -- NL to structured JSON action
+- `autonomous_action_light` -- one-sentence offscreen NPC activity
+- `autonomous_action` -- full NPC autonomous actions (active tier, player skip-turn, arrival)
+- `death_check` -- short structured JSON
+- `region_knowledge` -- one-line map-click note
+- `npc_perception` -- one-line NPC hover note
+- `historical_context` -- 2-3 sentence passage explainer (map/text highlight)
+- `memory_fade` -- one-sentence fade framing each observation turn
+- `npc_pov` -- NPC reactions to player actions (highest-impact prose in the game)
+- `character_gen` -- player + 8-15 NPCs at run start (concurrency capped by semaphore)
+- `ground_context` -- HCE ground context at run start and on arrival
+- `erasure` -- final narrative passage when the run ends (fires exactly once per run)
 
-- `npc_pov` — NPC reactions to player actions (highest-impact prose in the game)
-- `autonomous_action` — full NPC autonomous actions (active tier, player skip-turn, arrival catch-up)
-- `character_gen` — player + 8-15 NPCs at run start (concurrency capped by semaphore)
-- `ground_context` — HCE ground context at run start and on arrival
-- `erasure` — final narrative passage when the run ends (fires exactly once per run)
+Build-time only (not runtime): Events DB population script; embeddings (`nomic-embed-text`, local).
 
-### Fallback + resilience
+### NoOp fallback
 
-Quality-tier calls fall through to Ollama when:
+When Gemini is unavailable, all calls return `("...", cost=$0)` and the turn continues
+with degraded prose. This keeps turns alive on transient failures.
 
-- `GEMINI_API_KEY` is unset
-- `CHRONOS_FORCE_FAST_TIER=1` (dev flag)
-- the Gemini circuit breaker is open (3 failures in 60s → 5 minutes open; in-process, ephemeral across restarts)
-- a single Gemini call raises (fallback happens immediately and the failure counts toward the circuit)
+NoOp triggers when:
+
+- `GEMINI_API_KEY` is unset (ERROR log)
+- the Gemini circuit breaker is open (3 failures in 60s -> 5 minutes open; WARNING log)
+- a single Gemini call raises after retries (WARNING log; circuit records the failure)
 
 ### Current runtime status (2026-04-23)
 
-Two-tier provider active. Primary quality call is `gemini-3-1-flash-lite` at $0.25/M input, $1.50/M output. Local Ollama serves every fast-tier call and every quality-tier call when Gemini is unavailable. The migration replaced the previous Ollama-only architecture because 70b auto-selection on capable hardware produced ~6 min per turn, blocking playtest-driven iteration (Step 3.1 log review, Phase 3 development).
+All-Gemini provider active (`gemini-3-flash-preview`). The two-tier
+(Gemini quality + Ollama fast) configuration is retired. Ollama is no longer in the
+runtime path. The two-tier migration itself replaced the previous Ollama-only architecture
+because 70b auto-selection on capable hardware produced ~6 min per turn, blocking
+playtest-driven iteration. The all-Gemini migration followed because Ollama's fast-tier
+calls were the cause of `_parse_error` failures on every player action in the
+2026-04-24 playtest.
+
+Concurrency: `GEMINI_MAX_CONCURRENT_CEILING = 20` (hard constant, cannot be exceeded
+by env var). `CHRONOS_GEMINI_MAX_CONCURRENT` default 15. Paid tier (300 RPM) absorbs this.
 
 ### Per-run cost ceiling
 
-- **€0.31 median per run** (estimate; to be confirmed by live smoke test)
-- **€1.00 soft cap** — UI banner, dismissible, once per run; turns continue
-- **€2.00 hard cap** — turn endpoints reject further advances with `402` + `code: cost_cap_hard`; player can still observe the world and end the run manually
+- **~EUR 0.022 median per 10-turn run** (gemini-3-flash-preview pricing)
+- **EUR 1.00 soft cap** -- UI banner, dismissible, once per run; turns continue
+- **EUR 2.00 hard cap** -- turn endpoints reject further advances with `402` + `code: cost_cap_hard`; player can still observe the world and end the run manually
 
-Internal accounting is USD (Gemini bills USD). EUR is rendered via `config.USD_TO_EUR` (default 0.92, update from ECB reference rate periodically; if EUR/USD moves by ±5%, recompute caps or switch accounting to USD).
-
-### Recommended local models (fast tier)
-
-- `llama3.1:8b` — default. Minimum viable, works on 16GB.
-- `llama3.1:70b` — auto-selected when available. Richer NPC voices in fallback scenarios (Gemini down).
-- `mistral:7b` — alt fast model for extremely high-volume turns.
-- `nomic-embed-text` — embeddings, completely free.
-
-Override the auto-selection via `CHRONOS_FAST_MODEL` env var.
+Internal accounting is USD (Gemini bills USD). EUR is rendered via `config.USD_TO_EUR`
+(default 0.92, update from ECB reference rate periodically; if EUR/USD moves by +-5%,
+recompute caps or switch accounting to USD).
 
 ---
 
@@ -404,9 +410,8 @@ A single-player, turn-based historical simulation. You are assigned a random min
 | Backend | FastAPI + Uvicorn | Python 3.11 |
 | Database | SQLite (WAL mode, aiosqlite) | Sessions, Events DB, turn logs (with `turn_cost_usd`), consequence queue |
 | Embeddings | ChromaDB + nomic-embed-text | Local, free |
-| LLM (quality tier) | Gemini 3.1 Flash-Lite via `google-genai` | $0.25/$1.50 per M input/output tokens; npc_pov, autonomous_action, character_gen, ground_context, erasure |
-| LLM (fast tier) | llama3.1:8b (auto 70b) via Ollama | action_parser, autonomous_action_light, death_check, region_knowledge, npc_perception, historical_context, memory_fade |
-| LLM fallback | Ollama | Quality-tier calls route to Ollama when Gemini is unreachable, key is missing, or the circuit breaker is open |
+| LLM | Gemini (`CHRONOS_GEMINI_MODEL`, default `gemini-3-flash-preview`) via `google-genai` | all call sites; ~EUR 0.022 median per 10-turn run |
+| LLM fallback | NoOp ("...") | `GEMINI_API_KEY` unset or circuit breaker open (3 fails/60s -> 5 min); keeps turns alive on transient failure |
 | Cost ceiling | €1.00 soft / €2.00 hard per run | Tracked in USD, displayed in EUR; persisted in `WorldState.cumulative_cost_usd` and `turn_logs.turn_cost_usd` |
 
 ---
@@ -530,6 +535,60 @@ Use this shape:
   - **New carryover (2026-04-21):** Prompt coverage gap. Fix 1 and 3 hardened only `prompts/action_parser.md`. The other ~10 prompts were never audited for similar vocabulary / output-shape drift resistance.
   - **New carryover (2026-04-21):** Byzantine Empire centroid is era-ambiguous. Current YAML entry is median-period (39.0°N, 32.0°E, 1200 km radius); geographically wrong for 5th-century events. Future ingestion with era-keyed centroid sub-entries would fix this.
   - **New carryover (2026-04-21):** `polity_context` column in `historical_events` is architecturally planned as a centroid-resolution fallback but NULL across all 1,569 rows. Dead code path until future ingestion populates it.
+
+### Gameplay redesign: Addressed mode, NPC drift, character-study UX (2026-04-27)
+
+Three changes shipped together based on post-playtest diagnosis ("feels like a chatbot"):
+
+1. **Addressed mode (Change 1)** -- `prompts/npc_addressed.md` + `generate_npc_addressed`.
+   When `parsed.target` names an NPC at the player's location, that NPC produces a
+   direct reply (`reply` + optional `internal` thought) instead of a private monologue.
+   All other nearby NPCs stay in Ambient mode (`npc_pov.md`). Net new calls: zero.
+
+2. **NPC narrative drift (Change 3)** -- `current_preoccupation` field on NPC model,
+   initialized at character_gen from per-archetype pools (`ARCHETYPE_PREOCCUPATIONS`
+   in `npc_personality.py`), rotates every 6 turns via `tick_preoccupation_drift`.
+   `$player_actions_toward_you` replaces verbatim `stored_povs` injection -- the NPC
+   now sees a structured summary of what the PLAYER DID, not its own prior output.
+   Self-plagiarism (wet boot, King Harald's hair) eliminated at the source.
+
+3. **Character-study UX (Change 2)** -- Input placeholder: "What do you do, think, or
+   say?" Opening narration: description-first, name subordinated as "Your name is X."
+
+New prompt: `prompts/npc_addressed.md`. New schema: `NPCAddressedResponse`.
+New NPC fields: `player_interactions`, `current_preoccupation`, `last_preoccupation_shift_turn`.
+New test file: `tests/test_addressed_mode.py` (17 tests).
+
+### Post-playtest audit fixes (2026-04-27)
+
+Not a phase boundary -- cross-cutting quality fixes based on a structured playtest
+audit of run `17565bdc41f7` (2026-04-24). Five problems diagnosed, five fixes shipped.
+
+1. **Action parser routing confirmed (Fix 1)** -- `action_parser` confirmed Gemini-routed.
+   The `test_action_parser_uses_local_ollama` test was stale after the all-Gemini
+   migration; renamed and updated to assert Gemini config.
+
+2. **NPC memory pipeline completed (Fix 2)** -- `stored_povs` (last 3) and
+   `memory_of_player` float now injected into `npc_pov.md` as `$prior_player_interactions`
+   and `$memory_level`. Previously both were collected but never consumed by any prompt.
+
+3. **NPC voice retuned for Gemini (Fix 3)** -- `npc_pov.md` VOCABULARY RULES extended
+   with explicit bans on similes, metaphors, and parallel literary structures. A BANNED
+   phrases list targets patterns Gemini defaults to that llama3.1:8b did not produce.
+   JSON markdown fence stripping added to `npc_engine.py` (Gemini wraps JSON in
+   triple-backtick fences; llama did not).
+
+4. **Frontend visual hierarchy (Fix 4)** -- Scene (ambient NPC activity) and Voices
+   (NPC reactions to player) are now visually separated with section headers and
+   distinct opacity levels. Fallback `era_description` placeholder is suppressed in
+   the renderer.
+
+5. **Scene context in NPC POV (Fix 5)** -- `generate_npc_pov()` now receives
+   `this_turn_events` (other NPCs' ambient actions this turn, capped at 4). Each
+   NPC's reaction can reference the shared scene without a dedicated weaver call.
+
+**Test count:** 736 offline + 13 live = 749 total. 23 new tests added.
+Zero regressions against the pre-fix baseline.
 
 ### Phase 3
 
