@@ -13,12 +13,24 @@ const ChronosMap = (function () {
   let playerMarker = null;
   let npcMarkers = [];
   let eventLayer = null;
+  // Place-label layer (cities + small named regions). Opacity per
+  // marker scales with current zoom; entries below their tier
+  // threshold render fully transparent so they don't take pointer
+  // events.
+  let placeLayer = null;
+  let placesData = null;
   let isVisible = false;
   let initialized = false;
   let currentEraKey = null;
   let currentRunId = null;
   let perceptionCache = {};
   let regionCache = {};
+  // Most recent player coords; powers the "Recenter on player" button.
+  let lastPlayerLatLng = null;
+  // True only for the first marker placement of a given run, so the
+  // implicit "auto-recenter on player" only fires once. After that
+  // the user's pan/zoom (and the saved view) wins.
+  let _firstMarkerPlacement = true;
 
   // Event-type colors — must stay in sync with the 8 types in
   // historical_events.type. Keys match DB values exactly.
@@ -47,12 +59,72 @@ const ChronosMap = (function () {
     return _tierOpacity(tier) * base;
   }
 
+  // Per-era default view. Set on first loadBorders so resetView()
+  // returns to the right starting frame for the current run's era.
+  var defaultCenter = [42, 15];
+  var defaultZoom = 5;
+  var DEEP_ZOOM = 9;       // when zooming in on a single feature
+  var REGION_ZOOM = 7;     // when zooming on a polity / region
+
+  function _resolveViewKey() {
+    return currentRunId ? ("chronos_map_view_" + currentRunId) : null;
+  }
+
+  function _saveViewState() {
+    if (!map) return;
+    var key = _resolveViewKey();
+    if (!key) return;
+    try {
+      var c = map.getCenter();
+      localStorage.setItem(
+        key,
+        JSON.stringify({ lat: c.lat, lng: c.lng, zoom: map.getZoom() }),
+      );
+    } catch (e) {}
+  }
+
+  function _loadViewState() {
+    var key = _resolveViewKey();
+    if (!key) return null;
+    try {
+      var raw = localStorage.getItem(key);
+      if (!raw) return null;
+      var v = JSON.parse(raw);
+      if (
+        v &&
+        typeof v.lat === "number" && isFinite(v.lat) &&
+        typeof v.lng === "number" && isFinite(v.lng) &&
+        typeof v.zoom === "number" && isFinite(v.zoom) &&
+        v.lat >= -90 && v.lat <= 90 &&
+        v.lng >= -360 && v.lng <= 360 &&
+        v.zoom >= 0 && v.zoom <= 20
+      ) {
+        return v;
+      }
+      // Garbage in storage; remove so we don't keep tripping on it.
+      localStorage.removeItem(key);
+    } catch (e) {
+      try { localStorage.removeItem(key); } catch (e2) {}
+    }
+    return null;
+  }
+
+  function _updateZoomHint() {
+    var hint = document.getElementById("map-zoom-hint");
+    if (!hint || !map) return;
+    if (map.getZoom() > defaultZoom) {
+      hint.classList.remove("hidden");
+    } else {
+      hint.classList.add("hidden");
+    }
+  }
+
   function init() {
     if (initialized) return;
 
     map = L.map("map", {
-      center: [42, 15],
-      zoom: 5,
+      center: defaultCenter,
+      zoom: defaultZoom,
       zoomControl: false,
       attributionControl: false,
       maxBoundsViscosity: 1.0,
@@ -65,6 +137,79 @@ const ChronosMap = (function () {
     var zoomOut = document.getElementById("map-zoom-out");
     if (zoomIn) zoomIn.addEventListener("click", function () { map.zoomIn(); });
     if (zoomOut) zoomOut.addEventListener("click", function () { map.zoomOut(); });
+
+    var resetBtn = document.getElementById("map-reset");
+    if (resetBtn) resetBtn.addEventListener("click", resetView);
+
+    var centerBtn = document.getElementById("map-center-player");
+    if (centerBtn) centerBtn.addEventListener("click", centerOnPlayer);
+
+    // Esc resets the view while the map is the active overlay.
+    document.addEventListener("keydown", function (e) {
+      if (e.key !== "Escape") return;
+      if (!isVisible) return;
+      if (
+        document.activeElement &&
+        (document.activeElement.tagName === "INPUT" ||
+         document.activeElement.tagName === "TEXTAREA")
+      ) return;
+      resetView();
+    });
+
+    map.on("moveend zoomend", function () {
+      _saveViewState();
+      _updateZoomHint();
+      _updatePlaceLabels();
+      _restyleBorders();
+      _updateZoomClass();
+    });
+  }
+
+  // Apply a zoom-tier class to the map container so CSS can scale
+  // marker sizes without needing to recreate Leaflet markers on each
+  // zoom event. Three tiers: zoomed-out (default), zoomed-mid (+1..2),
+  // zoomed-in (+3 or more).
+  function _updateZoomClass() {
+    if (!map) return;
+    var c = map.getContainer();
+    if (!c) return;
+    var z = map.getZoom();
+    var tier = "zoom-out";
+    if (z >= defaultZoom + 3) tier = "zoom-in";
+    else if (z >= defaultZoom + 1) tier = "zoom-mid";
+    c.classList.remove("zoom-out", "zoom-mid", "zoom-in");
+    c.classList.add(tier);
+  }
+
+  function _flyTo(lat, lon, zoom) {
+    if (!map) return;
+    map.flyTo([lat, lon], zoom != null ? zoom : DEEP_ZOOM, {
+      animate: true,
+      duration: 0.6,
+    });
+  }
+
+  // True when the user has already moved past the era-default view —
+  // either zoomed in or panned somewhere specific. Used to skip the
+  // automatic "click also zooms" behavior so we don't yank them away
+  // from a feature they're already inspecting.
+  function _isUserNavigating() {
+    if (!map) return false;
+    return map.getZoom() > defaultZoom + 0.5;
+  }
+
+  function resetView() {
+    if (!map) return;
+    map.flyTo(defaultCenter, defaultZoom, { animate: true, duration: 0.5 });
+  }
+
+  function centerOnPlayer() {
+    if (!map || !lastPlayerLatLng) return;
+    map.flyTo(
+      [lastPlayerLatLng.lat, lastPlayerLatLng.lon],
+      Math.max(map.getZoom(), DEEP_ZOOM - 1),
+      { animate: true, duration: 0.5 },
+    );
   }
 
   async function loadCoastlines() {
@@ -73,15 +218,123 @@ const ChronosMap = (function () {
       const resp = await fetch("/geo/coastlines.geojson");
       const data = await resp.json();
       coastlineLayer = L.geoJSON(data, {
-        style: {
-          color: "#27272a",
-          weight: 1,
-          opacity: 0.5,
-          fill: false,
-        },
+        style: function () { return _coastlineStyle(); },
       }).addTo(map);
     } catch (e) {
       console.warn("Failed to load coastlines:", e);
+    }
+  }
+
+  // ── Place labels (cities + small named regions) ────────────────────
+  //
+  // Opacity per label scales with current map zoom so the map shows
+  // more detail as the player zooms in. Labels for tiny features
+  // (radius_km <= 80, "city") fade in at zoom 6 and beyond. Mid-size
+  // ("town") at zoom 7+, broad ("region") at zoom 5+. The layer is
+  // populated once per session; per-zoom updates only restyle.
+
+  function _placeOpacity(tier, zoom) {
+    // Linear ramp from invisible -> 1.0 over 2 zoom levels.
+    var threshold;
+    if (tier === "city") threshold = 6;
+    else if (tier === "town") threshold = 7;
+    else threshold = 5;  // region
+    if (zoom < threshold) return 0;
+    if (zoom >= threshold + 2) return 1.0;
+    return (zoom - threshold) / 2;
+  }
+
+  async function loadPlaceLabels() {
+    if (placeLayer) return;
+    try {
+      var resp = await fetch("/api/geo/places/labels");
+      if (!resp.ok) return;
+      var data = await resp.json();
+      placesData = data.places || [];
+      placeLayer = L.layerGroup().addTo(map);
+      placesData.forEach(function (p) {
+        var icon = L.divIcon({
+          className: "place-label place-label-" + p.tier,
+          html: '<span>' + _esc(p.name) + '</span>',
+          iconSize: [120, 14],
+          iconAnchor: [60, 7],
+        });
+        var m = L.marker([p.lat, p.lon], {
+          icon: icon,
+          interactive: false,
+          keyboard: false,
+          zIndexOffset: -300,  // sit beneath polity tooltips/markers
+        });
+        m._placeTier = p.tier;
+        m.addTo(placeLayer);
+      });
+      _updatePlaceLabels();
+    } catch (e) {
+      console.warn("Failed to load place labels:", e);
+    }
+  }
+
+  function _updatePlaceLabels() {
+    if (!placeLayer || !map) return;
+    var z = map.getZoom();
+    placeLayer.eachLayer(function (m) {
+      var op = _placeOpacity(m._placeTier, z);
+      var el = m.getElement();
+      if (el) {
+        el.style.opacity = String(op);
+        // pointer-events off when invisible so labels never
+        // intercept clicks meant for the polity / pin underneath.
+        el.style.pointerEvents = op > 0.1 ? "" : "none";
+      }
+    });
+  }
+
+  // Coastlines + borders styling is zoom-dependent. Computed via
+  // these helpers so loadCoastlines / loadBorders use the same logic
+  // as the live zoomend handler.
+
+  function _zoomScale(zoom) {
+    // Normalized 0..1 from default zoom (5) to high zoom (10).
+    var t = (zoom - defaultZoom) / 5;
+    if (t < 0) t = 0;
+    if (t > 1) t = 1;
+    return t;
+  }
+
+  function _coastlineStyle() {
+    var z = map ? map.getZoom() : defaultZoom;
+    var t = _zoomScale(z);
+    return {
+      color: "#3f3f46",
+      weight: 0.8 + t * 1.4,           // 0.8 -> 2.2
+      opacity: 0.45 + t * 0.4,          // 0.45 -> 0.85
+      fill: false,
+    };
+  }
+
+  function _borderStyle(feature) {
+    var z = map ? map.getZoom() : defaultZoom;
+    var t = _zoomScale(z);
+    var name = feature.properties && feature.properties.NAME;
+    return {
+      color: name ? "#52525b" : "#27272a",
+      weight: name ? (1.0 + t * 1.6) : (0.4 + t * 0.6),
+      opacity: name ? (0.55 + t * 0.4) : (0.2 + t * 0.25),
+      fillColor: name ? "#1f1f23" : "#000000",
+      fillOpacity: name ? (0.10 + t * 0.16) : (0.04 + t * 0.04),
+    };
+  }
+
+  function _restyleBorders() {
+    if (borderLayer) {
+      try {
+        borderLayer.setStyle(function (feature) { return _borderStyle(feature); });
+      } catch (e) {}
+    }
+    if (coastlineLayer) {
+      try {
+        coastlineLayer.setStyle(_coastlineStyle());
+      } catch (e) {}
     }
   }
 
@@ -96,16 +349,7 @@ const ChronosMap = (function () {
       if (!resp.ok) return;
       const data = await resp.json();
       borderLayer = L.geoJSON(data, {
-        style: function (feature) {
-          const name = feature.properties && feature.properties.NAME;
-          return {
-            color: name ? "#3f3f46" : "#18181b",
-            weight: name ? 1.2 : 0.5,
-            opacity: name ? 0.6 : 0.25,
-            fillColor: name ? "#18181b" : "#000000",
-            fillOpacity: name ? 0.12 : 0.04,
-          };
-        },
+        style: function (feature) { return _borderStyle(feature); },
         onEachFeature: function (feature, layer) {
           const name = feature.properties && feature.properties.NAME;
           if (name) {
@@ -115,8 +359,23 @@ const ChronosMap = (function () {
               permanent: false,
               opacity: 0.8,
             });
-            layer.on("click", function () {
+            layer.on("click", function (e) {
+              if (L.DomEvent && e && e.originalEvent) {
+                L.DomEvent.stopPropagation(e.originalEvent);
+              }
               _showRegionKnowledge(name);
+              if (_isUserNavigating()) return;
+              try {
+                map.flyToBounds(layer.getBounds(), {
+                  padding: [40, 40],
+                  maxZoom: REGION_ZOOM,
+                  animate: true,
+                  duration: 0.6,
+                });
+              } catch (err) {
+                var c = layer.getBounds && layer.getBounds().getCenter();
+                if (c) _flyTo(c.lat, c.lng, REGION_ZOOM);
+              }
             });
           }
         },
@@ -166,10 +425,20 @@ const ChronosMap = (function () {
             : "marker-player";
       var playerSize =
         runStatus === "active" ? 14 : 10;
+      lastPlayerLatLng = { lat: playerLoc.lat, lon: playerLoc.lon };
       playerMarker = L.marker([playerLoc.lat, playerLoc.lon], {
         icon: makeIcon(playerClass, playerSize),
         zIndexOffset: 1000,
       }).addTo(map);
+      // Click on the player marker zooms in on it (unless the user
+      // has already zoomed in — then we let them stay where they are).
+      playerMarker.on("click", function (e) {
+        if (L.DomEvent && e && e.originalEvent) {
+          L.DomEvent.stopPropagation(e.originalEvent);
+        }
+        if (_isUserNavigating()) return;
+        _flyTo(playerLoc.lat, playerLoc.lon, DEEP_ZOOM);
+      });
 
       if (runStatus === "active") {
         playerMarker.bindTooltip(
@@ -188,7 +457,7 @@ const ChronosMap = (function () {
     }
 
     if (runStatus === "ended") {
-      if (playerLoc && playerLoc.lat) {
+      if (playerLoc && playerLoc.lat && _firstMarkerPlacement) {
         map.setView([playerLoc.lat, playerLoc.lon], map.getZoom(), { animate: true, duration: 0.8 });
       }
       return;
@@ -214,7 +483,17 @@ const ChronosMap = (function () {
         { direction: "top", offset: [0, -8], opacity: 1, className: "npc-tooltip" }
       );
       (function (npcRef, marker) {
-        marker.on("click", function () { _showPerception(npcRef, marker); });
+        marker.on("click", function (e) {
+          if (L.DomEvent && e && e.originalEvent) {
+            L.DomEvent.stopPropagation(e.originalEvent);
+          }
+          _showPerception(npcRef, marker);
+          // Auto-zoom only if we're at the era-default view. Once the
+          // user has zoomed in we leave the camera alone.
+          if (!_isUserNavigating()) {
+            _flyTo(playerLoc.lat, playerLoc.lon, DEEP_ZOOM - 1);
+          }
+        });
       })(npc, m);
 
       npcMarkers.push(m);
@@ -264,12 +543,13 @@ const ChronosMap = (function () {
       npcMarkers.push(uvm);
     }
 
-    if (playerLoc && playerLoc.lat) {
+    if (playerLoc && playerLoc.lat && _firstMarkerPlacement) {
       map.setView([playerLoc.lat, playerLoc.lon], map.getZoom(), {
         animate: true,
         duration: 0.8,
       });
     }
+    _firstMarkerPlacement = false;
   }
 
   async function _showPerception(npc, marker) {
@@ -475,12 +755,27 @@ const ChronosMap = (function () {
         className: "npc-tooltip",
       });
       (function (evRef) {
-        pin.on("click", function () { _showEventPanel(evRef); });
+        pin.on("click", function (e) {
+          if (L.DomEvent && e && e.originalEvent) {
+            L.DomEvent.stopPropagation(e.originalEvent);
+          }
+          _showEventPanel(evRef);
+          if (_isUserNavigating()) return;
+          _flyTo(evRef.lat, evRef.lon, DEEP_ZOOM);
+        });
       })(ev);
     } else {
       // Clickable circle for broad or rumor-tier events.
       (function (evRef) {
-        circle.on("click", function () { _showEventPanel(evRef); });
+        circle.on("click", function (e) {
+          if (L.DomEvent && e && e.originalEvent) {
+            L.DomEvent.stopPropagation(e.originalEvent);
+          }
+          _showEventPanel(evRef);
+          if (_isUserNavigating()) return;
+          var z = evRef.broad ? 5 : REGION_ZOOM;
+          _flyTo(evRef.lat, evRef.lon, z);
+        });
       })(ev);
     }
   }
@@ -548,20 +843,38 @@ const ChronosMap = (function () {
     init();
     container.classList.remove("hidden");
     isVisible = true;
+    if (runId && runId !== currentRunId) {
+      _firstMarkerPlacement = true;
+    }
     if (runId) currentRunId = runId;
     perceptionCache = {};
     regionCache = {};
     map.invalidateSize();
 
     loadCoastlines();
+    loadPlaceLabels();
     if (eraKey && eraKey !== currentEraKey) {
       loadBorders(eraKey);
+    }
+    _restyleBorders();
+    _updatePlaceLabels();
+    _updateZoomClass();
+
+    // Restore prior pan/zoom if this run has been viewed before.
+    // Done BEFORE updateMarkers so the marker code can see we have a
+    // saved view (via _firstMarkerPlacement) and skip its
+    // auto-recenter on the player.
+    var saved = _loadViewState();
+    if (saved) {
+      map.setView([saved.lat, saved.lng], saved.zoom, { animate: false });
+      _firstMarkerPlacement = false;
     }
 
     if (playerView) {
       updateMarkers(playerView);
     }
     _loadEventsForRun(currentRunId);
+    _updateZoomHint();
   }
 
   function hide() {

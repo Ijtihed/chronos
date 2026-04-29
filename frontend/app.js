@@ -39,23 +39,73 @@ function saveRunToStorage() {
   }
 }
 
+// Per-run localStorage keys that this app owns. Listed so we can
+// nuke everything for a given run_id consistently when the run is
+// abandoned or reset, instead of leaking garbage forever.
+const _PER_RUN_KEY_PREFIXES = [
+  "chronos_narrative_",
+  "chronos_notes_",
+  "chronos_map_view_",
+  "chronos_graph_pins_",
+  "chronos_graph_view_",
+];
+
+function clearRunStateFor(runId) {
+  if (!runId) return;
+  _PER_RUN_KEY_PREFIXES.forEach((p) => {
+    try { localStorage.removeItem(p + runId); } catch {}
+  });
+}
+
 function clearRunFromStorage() {
   const oldId = localStorage.getItem("chronos_run_id");
-  if (oldId) localStorage.removeItem("chronos_narrative_" + oldId);
+  clearRunStateFor(oldId);
   localStorage.removeItem("chronos_run_id");
   localStorage.removeItem("chronos_era_key");
-  const keysToRemove = [];
+  localStorage.removeItem(_OVERLAY_KEY);
+  // Clean up any orphaned per-run keys for runs other than the
+  // current one. Walk a snapshot of keys (length-stable) since
+  // removeItem mutates the index.
+  const allKeys = [];
   for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    if (key && key.startsWith("chronos_notes_")) keysToRemove.push(key);
+    allKeys.push(localStorage.key(i));
   }
-  keysToRemove.forEach((k) => localStorage.removeItem(k));
+  allKeys.forEach((k) => {
+    if (!k) return;
+    if (_PER_RUN_KEY_PREFIXES.some((p) => k.startsWith(p))) {
+      try { localStorage.removeItem(k); } catch {}
+    }
+  });
 }
 
 function getSavedRun() {
   const id = localStorage.getItem("chronos_run_id");
   const era = localStorage.getItem("chronos_era_key");
   return id ? { runId: id, eraKey: era } : null;
+}
+
+// ── Overlay state — manuscript | map | connections ────────────────────
+//
+// Persisted per-key (not per-run) so reload lands the player back on
+// whatever they were viewing. Overlay-specific state (map zoom/center,
+// graph pinned positions and pan/zoom transform) is persisted per-run
+// inside the overlay modules themselves; this only tracks the page.
+
+const _OVERLAY_KEY = "chronos_last_overlay";
+const _OVERLAY_VALUES = new Set(["manuscript", "map", "connections"]);
+
+function setLastOverlay(name) {
+  if (!_OVERLAY_VALUES.has(name)) return;
+  try { localStorage.setItem(_OVERLAY_KEY, name); } catch {}
+}
+
+function getLastOverlay() {
+  try {
+    const v = localStorage.getItem(_OVERLAY_KEY);
+    if (_OVERLAY_VALUES.has(v)) return v;
+    if (v != null) localStorage.removeItem(_OVERLAY_KEY);
+    return "manuscript";
+  } catch { return "manuscript"; }
 }
 
 // ── Check for existing run on load ────────────────────────────────────
@@ -184,7 +234,7 @@ async function startNewRun() {
       preview.loading_voices.forEach((v, i) => {
         h += `<blockquote class="pl-4 border-l-2 border-white/8 stagger-item" style="--i:${base + i};">`;
         h += `<p class="text-sm italic leading-relaxed text-white/50">\u201c${esc(v.quote)}\u201d</p>`;
-        h += `<cite class="block mt-2 text-[10px] text-white/20 not-italic uppercase tracking-wider">\u2014 ${esc(v.source)}</cite>`;
+        h += `<cite class="block mt-2 text-[10px] text-white/55 not-italic uppercase tracking-wider">\u2014 ${esc(v.source)}</cite>`;
         h += `</blockquote>`;
       });
       voicesEl.innerHTML = h;
@@ -207,8 +257,8 @@ async function startNewRun() {
       if (charLabel) charLabel.textContent = "Your life begins";
       if (charDesc) {
         charDesc.innerHTML =
-          `You are <span class="text-white/80 font-medium">${esc(state.player_name)}</span>, ` +
-          `${esc(state.player_role.toLowerCase())}. ${esc(state.player_description)}`;
+          `${esc(state.player_description)} ` +
+          `<span class="text-white/40">Your name is ${esc(state.player_name)}.</span>`;
       }
       charSection.classList.add("fade-in-up");
       charSection.classList.remove("hidden");
@@ -250,9 +300,10 @@ function enterGame() {
     const year = state.current_year;
 
     let h = `<div class="mb-10">`;
-    h += `<div class="text-[10px] uppercase tracking-[0.15em] text-white/15 mb-4 font-medium">${esc(state.era_name)} \u2014 ${year} AD</div>`;
+    h += `<div class="text-[11px] uppercase tracking-[0.15em] text-white/55 mb-4 font-semibold">${esc(state.era_name)} \u2014 ${year} AD</div>`;
     h += `<p class="text-sm leading-loose text-white/60 mb-4">${esc(state.era_description)}</p>`;
-    h += `<p class="text-sm leading-loose text-white/60 mb-4">You are <span class="text-white/80 font-medium">${esc(state.player_name)}</span>, ${esc(state.player_role.toLowerCase())}. ${esc(state.player_description)}</p>`;
+    h += `<p class="text-sm leading-loose text-white/60 mb-3">${esc(state.player_description)}</p>`;
+    h += `<p class="text-xs leading-loose text-white/65 mb-4">Your name is <span class="text-white/85 font-semibold">${esc(state.player_name)}</span>.</p>`;
     if (loc) {
       h += `<p class="text-sm leading-loose text-white/60">${esc(loc.description)}</p>`;
     }
@@ -271,6 +322,16 @@ function enterGame() {
     if (deathEvent) showDeathMarker(deathEvent.description);
     enterObservationMode();
   }
+
+  // Restore the overlay the player was last viewing. Defer one frame
+  // so screen-game has been laid out and Leaflet/d3 measure correctly.
+  const last = getLastOverlay();
+  if (last === "map") {
+    requestAnimationFrame(() => showMapOverlay());
+  } else if (last === "connections") {
+    requestAnimationFrame(() => showGraphOverlay());
+  }
+  // "manuscript" is the default; nothing to do.
 }
 
 function updateTopBar() {
@@ -477,7 +538,7 @@ async function submitTurn(text) {
   const block = document.createElement("div");
   block.className = "turn-block mb-8";
   block.innerHTML =
-    `<p class="text-sm italic text-white/20 mb-3 pl-3 border-l border-white/5">${esc(text)}</p>` +
+    `<p class="text-sm italic text-white/55 mb-3 pl-3 border-l border-white/15">${esc(text)}</p>` +
     `<div class="turn-spinner"><div class="turn-spinner-ring"></div><span class="streaming-dots">\u00b7 \u00b7 \u00b7</span></div>`;
   turnsContainer.appendChild(block);
   block.scrollIntoView({ behavior: "smooth" });
@@ -533,7 +594,7 @@ async function submitTurn(text) {
     }
   } catch (e) {
     block.innerHTML =
-      `<p class="text-sm italic text-white/20 pl-3 border-l border-white/5">${esc(text)}</p>` +
+      `<p class="text-sm italic text-white/55 pl-3 border-l border-white/15">${esc(text)}</p>` +
       `<p class="text-[10px] text-red-400/60 mt-3 uppercase tracking-wider">Something went wrong. ${esc(e.message)}</p>`;
   } finally {
     turnInProgress = false;
@@ -545,7 +606,7 @@ async function submitTurn(text) {
         el.style.pointerEvents = "";
         el.style.opacity = "";
       });
-      if (input) input.placeholder = "...";
+      if (input) input.placeholder = "What do you do, think, or say?";
       if (obsInput) obsInput.placeholder = "Travel only...";
       if (state && state.run_status === "active" && input) input.focus();
       if (state && state.run_status === "dead_observing" && obsInput)
@@ -606,35 +667,45 @@ function sleep(ms) {
 
 // ── Staggered turn rendering ──────────────────────────────────────────
 
+// Pattern that identifies the fallback era_description produced when
+// action_parser fails — "X attempts something in Y." — so we can suppress it.
+const _ERA_FALLBACK_RE = /attempts something in /i;
+
 async function renderTurnStaggered(el, playerText, data) {
   const pa = data.parsed_action || {};
   const { npc_responses, player_view: pv } = data;
   const ambient = data.ambient_activity || [];
 
-  let h = `<div class="text-[10px] uppercase tracking-[0.15em] text-white/15 mb-4 font-medium">${pv.current_year} AD</div>`;
+  let h = `<div class="text-[11px] uppercase tracking-[0.15em] text-white/55 mb-4 font-semibold">${pv.current_year} AD</div>`;
 
+  // ── Ambient activity (what people nearby are doing) ───────────────────
   if (ambient.length) {
-    h += `<div class="space-y-2 mb-4">`;
+    h += `<div class="text-[9px] uppercase tracking-[0.18em] text-white/45 mb-2 font-semibold">Scene</div>`;
+    h += `<div class="space-y-2 mb-5">`;
     for (const a of ambient) {
-      h += `<p class="text-sm leading-relaxed text-white/50">`;
+      h += `<p class="text-sm leading-relaxed text-white/35">`;
       if (a.interacts_with) {
-        h += `<span class="text-white/60 font-medium">${esc(a.npc_name)}</span> and <span class="text-white/60 font-medium">${esc(a.interacts_with)}</span> \u2014 `;
+        h += `<span class="text-white/45 font-medium">${esc(a.npc_name)}</span> and <span class="text-white/45 font-medium">${esc(a.interacts_with)}</span> \u2014 `;
       } else {
-        h += `<span class="text-white/60 font-medium">${esc(a.npc_name)}</span> \u2014 `;
+        h += `<span class="text-white/45 font-medium">${esc(a.npc_name)}</span> \u2014 `;
       }
       h += `${esc(a.activity)}</p>`;
     }
     h += `</div>`;
   }
 
-  h += `<p class="text-sm italic text-white/20 mb-4 pl-3 border-l border-white/5">${esc(playerText)}</p>`;
+  // ── Player action ─────────────────────────────────────────────────────
+  h += `<p class="text-sm italic text-white/55 mb-3 pl-3 border-l border-white/15">${esc(playerText)}</p>`;
 
-  if (pa.era_description) {
-    h += `<p class="text-sm leading-loose text-white/70 mb-3">${esc(pa.era_description)}</p>`;
+  // Only render era_description when it carries real content — suppress the
+  // action_parser fallback placeholder ("X attempts something in Y").
+  const eraDesc = pa.era_description || "";
+  if (eraDesc && !_ERA_FALLBACK_RE.test(eraDesc)) {
+    h += `<p class="text-sm leading-loose text-white/65 mb-4">${esc(eraDesc)}</p>`;
   }
 
   if (data.travel) {
-    h += `<p class="text-sm leading-relaxed text-white/50 mb-3">${esc(
+    h += `<p class="text-sm leading-relaxed text-white/45 mb-3">${esc(
       `The journey from ${data.travel.from} to ${data.travel.to} takes ${data.travel.turns_spent} turns.`
     )}</p>`;
   }
@@ -646,13 +717,24 @@ async function renderTurnStaggered(el, playerText, data) {
     }
   }
 
+  // ── NPC reactions (what people say to / about you) ────────────────────
   const npcIds = [];
+  if ((npc_responses || []).length) {
+    h += `<div class="text-[9px] uppercase tracking-[0.18em] text-white/45 mt-5 mb-3 font-semibold">Voices</div>`;
+  }
   for (let i = 0; i < (npc_responses || []).length; i++) {
+    const r = npc_responses[i];
+    const isAddressed = r.mode === "addressed";
     const id = `npc-stagger-${Date.now()}-${i}`;
-    npcIds.push(id);
-    h += `<div id="${id}" class="npc-block-stagger pl-4 border-l-2 border-white/10 my-4">`;
-    h += `<div class="text-[9px] uppercase tracking-[0.15em] text-white/25 mb-1.5 font-medium">${esc(npc_responses[i].npc_name)}</div>`;
-    h += `<p class="text-sm leading-relaxed text-white/55 npc-pov-text"></p>`;
+    npcIds.push({ id, internal: r.internal || null, isAddressed });
+    // Addressed NPCs get a slightly brighter left-border to signal direct speech
+    const borderClass = isAddressed ? "border-white/40" : "border-white/20";
+    h += `<div id="${id}" class="npc-block-stagger pl-4 border-l-2 ${borderClass} my-4">`;
+    h += `<div class="text-[10px] uppercase tracking-[0.15em] text-white/75 mb-1.5 font-semibold">${esc(r.npc_name)}</div>`;
+    h += `<p class="text-sm leading-relaxed text-white/70 npc-pov-text"></p>`;
+    if (r.internal) {
+      h += `<p class="text-xs leading-relaxed text-white/55 italic npc-internal-text mt-1.5"></p>`;
+    }
     h += `</div>`;
   }
 
@@ -662,13 +744,21 @@ async function renderTurnStaggered(el, playerText, data) {
   el.scrollIntoView({ behavior: "smooth" });
 
   for (let i = 0; i < npcIds.length; i++) {
-    const npcEl = document.getElementById(npcIds[i]);
+    const { id, internal } = npcIds[i];
+    const npcEl = document.getElementById(id);
     if (!npcEl) continue;
     if (i > 0) await sleep(600);
     npcEl.classList.add("revealed");
     const povTextEl = npcEl.querySelector(".npc-pov-text");
     if (povTextEl && npc_responses[i].pov) {
       await streamWords(povTextEl, npc_responses[i].pov, 35);
+    }
+    if (internal) {
+      const internalEl = npcEl.querySelector(".npc-internal-text");
+      if (internalEl) {
+        await sleep(300);
+        await streamWords(internalEl, internal, 40);
+      }
     }
   }
 }
@@ -783,29 +873,97 @@ if (hamburgerBtn) {
 if (hamburgerOverlay) hamburgerOverlay.addEventListener("click", closePanel);
 if (panelCloseBtn) panelCloseBtn.addEventListener("click", closePanel);
 
+// Overlay routing — single source of truth for which overlay is open.
+//
+// The hamburger labels flip between the destination and "Manuscript",
+// so toggling one always implies you can return. setLastOverlay()
+// persists for cross-reload restoration.
+
+function showMapOverlay() {
+  const mapContainer = $("#map-container");
+  const graphContainer = $("#graph-container");
+  const manuscript = $("#manuscript");
+  const bottomBar = $("#bottom-bar");
+  const mapText = $("#map-btn-text");
+  const graphText = $("#graph-btn-text");
+  if (!mapContainer) return;
+  // Close graph if it happens to be open.
+  if (typeof ChronosGraph !== "undefined" && ChronosGraph.isVisible()) {
+    ChronosGraph.hide();
+    if (graphContainer) graphContainer.classList.add("hidden");
+    if (graphText) graphText.textContent = "Connections";
+  }
+  mapContainer.classList.remove("hidden");
+  if (manuscript) manuscript.style.display = "none";
+  if (bottomBar) bottomBar.classList.add("hidden");
+  if (mapText) mapText.textContent = "Manuscript";
+  if (typeof ChronosMap !== "undefined") ChronosMap.show(state, eraKey, runId);
+  setLastOverlay("map");
+}
+
+function showGraphOverlay() {
+  const graphContainer = $("#graph-container");
+  const mapContainer = $("#map-container");
+  const manuscript = $("#manuscript");
+  const bottomBar = $("#bottom-bar");
+  const graphText = $("#graph-btn-text");
+  const mapText = $("#map-btn-text");
+  if (!graphContainer) return;
+  if (typeof ChronosMap !== "undefined" && ChronosMap.isVisible()) {
+    ChronosMap.hide();
+    if (mapContainer) mapContainer.classList.add("hidden");
+    if (mapText) mapText.textContent = "Map";
+  }
+  if (manuscript) manuscript.style.display = "none";
+  if (bottomBar) bottomBar.classList.add("hidden");
+  if (graphText) graphText.textContent = "Manuscript";
+  if (typeof ChronosGraph !== "undefined") ChronosGraph.show(runId);
+  setLastOverlay("connections");
+}
+
+function showManuscriptOverlay() {
+  const mapContainer = $("#map-container");
+  const graphContainer = $("#graph-container");
+  const manuscript = $("#manuscript");
+  const bottomBar = $("#bottom-bar");
+  const mapText = $("#map-btn-text");
+  const graphText = $("#graph-btn-text");
+  if (mapContainer) mapContainer.classList.add("hidden");
+  if (graphContainer) graphContainer.classList.add("hidden");
+  if (manuscript) manuscript.style.display = "";
+  if (state && state.run_status === "active" && bottomBar) {
+    bottomBar.classList.remove("hidden");
+  }
+  if (mapText) mapText.textContent = "Map";
+  if (graphText) graphText.textContent = "Connections";
+  if (typeof ChronosMap !== "undefined") ChronosMap.hide();
+  if (typeof ChronosGraph !== "undefined") ChronosGraph.hide();
+  setLastOverlay("manuscript");
+}
+
 // Map toggle
 const mapBtn = $("#btn-map-hamburger");
 if (mapBtn) {
   mapBtn.addEventListener("click", () => {
     const mapContainer = $("#map-container");
-    const manuscript = $("#manuscript");
-    const bottomBar = $("#bottom-bar");
-    const mapText = $("#map-btn-text");
-
-    if (mapContainer.classList.contains("hidden")) {
-      mapContainer.classList.remove("hidden");
-      if (manuscript) manuscript.style.display = "none";
-      if (bottomBar) bottomBar.classList.add("hidden");
-      if (mapText) mapText.textContent = "Manuscript";
-      if (typeof ChronosMap !== "undefined")
-        ChronosMap.show(state, eraKey, runId);
+    if (mapContainer && mapContainer.classList.contains("hidden")) {
+      showMapOverlay();
     } else {
-      mapContainer.classList.add("hidden");
-      if (manuscript) manuscript.style.display = "";
-      if (state && state.run_status === "active" && bottomBar)
-        bottomBar.classList.remove("hidden");
-      if (mapText) mapText.textContent = "Map";
-      if (typeof ChronosMap !== "undefined") ChronosMap.hide();
+      showManuscriptOverlay();
+    }
+    closePanel();
+  });
+}
+
+// Connections (interaction graph) toggle
+const graphBtn = $("#btn-graph-hamburger");
+if (graphBtn) {
+  graphBtn.addEventListener("click", () => {
+    const graphContainer = $("#graph-container");
+    if (graphContainer && graphContainer.classList.contains("hidden")) {
+      showGraphOverlay();
+    } else {
+      showManuscriptOverlay();
     }
     closePanel();
   });
@@ -1172,7 +1330,7 @@ async function executeSkip(ticks) {
   block.className = "turn-block mb-8";
   const label = ticks === 30 ? "1 month" : `${ticks} turn${ticks > 1 ? "s" : ""}`;
   block.innerHTML =
-    `<p class="text-sm italic text-white/20 mb-3 pl-3 border-l border-white/5">Time passes\u2026 (${esc(label)})</p>` +
+    `<p class="text-sm italic text-white/55 mb-3 pl-3 border-l border-white/15">Time passes\u2026 (${esc(label)})</p>` +
     `<div class="turn-spinner"><div class="turn-spinner-ring"></div><span class="streaming-dots">\u00b7 \u00b7 \u00b7</span></div>`;
   turnsContainer.appendChild(block);
   block.scrollIntoView({ behavior: "smooth" });
@@ -1201,8 +1359,8 @@ async function executeSkip(ticks) {
     const data = await res.json();
     state = data.player_view;
 
-    let h = `<div class="text-[10px] uppercase tracking-[0.15em] text-white/15 mb-4 font-medium">${state.current_year} AD</div>`;
-    h += `<p class="text-sm italic text-white/20 mb-4 pl-3 border-l border-white/5">Time passes\u2026 (${esc(label)})</p>`;
+    let h = `<div class="text-[11px] uppercase tracking-[0.15em] text-white/55 mb-4 font-semibold">${state.current_year} AD</div>`;
+    h += `<p class="text-sm italic text-white/55 mb-4 pl-3 border-l border-white/15">Time passes\u2026 (${esc(label)})</p>`;
     h += `<p class="text-sm leading-loose text-white/55 mb-3">${esc(data.regrounding)}</p>`;
     h += `<div class="mt-6 mb-2"><div class="w-full h-px bg-white/[0.03]"></div></div>`;
     block.innerHTML = h;
@@ -1219,7 +1377,7 @@ async function executeSkip(ticks) {
     }
   } catch (e) {
     block.innerHTML =
-      `<p class="text-sm italic text-white/20 pl-3 border-l border-white/5">Time passes\u2026 (${esc(label)})</p>` +
+      `<p class="text-sm italic text-white/55 pl-3 border-l border-white/15">Time passes\u2026 (${esc(label)})</p>` +
       `<p class="text-[10px] text-red-400/60 mt-3 uppercase tracking-wider">Something went wrong. ${esc(e.message)}</p>`;
   } finally {
     turnInProgress = false;
@@ -1229,7 +1387,7 @@ async function executeSkip(ticks) {
       input.disabled = false;
       input.style.pointerEvents = "";
       input.style.opacity = "";
-      input.placeholder = "...";
+      input.placeholder = "What do you do, think, or say?";
       input.focus();
     }
   }

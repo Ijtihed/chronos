@@ -150,7 +150,7 @@
     <header id="top-bar"
       class="fixed top-0 w-full h-10 bg-black/90 backdrop-blur-sm flex items-center px-5 z-[300] border-b border-white/5">
       <div class="flex-1 flex items-center min-w-0 gap-4">
-        <span id="top-bar-info" class="text-[10px] uppercase tracking-wide text-white/25 truncate">411 AD &middot; Mediolanum</span>
+        <span id="top-bar-info" class="text-[11px] uppercase tracking-wide text-white/70 truncate">411 AD &middot; Mediolanum</span>
         <div id="clock-element" class="hidden items-center gap-3 shrink-0">
           <span class="text-white/8 select-none">&middot;</span>
           <span id="clock-season" class="text-[9px] uppercase tracking-[0.12em] text-white/20"></span>
@@ -163,11 +163,11 @@
         </div>
       </div>
       <div id="cost-indicator"
-           class="hidden items-center gap-1 mx-3 shrink-0 text-[10px] uppercase tracking-[0.12em] text-white/40"
+           class="hidden items-center gap-1 mx-3 shrink-0 text-[10px] uppercase tracking-[0.12em] text-white/65"
            title="LLM provider cost for this run (EUR)">
         <span id="cost-current">&euro;0.00</span>
-        <span class="text-white/15">/</span>
-        <span id="cost-goal" class="text-white/20">&euro;1.00</span>
+        <span class="text-white/30">/</span>
+        <span id="cost-goal" class="text-white/45">&euro;1.00</span>
       </div>
       <div id="death-indicator" class="hidden items-center gap-2 mx-4 shrink-0">
         <span class="status-dot status-dot-critical status-dot-sm"></span>
@@ -341,7 +341,7 @@
           </svg>
         </button>
         <div class="relative group flex-1">
-          <input id="player-input" type="text" autocomplete="off" placeholder="..."
+          <input id="player-input" type="text" autocomplete="off" placeholder="What do you do, think, or say?"
             class="w-full bg-transparent py-2.5 px-4 text-xs text-white/70 placeholder-white/10 focus:ring-0 focus:outline-none transition-colors player-input-field rounded-md"
             style="border: 1px solid rgba(255,255,255,0.06);">
           <div class="absolute right-3 top-1/2 -translate-y-1/2 opacity-0 group-focus-within:opacity-100 transition-opacity duration-200">
@@ -383,6 +383,10 @@
         <div id="btn-map-hamburger" class="group cursor-pointer">
           <span id="map-btn-text"
             class="text-sm text-white/50 hover:text-white transition-colors uppercase tracking-widest">Map</span>
+        </div>
+        <div id="btn-graph-hamburger" class="group cursor-pointer">
+          <span id="graph-btn-text"
+            class="text-sm text-white/50 hover:text-white transition-colors uppercase tracking-widest">Connections</span>
         </div>
         <div class="space-y-4">
           <div id="btn-new-run" class="group cursor-pointer">
@@ -430,11 +434,165 @@
   <!-- ════════════════════════════════════════════════════════════════ -->
   <div id="map-container" class="hidden fixed top-10 left-0 right-0 bottom-0 z-[200] bg-black">
     <div id="map" class="w-full h-full"></div>
-    <div class="fixed bottom-6 right-6 z-[999] flex flex-col gap-2">
-      <button id="map-zoom-in"
-        class="w-7 h-7 flex items-center justify-center bg-black/80 backdrop-blur-sm text-white/30 hover:text-white/60 cursor-pointer text-sm border border-white/10 rounded-md transition-colors">+</button>
-      <button id="map-zoom-out"
-        class="w-7 h-7 flex items-center justify-center bg-black/80 backdrop-blur-sm text-white/30 hover:text-white/60 cursor-pointer text-sm border border-white/10 rounded-md transition-colors">&minus;</button>
+
+    <!-- Map control toolbar — bottom-center, large + clearly labeled.
+         Single canonical strip so new players immediately see what
+         they can do. -->
+    <div id="map-toolbar"
+         class="fixed bottom-6 left-1/2 -translate-x-1/2 z-[999] flex items-stretch gap-1 bg-black/90 backdrop-blur-md border border-white/15 rounded-lg p-1 shadow-2xl">
+      <button id="map-zoom-out" title="Zoom out"
+        class="w-10 h-10 flex items-center justify-center text-white hover:bg-white/10 rounded-md transition-colors cursor-pointer text-lg leading-none font-light">
+        &minus;
+      </button>
+      <button id="map-zoom-in" title="Zoom in"
+        class="w-10 h-10 flex items-center justify-center text-white hover:bg-white/10 rounded-md transition-colors cursor-pointer text-lg leading-none font-light">
+        +
+      </button>
+      <div class="w-px self-stretch bg-white/15 mx-1"></div>
+      <button id="map-reset"
+        class="h-10 px-3 flex items-center gap-2 text-white/85 hover:text-white hover:bg-white/10 rounded-md transition-colors cursor-pointer text-[11px] uppercase tracking-[0.12em]">
+        <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M11.5 7A4.5 4.5 0 1 1 7 2.5"/>
+          <path d="M11.5 2.5v3h-3"/>
+        </svg>
+        Reset
+      </button>
+      <button id="map-center-player"
+        class="h-10 px-3 flex items-center gap-2 text-amber-300 hover:text-amber-200 hover:bg-amber-500/10 rounded-md transition-colors cursor-pointer text-[11px] uppercase tracking-[0.12em]">
+        <svg width="12" height="12" viewBox="0 0 14 14" fill="currentColor">
+          <circle cx="7" cy="7" r="2.6"/>
+          <circle cx="7" cy="7" r="5" fill="none" stroke="currentColor" stroke-width="1"/>
+        </svg>
+        You
+      </button>
+    </div>
+
+    <div id="map-zoom-hint"
+         class="hidden fixed bottom-20 left-1/2 -translate-x-1/2 z-[998] text-[10px] uppercase tracking-[0.15em] text-white/70 bg-black/85 backdrop-blur-sm border border-white/15 rounded-md px-3 py-1.5 pointer-events-none">
+      Press <span class="text-white">Esc</span> to reset view
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════════ -->
+  <!-- CONNECTIONS GRAPH OVERLAY                                       -->
+  <!--                                                                 -->
+  <!-- Player-centric NPC interaction graph. Read-only visualization   -->
+  <!-- of npc.player_interactions + state.events. d3-force layout,     -->
+  <!-- pin-on-drop draggable nodes. Snapshot on open; no live updates. -->
+  <!-- ════════════════════════════════════════════════════════════════ -->
+  <div id="graph-container" class="hidden fixed top-10 left-0 right-0 bottom-0 z-[200] bg-black">
+    <div class="absolute inset-0 flex flex-col">
+      <div id="graph-header"
+           class="shrink-0 h-9 flex items-center justify-between px-5 border-b border-white/5 bg-black/80 backdrop-blur-sm">
+        <div class="flex items-center gap-3 min-w-0">
+          <span id="graph-title-year"
+                class="text-[11px] uppercase tracking-[0.15em] text-white/70 truncate"></span>
+          <span class="text-white/25 select-none">&middot;</span>
+          <span id="graph-title-name"
+                class="text-[11px] uppercase tracking-[0.15em] text-white/85 truncate"></span>
+        </div>
+        <div class="flex items-center gap-2">
+          <button id="btn-graph-list-toggle"
+                  class="text-[9px] uppercase tracking-[0.15em] text-white/55 hover:text-white transition-colors cursor-pointer px-2 py-1 rounded border border-white/15 hover:border-white/35">
+            Hide list
+          </button>
+          <button id="btn-graph-reset"
+                  class="text-[9px] uppercase tracking-[0.15em] text-white/55 hover:text-white transition-colors cursor-pointer px-2 py-1 rounded border border-white/15 hover:border-white/35">
+            Reset view
+          </button>
+        </div>
+      </div>
+      <div class="relative flex-1 min-h-0">
+        <svg id="graph-canvas" class="w-full h-full block"></svg>
+
+        <aside id="graph-npc-list-panel">
+          <div class="graph-list-header">
+            <span class="graph-list-title">People</span>
+            <span class="graph-list-count" id="graph-npc-count">0</span>
+          </div>
+          <div id="graph-npc-list" class="graph-list-scroll"></div>
+        </aside>
+
+        <div id="graph-empty"
+             class="hidden absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+          <div class="w-6 h-6 rounded-full bg-amber-400/80 mb-7"
+               style="box-shadow: 0 0 28px rgba(251,191,36,0.4);"></div>
+          <p class="text-sm uppercase tracking-[0.2em] text-white/85 text-center max-w-md px-6 leading-relaxed font-semibold">
+            No connections yet
+          </p>
+          <p class="text-xs text-white/55 text-center max-w-md px-6 mt-3 leading-relaxed">
+            Speak to someone, or do something to someone, and they&rsquo;ll appear here.
+          </p>
+        </div>
+
+        <!-- Legend (always visible). Helps new players read the graph
+             without trial and error. -->
+        <aside id="graph-legend">
+          <div class="legend-section">
+            <div class="legend-label">Node color &mdash; how they feel about you</div>
+            <ul class="legend-list">
+              <li><span class="legend-swatch" style="background:#10b981"></span>Warming</li>
+              <li><span class="legend-swatch" style="background:#d4d4d8"></span>Formal</li>
+              <li><span class="legend-swatch" style="background:#a1a1aa"></span>Neutral</li>
+              <li><span class="legend-swatch" style="background:#f59e0b"></span>Wary</li>
+              <li><span class="legend-swatch" style="background:#60a5fa"></span>Fearful</li>
+              <li><span class="legend-swatch" style="background:#ef4444"></span>Hostile</li>
+            </ul>
+            <div class="legend-sub">
+              <span class="legend-glow-chip"></span>
+              Glow = remembers you vividly
+            </div>
+          </div>
+
+          <div class="legend-section">
+            <div class="legend-label">Lines &mdash; what happened</div>
+            <div class="legend-edge-row">
+              <svg width="56" height="14" aria-hidden="true">
+                <line x1="3" y1="7" x2="53" y2="7" stroke="#10b981" stroke-opacity="0.7" stroke-width="4" stroke-linecap="round"/>
+              </svg>
+              <span>You were friendly</span>
+            </div>
+            <div class="legend-edge-row">
+              <svg width="56" height="14" aria-hidden="true">
+                <line x1="3" y1="7" x2="53" y2="7" stroke="#ef4444" stroke-opacity="0.75" stroke-width="4" stroke-linecap="round"/>
+              </svg>
+              <span>You were hostile</span>
+            </div>
+            <div class="legend-edge-row">
+              <svg width="56" height="14" aria-hidden="true">
+                <line x1="3" y1="7" x2="53" y2="7" stroke="#cbd5e1" stroke-opacity="0.7" stroke-width="3" stroke-dasharray="5 3" stroke-linecap="round"/>
+              </svg>
+              <span>You saw them together</span>
+            </div>
+          </div>
+
+          <div class="legend-section">
+            <div class="legend-label">Line thickness &mdash; how many times</div>
+            <div class="legend-thick-row">
+              <svg width="56" height="22" aria-hidden="true">
+                <line x1="3" y1="6"  x2="53" y2="6"  stroke="#cbd5e1" stroke-opacity="0.7" stroke-width="1.5" stroke-linecap="round"/>
+                <line x1="3" y1="16" x2="53" y2="16" stroke="#cbd5e1" stroke-opacity="0.7" stroke-width="7"   stroke-linecap="round"/>
+              </svg>
+              <span>once &nbsp;&rarr;&nbsp; many times</span>
+            </div>
+          </div>
+
+          <div class="legend-section legend-tip">
+            Drag a node to pin it. Click for full history.
+          </div>
+        </aside>
+
+        <div id="graph-tooltip" class="hidden"></div>
+
+        <div id="graph-side-panel" class="hidden">
+          <button id="graph-side-close" class="graph-side-close">&#x2715;</button>
+          <div id="graph-side-header" class="graph-side-header">
+            <div id="graph-side-name"></div>
+            <div id="graph-side-meta"></div>
+          </div>
+          <div id="graph-side-body"></div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -483,7 +641,16 @@
   <!-- SCRIPTS                                                         -->
   <!-- ════════════════════════════════════════════════════════════════ -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!--
+    d3@7 bundled UMD. We use d3-force (which depends on d3-quadtree,
+    d3-dispatch, d3-timer) plus d3-drag (depends on d3-dispatch,
+    d3-selection). Loading individual sub-modules from unpkg breaks
+    because they declare internal require() peers that the browser
+    can't resolve. The bundle resolves them all together. ~270KB.
+  -->
+  <script src="https://unpkg.com/d3@7/dist/d3.min.js"></script>
   <script src="map.js"></script>
+  <script src="graph.js"></script>
   <script src="app.js"></script>
 
   <!-- Design review: hash-based screen navigation -->

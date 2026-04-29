@@ -590,6 +590,93 @@ html, body {
   margin-bottom: 8px;
 }
 
+/* ── Place labels (cities, towns, named regions) ──────────────────
+ * Rendered inside Leaflet divIcons. Opacity is set inline by
+ * _updatePlaceLabels() based on current zoom. The base style here is
+ * the appearance once visible.
+ */
+.place-label {
+  background: transparent !important;
+  border: none !important;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.18s ease;
+}
+
+.place-label > span {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 10px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.7);
+  text-shadow:
+    0 0 3px rgba(0, 0, 0, 0.95),
+    0 0 8px rgba(0, 0, 0, 0.7),
+    -1px 0 0 rgba(0, 0, 0, 0.85),
+    1px 0 0 rgba(0, 0, 0, 0.85),
+    0 -1px 0 rgba(0, 0, 0, 0.85),
+    0 1px 0 rgba(0, 0, 0, 0.85);
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+.place-label-city > span {
+  color: rgba(255, 255, 255, 0.85);
+  font-weight: 600;
+  font-size: 11px;
+}
+
+.place-label-town > span {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 10px;
+}
+
+.place-label-region > span {
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  font-style: italic;
+}
+
+/* Zoom-tier marker scaling. Map container gets one of:
+ *   .zoom-out (default era zoom)
+ *   .zoom-mid (default+1..2)
+ *   .zoom-in  (default+3 or more)
+ * Player and NPC markers grow as the player zooms in so detail and
+ * clickability scale together. transform-origin is the icon center
+ * so the anchor point Leaflet computes still lines up.
+ */
+#map.zoom-mid .marker-player,
+#map.zoom-mid .marker-visited {
+  transform: scale(1.25);
+  transform-origin: center;
+}
+
+#map.zoom-in .marker-player,
+#map.zoom-in .marker-visited {
+  transform: scale(1.6);
+  transform-origin: center;
+}
+
+#map.zoom-mid .marker-event {
+  transform: scale(1.2);
+  transform-origin: center;
+}
+
+#map.zoom-in .marker-event {
+  transform: scale(1.55);
+  transform-origin: center;
+}
+
+/* Anonymous unvisited dots stay subtle even when zoomed in — they
+ * indicate "someone is here" not a clickable thing. */
+#map.zoom-in .marker-unvisited {
+  transform: scale(1.3);
+  transform-origin: center;
+}
+
 .marker-faded {
   background: #18181b;
   border: 1px solid #27272a;
@@ -830,54 +917,54 @@ html, body {
 }
 
 #region-panel .region-header {
-  font-size: 10px;
+  font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.15em;
-  color: rgba(255, 255, 255, 0.25);
-  font-weight: 500;
-  margin-bottom: 12px;
+  color: rgba(255, 255, 255, 0.85);
+  font-weight: 600;
+  margin-bottom: 14px;
 }
 
 #region-panel .region-section-label {
-  font-size: 9px;
+  font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.12em;
-  color: rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 0.55);
   margin-bottom: 6px;
   margin-top: 14px;
-  font-weight: 500;
+  font-weight: 600;
 }
 
 #region-panel .region-fact {
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.7;
-  color: #d4d4d8;
-  margin-bottom: 4px;
+  color: #f4f4f5;
+  margin-bottom: 6px;
 }
 
 #region-panel .region-rumor {
   font-size: 12px;
   line-height: 1.7;
-  color: rgba(252, 211, 77, 0.45);
+  color: rgba(252, 211, 77, 0.85);
   font-style: italic;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
 }
 
 #region-panel .region-note {
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.7;
-  color: rgba(255, 255, 255, 0.35);
+  color: rgba(255, 255, 255, 0.75);
   margin-top: 14px;
   padding-top: 10px;
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 #region-panel .region-close {
   position: absolute;
   top: 12px;
   right: 14px;
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.15);
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.55);
   cursor: pointer;
   background: none;
   border: none;
@@ -885,12 +972,12 @@ html, body {
 }
 
 #region-panel .region-close:hover {
-  color: rgba(255, 255, 255, 0.4);
+  color: rgba(255, 255, 255, 0.95);
 }
 
 #region-panel .region-loading {
-  font-size: 10px;
-  color: rgba(255, 255, 255, 0.2);
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.55);
   text-transform: uppercase;
   letter-spacing: 0.1em;
 }
@@ -961,4 +1048,534 @@ html, body {
 @keyframes cost-blink {
   0%, 100% { opacity: 1; }
   50%      { opacity: 0.4; }
+}
+
+
+/* ── Connections Graph (player-centric NPC interaction graph) ────────
+ *
+ * Full-bleed overlay rendered on top of #screen-game (under the top
+ * bar at z-[300]). Mirrors the map overlay z-index. d3-force layout
+ * inside #graph-canvas SVG; metadata side panel docks right on
+ * desktop, slides up from bottom on narrow viewports.
+ */
+
+#graph-container {
+  background: #000;
+  animation: fadeIn 0.35s ease;
+}
+
+#graph-canvas {
+  background: transparent;
+  user-select: none;
+}
+
+.graph-edge {
+  transition: stroke-opacity 0.15s ease, stroke-width 0.15s ease;
+}
+
+.graph-edge:hover {
+  stroke-opacity: 0.95 !important;
+}
+
+.graph-npc-link {
+  transition: stroke-opacity 0.15s ease, stroke-width 0.15s ease, stroke 0.15s ease;
+}
+
+.graph-npc-link:hover {
+  stroke: #ffffff !important;
+  stroke-opacity: 0.95 !important;
+  stroke-width: 4px !important;
+}
+
+.graph-node-label {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 600;
+  fill: rgba(255, 255, 255, 0.78);
+  letter-spacing: 0.04em;
+  pointer-events: none;
+  paint-order: stroke fill;
+  stroke: rgba(0, 0, 0, 0.92);
+  stroke-width: 4px;
+  stroke-linejoin: round;
+}
+
+.graph-node-player .graph-node-label {
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  fill: rgba(251, 191, 36, 0.95);
+}
+
+.graph-node circle {
+  transition: stroke-width 0.15s ease, filter 0.15s ease;
+}
+
+.graph-node-npc:hover circle {
+  stroke: rgba(255, 255, 255, 0.6);
+  stroke-width: 2px;
+  filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.18));
+}
+
+.graph-node-player circle {
+  filter: drop-shadow(0 0 16px rgba(251, 191, 36, 0.35));
+}
+
+/* Soft glow on NPCs whose memory_label is "vivid" -- visually obvious
+ * "they remember you well" cue. Color-neutral so it doesn't fight with
+ * the disposition fill underneath. Tightened to 7px spread so the
+ * glow doesn't wash out edge endpoints meeting the node circle. */
+.graph-node-vivid circle {
+  filter: drop-shadow(0 0 7px rgba(255, 255, 255, 0.45));
+}
+
+.graph-node-focused circle {
+  stroke: #fff;
+  stroke-width: 2.5px;
+  filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.55));
+}
+
+#graph-tooltip {
+  position: fixed;
+  z-index: 9999;
+  background: rgba(10, 10, 10, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  padding: 10px 14px;
+  max-width: 320px;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 11px;
+  line-height: 1.5;
+  color: #d4d4d8;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.7);
+  pointer-events: none;
+  backdrop-filter: blur(8px);
+}
+
+#graph-tooltip .gtt-name {
+  color: #fafafa;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+#graph-tooltip .gtt-meta {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.4);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 6px;
+}
+
+#graph-tooltip .gtt-last {
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+#graph-side-panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 320px;
+  max-width: 90vw;
+  height: 100%;
+  background: rgba(10, 10, 10, 0.95);
+  border-left: 1px solid rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(12px);
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  animation: fadeInSlide 0.2s ease;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+}
+
+.graph-side-close {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.2);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 6px;
+  transition: color 0.2s;
+}
+
+.graph-side-close:hover {
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.graph-side-header {
+  padding: 18px 22px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+#graph-side-name {
+  font-size: 13px;
+  color: #fafafa;
+  font-weight: 500;
+  margin-bottom: 4px;
+  padding-right: 24px;
+}
+
+#graph-side-meta {
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.35);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+#graph-side-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 22px 22px;
+}
+
+.graph-side-role {
+  font-size: 11px;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.5);
+  margin-bottom: 16px;
+}
+
+.graph-side-section-label {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: rgba(255, 255, 255, 0.2);
+  margin-bottom: 10px;
+  font-weight: 500;
+}
+
+.graph-side-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.graph-side-item {
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  border-radius: 4px;
+  border-left: 2px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.015);
+}
+
+.graph-side-item.graph-sent-positive {
+  border-left-color: rgba(16, 185, 129, 0.55);
+}
+
+.graph-side-item.graph-sent-negative {
+  border-left-color: rgba(239, 68, 68, 0.6);
+}
+
+.graph-side-item.graph-sent-neutral {
+  border-left-color: rgba(113, 113, 122, 0.55);
+}
+
+.graph-side-item-head {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgba(255, 255, 255, 0.35);
+  margin-bottom: 4px;
+}
+
+.graph-side-item-head .graph-action-type {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.graph-side-item-body {
+  font-size: 11px;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.graph-side-empty {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.25);
+  font-style: italic;
+}
+
+/* ── Graph NPC list (left sidebar) ──────────────────────────────── */
+
+#graph-npc-list-panel {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  width: 220px;
+  max-height: calc(100% - 24px);
+  z-index: 25;
+  background: rgba(10, 10, 10, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(8px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: width 0.18s ease, opacity 0.18s ease;
+}
+
+#graph-npc-list-panel.collapsed {
+  width: 0;
+  opacity: 0;
+  pointer-events: none;
+  border: none;
+}
+
+.graph-list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  flex-shrink: 0;
+}
+
+.graph-list-title {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 600;
+}
+
+.graph-list-count {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.06);
+  padding: 1px 6px;
+  border-radius: 10px;
+}
+
+.graph-list-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+
+.graph-list-empty {
+  font-size: 11px;
+  font-style: italic;
+  color: rgba(255, 255, 255, 0.35);
+  padding: 14px 14px;
+  line-height: 1.5;
+}
+
+.graph-list-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 12px;
+  background: transparent;
+  border: none;
+  border-left: 2px solid transparent;
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.78);
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+
+.graph-list-row:hover {
+  background: rgba(255, 255, 255, 0.03);
+  color: #fff;
+}
+
+.graph-list-row-active {
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+}
+
+.graph-list-row.graph-list-sent-positive { border-left-color: rgba(16, 185, 129, 0.45); }
+.graph-list-row.graph-list-sent-negative { border-left-color: rgba(239, 68, 68, 0.55); }
+.graph-list-row.graph-list-sent-neutral  { border-left-color: rgba(113, 113, 122, 0.45); }
+
+.graph-list-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  border: 1px solid rgba(0, 0, 0, 0.4);
+}
+
+.graph-list-name {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.graph-list-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.45);
+  flex-shrink: 0;
+}
+
+.graph-list-vivid {
+  font-size: 8px;
+  color: #fff;
+  filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.7));
+}
+
+
+/* ── Graph legend ────────────────────────────────────────────────── */
+
+#graph-legend {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  z-index: 30;
+  background: rgba(10, 10, 10, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 12px 14px;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(8px);
+  pointer-events: auto;
+  width: 250px;
+  max-width: calc(100vw - 32px);
+}
+
+#graph-legend .legend-section {
+  margin-bottom: 10px;
+}
+
+#graph-legend .legend-section:last-child {
+  margin-bottom: 0;
+}
+
+#graph-legend .legend-label {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: rgba(255, 255, 255, 0.25);
+  margin-bottom: 6px;
+  font-weight: 500;
+}
+
+#graph-legend .legend-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 10px;
+}
+
+#graph-legend .legend-list li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+#graph-legend .legend-swatch {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.5);
+  flex-shrink: 0;
+}
+
+#graph-legend .legend-edge-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 5px;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+#graph-legend .legend-edge-row:last-child {
+  margin-bottom: 0;
+}
+
+#graph-legend .legend-edge-row svg {
+  flex-shrink: 0;
+}
+
+#graph-legend .legend-thick-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+#graph-legend .legend-thick-row svg {
+  flex-shrink: 0;
+}
+
+#graph-legend .legend-sub {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.5);
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.06);
+}
+
+#graph-legend .legend-glow-chip {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #d4d4d8;
+  box-shadow: 0 0 7px rgba(255, 255, 255, 0.6);
+  flex-shrink: 0;
+}
+
+#graph-legend .legend-tip {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.4);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  padding-top: 8px;
+  margin-top: 4px;
+  font-style: italic;
+}
+
+@media (max-width: 640px) {
+  #graph-side-panel {
+    width: 100%;
+    max-width: 100%;
+    height: 55%;
+    top: auto;
+    bottom: 0;
+    right: 0;
+    left: 0;
+    border-left: none;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+  }
+  #graph-legend {
+    /* Collapse to a tiny chip on phone — full panel covers too much
+     * canvas. Tap to expand could be a follow-up. */
+    width: 180px;
+    max-width: calc(100vw - 24px);
+    padding: 8px 10px;
+    font-size: 9px;
+  }
+  #graph-legend .legend-list {
+    grid-template-columns: 1fr 1fr;
+    gap: 3px 8px;
+  }
+  #graph-npc-list-panel {
+    width: 180px;
+    max-height: 45%;
+  }
 }
