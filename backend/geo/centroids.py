@@ -144,6 +144,149 @@ def resolve_region(region: Optional[str]) -> Optional[Centroid]:
     return None
 
 
+# ---------------------------------------------------------------------------
+# Event-text place extraction
+#
+# Most historical events in the corpus are tagged with a broad region
+# ("Byzantine Empire", "Italia") but the text mentions a specific
+# place ("Thessalonica sold to Venice...", "outside the gates of
+# Hexamilion"). Scanning the summary for known centroid names lets us
+# place the event near the specific city instead of the broad
+# region's geometric centroid, where every event would otherwise
+# stack on a single point.
+#
+# Strategy:
+#   1. Tokenize all centroid names; build a longest-first list of
+#      candidate keys for prefix matching.
+#   2. Iterate centroid names in length order, longest first, and
+#      look for an exact whole-word match in the summary.
+#   3. Among matches, pick the one with the smallest radius_km
+#      (i.e. most specific). Cities (radius ~30-80km) beat regions
+#      (radius ~400km) which beat broad areas (radius_km >= 1000,
+#      flagged broad: true).
+#   4. Fall back to the region-only resolver if no place is found.
+#
+# Performance: the candidate list is sorted once and cached. Each
+# event scan is O(N centroids) string-contains, fine for ~120 entries.
+# ---------------------------------------------------------------------------
+
+
+@lru_cache(maxsize=1)
+def _place_lookup_keys() -> list[str]:
+    """Return centroid names sorted by length descending so that
+    'Holy Roman Empire' is checked before 'Roman' before 'Rome'."""
+    return sorted(load_centroids().keys(), key=lambda k: -len(k))
+
+
+_WORD_BOUND_CACHE: dict[str, "re.Pattern[str]"] = {}
+
+
+def _word_pattern(name: str) -> "re.Pattern[str]":
+    """Return a cached case-insensitive whole-word regex for `name`."""
+    pat = _WORD_BOUND_CACHE.get(name)
+    if pat is None:
+        pat = re.compile(r"\b" + re.escape(name) + r"\b", re.IGNORECASE)
+        _WORD_BOUND_CACHE[name] = pat
+    return pat
+
+
+def find_place_in_text(text: Optional[str]) -> Optional[Centroid]:
+    """Look for a known centroid name as a whole word in `text`.
+
+    Returns the most specific (smallest-radius) match. Used by callers
+    that have an event summary and want a per-event place rather than
+    a per-region centroid.
+    """
+    if not text:
+        return None
+    centroids = load_centroids()
+    matches: list[tuple[float, Centroid]] = []
+    for name in _place_lookup_keys():
+        if _word_pattern(name).search(text):
+            matches.append((centroids[name]["radius_km"], centroids[name]))
+    if not matches:
+        return None
+    # Smallest radius first — the most specific named place wins.
+    matches.sort(key=lambda t: t[0])
+    return matches[0][1]
+
+
+def resolve_event_location(
+    region: Optional[str],
+    summary: Optional[str] = None,
+) -> Optional[Centroid]:
+    """Resolve an event's coordinates with progressive precision.
+
+    Order of preference:
+      1. Specific place mentioned in `summary` (city, named region).
+      2. Region centroid (existing resolve_region behavior).
+
+    Returns None if neither yields a centroid. Callers that don't have
+    a summary keep using resolve_region directly.
+    """
+    place = find_place_in_text(summary)
+    if place is not None:
+        # If the event is tagged with a small region, prefer that
+        # only when the summary's place lookup would land somewhere
+        # broader. Otherwise the place-in-text wins.
+        region_resolved = resolve_region(region)
+        if region_resolved is None:
+            return place
+        if place["radius_km"] <= region_resolved["radius_km"]:
+            return place
+        return region_resolved
+    return resolve_region(region)
+
+
+# ---------------------------------------------------------------------------
+# Deterministic jitter
+#
+# Even after place extraction, many events still resolve to the same
+# region centroid (e.g. "the Byzantine Empire is collapsing" with no
+# city named). Without offset they stack on one pixel and read as a
+# single super-saturated dot. A small deterministic angular offset
+# keyed by a stable identifier spreads them visibly while keeping
+# repeated requests stable (no random-walk between turns).
+# ---------------------------------------------------------------------------
+
+import hashlib
+import math
+
+
+def jitter_point(
+    lat: float, lon: float, key: str, radius_km: float,
+) -> tuple[float, float]:
+    """Return a deterministic offset of (lat, lon) keyed by `key`.
+
+    The offset varies in angle and magnitude with the hash of `key`.
+    Same key + same radius -> same offset every time.
+
+    Magnitude tuning notes (apr 2026):
+      - Small regions (cities, ~30-200km radius) jitter by <= 10-30km.
+        Radius/6 keeps events clearly inside the region.
+      - Broad regions (~1000km+) used to jitter up to 250km. That
+        leaks events into the wrong polity (Rome-to-Naples is 250km).
+        Cap shrunk to 100km for broad regions, with a sub-linear curve
+        so multi-event clusters still spread visibly without crossing
+        national boundaries.
+      - Floor at 8km so a 50km city still spreads its events apart.
+    """
+    if not key:
+        return lat, lon
+    h = hashlib.md5(key.encode("utf-8")).digest()
+    angle = (h[0] / 256.0) * 2 * math.pi
+    radial = (h[1] / 256.0)
+    if radius_km >= 800:
+        # Broad regions: tight cap so events don't cross polities.
+        drift_km = min(100.0, max(15.0, radius_km / 12.0)) * radial
+    else:
+        drift_km = min(60.0, max(6.0, radius_km / 6.0)) * radial
+    dlat = (drift_km / 111.0) * math.sin(angle)
+    cos_lat = max(0.1, math.cos(math.radians(lat)))
+    dlon = (drift_km / (111.0 * cos_lat)) * math.cos(angle)
+    return lat + dlat, lon + dlon
+
+
 def resolution_path(region: Optional[str]) -> Optional[str]:
     """Classify how a region resolved, for coverage diagnostics.
 

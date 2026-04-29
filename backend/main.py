@@ -35,7 +35,7 @@ from backend.llm_provider import (
     track_turn_cost,
 )
 from backend import config
-from backend.npc_engine import generate_npc_pov
+from backend.npc_engine import generate_npc_addressed, generate_npc_pov
 from backend.persistence import (
     append_turn_log,
     build_narrative_output,
@@ -206,6 +206,40 @@ async def get_geo(era_key: str):
         return json.loads(border_file.read_text())
     except (json.JSONDecodeError, IOError) as exc:
         raise HTTPException(500, f"Failed to load border data: {exc}")
+
+
+# Place labels (cities + small named regions) for zoom-dependent
+# rendering on the map. Returned with a 'tier' field so the frontend
+# can fade them in at different zoom levels:
+#   "city"     radius_km <= 80    - shown from zoom 6+
+#   "town"     radius_km <= 200   - shown from zoom 7+
+#   "region"   radius_km <= 500   - shown from zoom 5+
+# Broad regions (radius_km > 500) are deliberately excluded;
+# rendering "Mediterranean" as a single label point is meaningless.
+@app.get("/api/geo/places/labels")
+async def get_place_labels():
+    from backend.geo.centroids import load_centroids
+    centroids = load_centroids()
+
+    out: list[dict] = []
+    for name, c in centroids.items():
+        r = c["radius_km"]
+        if r > 500:
+            continue
+        if r <= 80:
+            tier = "city"
+        elif r <= 200:
+            tier = "town"
+        else:
+            tier = "region"
+        out.append({
+            "name": name,
+            "lat": c["lat"],
+            "lon": c["lon"],
+            "tier": tier,
+            "radius_km": r,
+        })
+    return {"places": out}
 
 
 # ------------------------------------------------------------------
@@ -394,11 +428,32 @@ async def _execute_turn(run_id: str, req: TurnRequest) -> dict:
         death_result = await check_death(state, parsed)
 
         # --- Step 5: Generate NPC reactions to player (selective) ---
-        relevant = _filter_relevant(npcs_near_player(state), parsed.get("npc_impacts", []))
-        pov_tasks = [generate_npc_pov(npc, parsed, state) for npc in relevant]
-        pov_results = await asyncio.gather(*pov_tasks, return_exceptions=True)
-        npc_responses = _build_npc_responses(relevant, pov_results)
-        _store_povs(state, relevant, pov_results)
+        relevant = _filter_relevant(
+            npcs_near_player(state),
+            parsed.get("npc_impacts", []),
+            target=parsed.get("target"),
+        )
+        addressed_npc, ambient_npcs = _split_addressed(relevant, parsed, state)
+
+        # Addressed NPC (if any) gets a direct-reply call; ambient NPCs get POV.
+        pov_tasks = []
+        task_npcs = []
+        if addressed_npc:
+            pov_tasks.append(
+                generate_npc_addressed(
+                    addressed_npc, parsed, state,
+                    player_input=text,
+                    this_turn_events=ambient,
+                )
+            )
+            task_npcs.append((addressed_npc, "addressed"))
+        for npc in ambient_npcs:
+            pov_tasks.append(generate_npc_pov(npc, parsed, state, this_turn_events=ambient))
+            task_npcs.append((npc, "ambient"))
+
+        all_results = await asyncio.gather(*pov_tasks, return_exceptions=True)
+        npc_responses = _build_npc_responses_mixed(task_npcs, all_results)
+        _store_povs_mixed(state, task_npcs, all_results)
 
         death_info = death_result if death_result["died"] else None
         if death_result["died"]:
@@ -679,8 +734,98 @@ async def region_knowledge(run_id: str, polity_name: str):
 # Visible events for map (knowledge-filtered + geocoded)
 # ------------------------------------------------------------------
 
-_VISIBLE_EVENTS_WINDOW_BEFORE = 50
+# Forward-looking buffer (years). Keeps short-horizon "things just
+# about to happen in your era" eligible — historical-record events
+# dated slightly after the current turn the player could plausibly
+# hear forewarning about, and that absorb time-skips cleanly.
 _VISIBLE_EVENTS_WINDOW_AFTER = 5
+
+# Floor used when birth_year is unset or sentinel (e.g. test sessions
+# created without going through character_gen). Roughly an adult
+# lifetime in pre-modern eras.
+_VISIBLE_EVENTS_LIFETIME_FALLBACK = 50
+
+# Significance levels we consider important enough to render as map
+# pins. Local-significance events (a vizier in Mecca being assassinated
+# while the player is in Florence in 1416) are real history but they
+# are noise on a player-facing map.
+_VISIBLE_EVENT_SIGNIFICANCE = frozenset({"civilizational", "regional"})
+
+# For dense eras like Fall of Constantinople, even civilizational+
+# regional produces hundreds of pins because the era's region is
+# heavily documented. Civilizational events are world-historical
+# (Sack of Rome, Black Death, fall of Constantinople) and stay
+# globally visible. Regional events are pruned to the player's own
+# era region — the Greek living in Constantinople in 1453 hears
+# Mediterranean / Byzantine / Balkan news, not the latest from
+# Hungary or Lombardy.
+_REGION_STOPWORDS = frozenset({
+    "and", "the", "of", "or", "at", "in", "to", "with",
+    "empire", "kingdom", "republic", "duchy", "state", "states",
+    "frontier", "region", "area",
+})
+
+# Historical naming variants. The events DB uses Latin and English
+# names interchangeably ("Italia" vs "Italy", "Byzantium" vs
+# "Byzantine"). Each token in this map normalizes to a canonical form
+# so a Northern Italian player at year 1348 sees "Italia"-tagged
+# events as in-region. New eras and event sources should add here.
+_REGION_ALIASES = {
+    "italy": "italia", "italian": "italia",
+    "byzantium": "byzantine",
+    "francia": "france", "frankish": "france", "gaul": "france", "gallia": "france",
+    "germany": "germania", "german": "germania",
+    "britain": "britannia", "british": "britannia", "english": "britannia", "england": "britannia",
+    "spain": "hispania", "spanish": "hispania", "iberian": "hispania", "iberia": "hispania",
+    "greek": "greece", "hellenic": "greece", "hellas": "greece",
+    "nordic": "scandinavia", "scandinavian": "scandinavia",
+    "palestine": "levant", "palestinian": "levant", "syria": "levant", "syrian": "levant",
+    "minor": "anatolia",  # "Asia Minor" -> anatolia
+    "europa": "europe", "european": "europe",
+}
+
+
+def _region_tokens(region: str) -> frozenset[str]:
+    """Lowercase keyword set for fuzzy region overlap matching, with
+    historical-naming aliases applied so Italia/Italy etc collapse."""
+    if not region:
+        return frozenset()
+    cleaned = []
+    for ch in region.lower():
+        if ch.isalpha() or ch.isspace():
+            cleaned.append(ch)
+        else:
+            cleaned.append(" ")
+    tokens = "".join(cleaned).split()
+    out: set[str] = set()
+    for t in tokens:
+        if not t or t in _REGION_STOPWORDS:
+            continue
+        out.add(_REGION_ALIASES.get(t, t))
+    return frozenset(out)
+
+
+def _event_in_player_region(event_region: str, era_region: str) -> bool:
+    """True if the event's region shares at least one meaningful keyword
+    with the era's home region. Used only for regional-significance
+    pruning; civilizational events bypass this check."""
+    a = _region_tokens(event_region)
+    b = _region_tokens(era_region)
+    if not a or not b:
+        return False
+    return bool(a & b)
+
+
+def _visible_events_window_before(state: WorldState) -> int:
+    """How far back to look. Defaults to the player character's lifetime
+    so the map shows "things you grew up hearing about", not 50 years
+    of ambient background news.
+    """
+    year = state.current_year or state.era.year_start
+    by = state.player.birth_year
+    if by and by > 0 and year >= by:
+        return max(1, year - by)
+    return _VISIBLE_EVENTS_LIFETIME_FALLBACK
 
 
 def _era_key_for_state(state: WorldState) -> str:
@@ -703,14 +848,19 @@ async def events_visible(run_id: str):
     that layer.  Events whose `region` does not resolve to a
     centroid are also omitted — no pin we could plausibly render.
     """
-    from backend.geo.centroids import resolve_region
+    from backend.geo.centroids import (
+        resolve_region,
+        resolve_event_location,
+        jitter_point,
+    )
 
     state = await _load_or_404(run_id)
     year = state.current_year or state.era.year_start
+    window_before = _visible_events_window_before(state)
 
     try:
         raw_events = await query_historical_events(
-            year_start=year - _VISIBLE_EVENTS_WINDOW_BEFORE,
+            year_start=year - window_before,
             year_end=year + _VISIBLE_EVENTS_WINDOW_AFTER,
             region=state.era.region,
         )
@@ -719,7 +869,7 @@ async def events_visible(run_id: str):
         # plausibly hear from abroad.
         if not raw_events:
             raw_events = await query_historical_events(
-                year_start=year - _VISIBLE_EVENTS_WINDOW_BEFORE,
+                year_start=year - window_before,
                 year_end=year + _VISIBLE_EVENTS_WINDOW_AFTER,
             )
     except Exception as exc:
@@ -737,10 +887,36 @@ async def events_visible(run_id: str):
 
     out: list[dict] = []
     for ev_view in filtered:
-        centroid = resolve_region(ev_view.region)
+        # Map only surfaces big history. Local-significance events
+        # (assassinations of distant viziers, minor city ordinances)
+        # remain in the DB for the HCE / NPC-grounding pipelines but
+        # are filtered out of the player-facing pin layer.
+        if ev_view.significance not in _VISIBLE_EVENT_SIGNIFICANCE:
+            continue
+        # Regional-significance events are further constrained to the
+        # player's era region. Civilizational events bypass this check
+        # because they are by definition world-historical news that
+        # propagates everywhere.
+        if ev_view.significance == "regional":
+            if not _event_in_player_region(
+                ev_view.region or "", state.era.region or "",
+            ):
+                continue
+        # Per-event placement: try to land near a specific city or
+        # named place mentioned in the event text, and fall back to
+        # the region centroid otherwise. Then apply a small
+        # deterministic jitter so events that share a centroid don't
+        # stack as one pixel.
+        centroid = resolve_event_location(ev_view.region, ev_view.event)
         if centroid is None:
             continue
         ev_id = id_by_sig.get((ev_view.year, ev_view.event, ev_view.region))
+        jitter_key = str(ev_id) if ev_id is not None else (
+            f"{ev_view.year}|{ev_view.event[:60]}|{ev_view.region}"
+        )
+        jlat, jlon = jitter_point(
+            centroid["lat"], centroid["lon"], jitter_key, centroid["radius_km"],
+        )
         out.append({
             "id": ev_id,
             "year": ev_view.year,
@@ -748,8 +924,8 @@ async def events_visible(run_id: str):
             "significance": ev_view.significance,
             "tier": ev_view.knowledge_quality,
             "accuracy": ev_view.accuracy,
-            "lat": centroid["lat"],
-            "lon": centroid["lon"],
+            "lat": jlat,
+            "lon": jlon,
             "radius_km": centroid["radius_km"],
             "broad": centroid["broad"],
             "summary": ev_view.event,
@@ -759,6 +935,151 @@ async def events_visible(run_id: str):
     return {
         "era_key": _era_key_for_state(state),
         "events": out,
+    }
+
+
+# ------------------------------------------------------------------
+# Player-centric NPC interaction graph (read-only visualization)
+#
+# Computed from existing state — no new tracking infrastructure, no
+# LLM calls, no schema changes. Per-run, per-character snapshot used
+# by the frontend Connections page (frontend/graph.js).
+#
+# Node selection: every NPC with at least one entry in
+# npc.player_interactions OR who matches (by name/role substring,
+# case-insensitive — same rule as world_state._apply_target_fallback)
+# the target field of any entry in state.events. Avoids surfacing
+# every NPC at every location the player passed through.
+# ------------------------------------------------------------------
+
+# Sentiment vocabulary derives from the canonical action types in
+# action_parser._CANONICAL_TYPES. Hostile set is reused verbatim from
+# scene_triggers._HOSTILE_ACTION_TYPES so we don't drift. Prosocial
+# includes both peaceful (speak/trade) and formal/triumphant
+# (petition/negotiate/alliance/defend/save/prevent) actions —
+# defending an NPC is positive from the player's POV.
+_GRAPH_HOSTILE_ACTIONS = frozenset({
+    "attack", "threaten", "betray", "steal", "fight", "siege",
+})
+_GRAPH_POSITIVE_ACTIONS = frozenset({
+    "speak", "trade", "petition", "negotiate", "alliance",
+    "defend", "save", "prevent",
+})
+
+
+def _graph_sentiment_for(action_type: str) -> str:
+    at = (action_type or "").lower()
+    if at in _GRAPH_HOSTILE_ACTIONS:
+        return "negative"
+    if at in _GRAPH_POSITIVE_ACTIONS:
+        return "positive"
+    return "neutral"
+
+
+def _graph_memory_label(memory: float) -> str:
+    """Mirror the bucketing used by /api/run/{id}/npc/{id}/perception."""
+    if memory > 0.7:
+        return "vivid"
+    if memory > 0.3:
+        return "faint"
+    return "barely remember"
+
+
+def _graph_npc_matches_event_target(npc, target_raw: str) -> bool:
+    """Mirror world_state._apply_target_fallback's matching rule."""
+    if not target_raw:
+        return False
+    t = target_raw.lower()
+    return t in npc.name.lower() or t in npc.role.lower()
+
+
+@app.get("/api/run/{run_id}/interaction_graph")
+async def interaction_graph(run_id: str):
+    state = await _load_or_404(run_id)
+
+    targets_in_events = {
+        (ev.target or "").lower()
+        for ev in state.events
+        if ev.target
+    }
+    targets_in_events.discard("")
+
+    nodes: list[dict] = []
+    # Map id -> set of turns the player engaged with this NPC. Used
+    # below to derive NPC<->NPC "witnessed-together" edges. Stays
+    # loyal to the design rule "information through interaction":
+    # the player only sees a connection between two NPCs if they
+    # personally walked into a turn that engaged both at once.
+    turns_by_npc: dict[str, set[int]] = {}
+
+    for npc in state.npcs:
+        has_recorded = bool(npc.player_interactions)
+        matches_event = any(
+            _graph_npc_matches_event_target(npc, t)
+            for t in targets_in_events
+        )
+        if not (has_recorded or matches_event):
+            continue
+
+        interactions = []
+        npc_turns: set[int] = set()
+        for entry in npc.player_interactions:
+            action_type = entry.get("action_type", "other")
+            t = int(entry.get("turn", 0) or 0)
+            if t > 0:
+                npc_turns.add(t)
+            interactions.append({
+                "turn": t,
+                "year": entry.get("year", 0),
+                "action_type": action_type,
+                "intent": entry.get("intent", ""),
+                "sentiment": _graph_sentiment_for(action_type),
+            })
+        turns_by_npc[npc.id] = npc_turns
+
+        nodes.append({
+            "id": npc.id,
+            "name": npc.name,
+            "archetype": npc.archetype or "",
+            "role": npc.role,
+            "memory_of_player": round(npc.memory_of_player, 3),
+            "memory_label": _graph_memory_label(npc.memory_of_player),
+            "disposition": npc.disposition,
+            "last_interaction_turn": npc.last_interaction_turn,
+            "interactions": interactions,
+            "interaction_count": len(interactions),
+        })
+
+    # Witnessed NPC<->NPC links: any pair of nodes whose recorded
+    # player_interactions share at least one turn number. shared_turns
+    # lets the frontend scale edge weight by how often the player saw
+    # them together.
+    npc_links: list[dict] = []
+    ids = [n["id"] for n in nodes]
+    for i in range(len(ids)):
+        for j in range(i + 1, len(ids)):
+            a, b = ids[i], ids[j]
+            shared = sorted(turns_by_npc.get(a, set()) & turns_by_npc.get(b, set()))
+            if shared:
+                npc_links.append({
+                    "source": a,
+                    "target": b,
+                    "shared_turns": shared,
+                    "weight": len(shared),
+                })
+
+    return {
+        "run_id": run_id,
+        "year": state.current_year or state.era.year_start,
+        "turn": state.turn,
+        "player": {
+            "id": state.player.id,
+            "name": state.player.name,
+            "archetype": state.player.archetype or "",
+            "role": state.player.role,
+        },
+        "nodes": nodes,
+        "npc_links": npc_links,
     }
 
 
@@ -888,7 +1209,7 @@ async def _handle_travel(
     nearby = npcs_near_player(state)
     arrival_povs = []
     if nearby:
-        pov_tasks = [generate_npc_pov(npc, arrival_action, state) for npc in nearby[:3]]
+        pov_tasks = [generate_npc_pov(npc, arrival_action, state, this_turn_events=ambient) for npc in nearby[:3]]
         pov_results = await asyncio.gather(*pov_tasks, return_exceptions=True)
         arrival_povs = _build_npc_responses(nearby[:3], pov_results)
         _store_povs(state, nearby[:3], pov_results)
@@ -1063,9 +1384,36 @@ async def _handle_observation(state: WorldState, text: str) -> dict:
 # Internal helpers
 # ------------------------------------------------------------------
 
-def _filter_relevant(nearby_npcs, npc_impacts):
+def _filter_relevant(nearby_npcs, npc_impacts, target: str | None = None):
+    """Select which NPCs receive a POV call this turn.
+
+    Selection rules (in order):
+      1. If parsed.target names an NPC in nearby_npcs, that NPC is ALWAYS
+         included regardless of npc_impacts. The Addressed-mode upgrade in
+         _split_addressed routes them through generate_npc_addressed; if the
+         filter dropped them here, the upgrade could never fire.
+      2. Otherwise, fall back to npc_impacts: NPCs marked relevant=True.
+      3. Otherwise (no impacts or no relevant flags): the first 2 nearby NPCs.
+    """
+    target_npc = None
+    if target:
+        target_lower = target.lower().strip()
+        if target_lower:
+            target_npc = next(
+                (n for n in nearby_npcs if target_lower in n.name.lower()),
+                None,
+            )
+
+    def _ensure_target_first(npcs):
+        """Make sure the addressed NPC is in the result and appears once."""
+        if target_npc is None:
+            return npcs
+        result = [n for n in npcs if n.id != target_npc.id]
+        return [target_npc, *result]
+
     if not npc_impacts:
-        return nearby_npcs[:2] if nearby_npcs else []
+        base = nearby_npcs[:2] if nearby_npcs else []
+        return _ensure_target_first(base)
 
     relevant_names = set()
     has_relevant_field = False
@@ -1078,14 +1426,46 @@ def _filter_relevant(nearby_npcs, npc_impacts):
                 relevant_names.add((impact.get("name") or "").lower())
 
     if not has_relevant_field:
-        return nearby_npcs[:2] if nearby_npcs else []
+        base = nearby_npcs[:2] if nearby_npcs else []
+        return _ensure_target_first(base)
     if not relevant_names:
-        return []
+        # Even if nothing is "relevant" per the parser, an explicitly named
+        # target at the player's location should still get a reaction.
+        return _ensure_target_first([])
 
-    return [
+    matched = [
         npc for npc in nearby_npcs
         if any(rn in npc.name.lower() for rn in relevant_names)
     ]
+    return _ensure_target_first(matched)
+
+
+def _split_addressed(relevant_npcs, parsed: dict, state):
+    """Identify the addressed NPC (if any) and split off the ambient remainder.
+
+    Returns (addressed_npc | None, [ambient_npcs]).
+
+    Addressed mode fires when parsed.target is non-null and matches an NPC
+    at the player's current location. All other relevant NPCs get Ambient mode.
+    """
+    target_raw = (parsed.get("target") or "").lower().strip()
+    if not target_raw:
+        return None, relevant_npcs
+
+    addressed = None
+    ambient = []
+    player_loc = state.player.location
+    for npc in relevant_npcs:
+        if (
+            addressed is None
+            and npc.location == player_loc
+            and target_raw in npc.name.lower()
+        ):
+            addressed = npc
+        else:
+            ambient.append(npc)
+
+    return addressed, ambient
 
 
 _MAX_STORED_POVS = 10
@@ -1101,6 +1481,82 @@ def _store_povs(state, npcs, pov_results):
             target.stored_povs.append(pov)
             if len(target.stored_povs) > _MAX_STORED_POVS:
                 target.stored_povs = target.stored_povs[-_MAX_STORED_POVS:]
+
+
+def _store_povs_mixed(state, task_npcs, all_results):
+    """Store POV text for both addressed and ambient results.
+
+    Also extracts sensory grounding phrases from each successful POV
+    (reply + internal for addressed mode; perspective for ambient) and
+    merges them into state.used_grounding_details (FIFO-capped at 30).
+
+    task_npcs: list of (npc, mode) where mode is "addressed" or "ambient".
+    all_results: parallel list of LLM results (dict for addressed, str for ambient).
+    """
+    from backend.grounding_extractor import extract_grounding_details, merge_into_tracker
+
+    for (npc, mode), result in zip(task_npcs, all_results):
+        target = next((n for n in state.npcs if n.id == npc.id), None)
+        if not target:
+            continue
+        if mode == "addressed" and isinstance(result, dict):
+            primary_text = result.get("reply", "")
+            secondary_text = result.get("internal") or ""
+        elif mode == "ambient" and isinstance(result, str):
+            primary_text = result
+            secondary_text = ""
+        else:
+            continue
+
+        if primary_text and not primary_text.startswith("["):
+            target.stored_povs.append(primary_text)
+            if len(target.stored_povs) > _MAX_STORED_POVS:
+                target.stored_povs = target.stored_povs[-_MAX_STORED_POVS:]
+
+        # Extract sensory grounding phrases from both reply and internal
+        # thought, then merge into the run-level tracker (FIFO cap 30).
+        for src in (primary_text, secondary_text):
+            if not src or src.startswith("["):
+                continue
+            new_phrases = extract_grounding_details(src)
+            if new_phrases:
+                merge_into_tracker(state.used_grounding_details, new_phrases)
+
+
+def _build_npc_responses_mixed(task_npcs, all_results):
+    """Build npc_responses list from mixed addressed/ambient results.
+
+    Addressed responses carry both 'pov' (the reply) and 'internal' (private thought).
+    Ambient responses carry only 'pov'.
+    """
+    responses = []
+    for (npc, mode), result in zip(task_npcs, all_results):
+        if mode == "addressed":
+            if isinstance(result, dict):
+                reply = result.get("reply") or f"[{npc.name} says nothing]"
+                internal = result.get("internal") or None
+            else:
+                reply = f"[{npc.name} says nothing]"
+                internal = None
+            responses.append({
+                "npc_id": npc.id,
+                "npc_name": npc.name,
+                "npc_role": npc.role,
+                "pov": reply,
+                "internal": internal,
+                "mode": "addressed",
+            })
+        else:
+            pov_text = result if isinstance(result, str) else f"[{npc.name} is silent]"
+            responses.append({
+                "npc_id": npc.id,
+                "npc_name": npc.name,
+                "npc_role": npc.role,
+                "pov": pov_text,
+                "internal": None,
+                "mode": "ambient",
+            })
+    return responses
 
 
 def _build_npc_responses(npcs, pov_results):

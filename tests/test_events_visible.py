@@ -87,17 +87,129 @@ class TestEventsVisibleResponseShape:
         assert tiers.issubset(allowed)
 
     @pytest.mark.asyncio
-    async def test_year_window(self, client, roman_run):
-        """Events clamped to state.current_year - 50 ... + 5."""
+    async def test_year_window_uses_player_lifetime(self, client, roman_run):
+        """Events clamped to (birth_year .. current_year + 5).
+
+        Roman starter character: birth_year=375, current_year=410. So
+        no event before year 375 should appear, and none after 415.
+        """
         res = await client.get(f"/api/run/{roman_run}/events/visible")
         events = res.json()["events"]
         if not events:
             pytest.skip("No events to check window against")
-        # current_year for fresh Roman run is 410; window is 360-415.
         for ev in events:
-            assert 350 <= ev["year"] <= 420, (
-                f"event {ev['id']} year {ev['year']} outside window"
+            assert 375 <= ev["year"] <= 415, (
+                f"event {ev['id']} year {ev['year']} outside lifetime window"
             )
+
+    @pytest.mark.asyncio
+    async def test_local_significance_dropped(self, client, roman_run):
+        """Map-facing endpoint omits 'local' significance events.
+
+        local-significance items remain in the DB for HCE / NPC
+        grounding pipelines but are noise on the player's map.
+        """
+        res = await client.get(f"/api/run/{roman_run}/events/visible")
+        events = res.json()["events"]
+        for ev in events:
+            assert ev["significance"] in {"civilizational", "regional"}, (
+                f"event {ev['id']} sig={ev['significance']} should not appear"
+            )
+
+    @pytest.mark.asyncio
+    async def test_regional_events_constrained_to_era_region(
+        self, client, roman_run,
+    ):
+        """Regional-significance events must share at least one meaningful
+        keyword with the era's home region. Civilizational events
+        bypass this check.
+
+        Roman Late Empire era region is 'Italia'. Regional events
+        from 'Britannia' or 'Persia' should be filtered. Civilizational
+        events from any region remain.
+        """
+        from backend.main import _event_in_player_region
+
+        res = await client.get(f"/api/run/{roman_run}/events/visible")
+        events = res.json()["events"]
+        era_region = "Italia"
+        for ev in events:
+            if ev["significance"] == "civilizational":
+                continue
+            assert _event_in_player_region(ev["region"] or "", era_region), (
+                f"regional event {ev['id']} region={ev['region']!r} "
+                f"shares no keyword with era region {era_region!r}"
+            )
+
+    def test_region_token_helper(self):
+        """Canonical region tokenizer behavior — covers stopwords,
+        slashes, parens, multi-region descriptors."""
+        from backend.main import _region_tokens, _event_in_player_region
+
+        assert _region_tokens("Italia") == frozenset({"italia"})
+        # Stopwords stripped.
+        assert _region_tokens("Byzantine Empire") == frozenset({"byzantine"})
+        # Slashes and other punctuation become whitespace.
+        assert _region_tokens("Byzantine Empire/Anatolia") == frozenset(
+            {"byzantine", "anatolia"}
+        )
+        assert _region_tokens("Byzantine Empire (Wallachia)") == frozenset(
+            {"byzantine", "wallachia"}
+        )
+        # Non-overlap returns False.
+        assert not _event_in_player_region("Persia", "Italia")
+        assert not _event_in_player_region("Hungary", "Byzantine Empire")
+        # Overlap (even one token) returns True.
+        assert _event_in_player_region(
+            "Byzantine Empire/Anatolia",
+            "Byzantine Empire and the Ottoman frontier",
+        )
+        # Empty strings return False (don't crash, don't pass).
+        assert not _event_in_player_region("", "Italia")
+        assert not _event_in_player_region("Italia", "")
+
+    def test_region_aliases_collapse(self):
+        """Historical naming variants (Italia/Italy, Byzantium/Byzantine,
+        Gaul/France) must collapse to the same canonical token so the
+        overlap check works across the events corpus."""
+        from backend.main import _region_tokens, _event_in_player_region
+
+        # Italia / Italy / Italian collapse.
+        assert _region_tokens("Italia") == _region_tokens("Italy")
+        assert _region_tokens("Italian peninsula") == frozenset(
+            {"italia", "peninsula"}
+        )
+
+        # Cross-pair: an Italia event reads as in-region for an
+        # Italy-named era (and vice versa).
+        assert _event_in_player_region("Italia", "Northern Italy and Southern France")
+        assert _event_in_player_region(
+            "Italian cities", "Northern Italy and Southern France",
+        )
+
+        # Byzantium / Byzantine collapse.
+        assert _event_in_player_region("Byzantium", "Byzantine Empire")
+        # Gaul / France / Frankish collapse.
+        assert _event_in_player_region("Gaul", "France")
+        assert _event_in_player_region("Frankish kingdom", "France")
+
+    @pytest.mark.asyncio
+    async def test_lifetime_window_fallback_when_birth_year_missing(
+        self, client,
+    ):
+        """If birth_year is unset/sentinel, fall back to a sensible
+        50-year window so test sessions and migrations still work."""
+        state = create_initial_state()
+        state.player.birth_year = 0  # unset / sentinel
+        await save_session(state)
+        res = await client.get(f"/api/run/{state.run_id}/events/visible")
+        assert res.status_code == 200
+        events = res.json()["events"]
+        if not events:
+            pytest.skip("No events returned to check window against")
+        # current_year=410, fallback window=50, so 360..415.
+        for ev in events:
+            assert 360 <= ev["year"] <= 415
 
 
 class TestKnowledgeFilterByArchetype:
@@ -139,3 +251,44 @@ class TestErrors:
     async def test_nonexistent_run_returns_404(self, client):
         res = await client.get("/api/run/does_not_exist/events/visible")
         assert res.status_code == 404
+
+
+class TestPlaceLabelsEndpoint:
+    """GET /api/geo/places/labels feeds the zoom-dependent city
+    labels on the map. Pure read of the centroids YAML; no run state
+    or LLM involvement."""
+
+    @pytest.mark.asyncio
+    async def test_returns_200_and_shape(self, client):
+        res = await client.get("/api/geo/places/labels")
+        assert res.status_code == 200
+        data = res.json()
+        assert "places" in data
+        assert isinstance(data["places"], list)
+        assert len(data["places"]) > 50  # we have ~120 centroids
+        sample = data["places"][0]
+        assert set(sample.keys()) == {"name", "lat", "lon", "tier", "radius_km"}
+        assert sample["tier"] in {"city", "town", "region"}
+
+    @pytest.mark.asyncio
+    async def test_excludes_broad_regions(self, client):
+        """Broad regions (radius_km > 500) like 'Mediterranean' or
+        'Europe' must NOT appear; rendering them as a single label
+        point is meaningless."""
+        res = await client.get("/api/geo/places/labels")
+        data = res.json()
+        for p in data["places"]:
+            assert p["radius_km"] <= 500, (
+                f"{p['name']} radius={p['radius_km']} should be excluded"
+            )
+
+    @pytest.mark.asyncio
+    async def test_known_cities_present(self, client):
+        """Sanity check: the cities we hand-mapped for event placement
+        are surfaced as label tier 'city'."""
+        res = await client.get("/api/geo/places/labels")
+        data = res.json()
+        names = {p["name"]: p for p in data["places"]}
+        for required in ("Rome", "Constantinople", "Venice", "Florence"):
+            assert required in names, f"{required} missing from labels"
+            assert names[required]["tier"] == "city"

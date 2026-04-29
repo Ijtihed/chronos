@@ -496,3 +496,316 @@ Mezzogiorno:
   lon: 15.5
   radius_km: 300
   note: "Southern Italy alias."
+
+# ───────────────────────────────────────────────────────────────────
+# Per-event place lookup additions (apr 2026)
+#
+# These are specific places frequently mentioned in event summaries
+# that previously had no centroid, causing 100+ events to stack on
+# their broad-region centroid. Added so resolve_event_location() can
+# place events near the city/sub-region the text actually names.
+# ───────────────────────────────────────────────────────────────────
+
+# --- Cities & city-states ---
+Ravenna:
+  lat: 44.42
+  lon: 12.20
+  radius_km: 30
+
+Milan:
+  lat: 45.46
+  lon: 9.19
+  radius_km: 40
+
+Naples:
+  lat: 40.85
+  lon: 14.27
+  radius_km: 50
+
+Pavia:
+  lat: 45.19
+  lon: 9.16
+  radius_km: 25
+
+Bologna:
+  lat: 44.49
+  lon: 11.34
+  radius_km: 30
+
+Carthage:
+  lat: 36.85
+  lon: 10.32
+  radius_km: 40
+
+Antioch:
+  lat: 36.20
+  lon: 36.16
+  radius_km: 40
+
+Damascus:
+  lat: 33.51
+  lon: 36.30
+  radius_km: 40
+
+Jerusalem:
+  lat: 31.78
+  lon: 35.22
+  radius_km: 30
+
+Acre:
+  lat: 32.93
+  lon: 35.08
+  radius_km: 25
+
+Edessa:
+  lat: 37.16
+  lon: 38.79
+  radius_km: 40
+
+Tripoli:
+  lat: 34.43
+  lon: 35.85
+  radius_km: 35
+  note: "Crusader-era Tripoli (Lebanon coast), not Libyan Tripoli."
+
+Baghdad:
+  lat: 33.31
+  lon: 44.36
+  radius_km: 50
+
+Cairo:
+  lat: 30.05
+  lon: 31.24
+  radius_km: 50
+
+Mecca:
+  lat: 21.42
+  lon: 39.83
+  radius_km: 30
+
+Mosul:
+  lat: 36.34
+  lon: 43.13
+  radius_km: 40
+
+Aleppo:
+  lat: 36.20
+  lon: 37.16
+  radius_km: 40
+
+Belgrade:
+  lat: 44.79
+  lon: 20.45
+  radius_km: 40
+
+Adrianople:
+  lat: 41.68
+  lon: 26.55
+  radius_km: 30
+  note: "Modern Edirne; major Byzantine/Ottoman city."
+
+Thessalonica:
+  lat: 40.64
+  lon: 22.93
+  radius_km: 40
+
+Athens:
+  lat: 37.98
+  lon: 23.73
+  radius_km: 40
+
+Nicaea:
+  lat: 40.43
+  lon: 29.72
+  radius_km: 25
+
+Trebizond:
+  lat: 40.99
+  lon: 39.72
+  radius_km: 30
+
+Bursa:
+  lat: 40.19
+  lon: 29.06
+  radius_km: 30
+
+Smyrna:
+  lat: 38.42
+  lon: 27.14
+  radius_km: 30
+
+Prague:
+  lat: 50.07
+  lon: 14.43
+  radius_km: 50
+
+Krakow:
+  lat: 50.06
+  lon: 19.94
+  radius_km: 40
+
+Kiev:
+  lat: 50.45
+  lon: 30.52
+  radius_km: 50
+
+Novgorod:
+  lat: 58.52
+  lon: 31.27
+  radius_km: 50
+
+Tunis:
+  lat: 36.80
+  lon: 10.18
+  radius_km: 40
+
+# --- Sub-regions and provinces ---
+Lombardy:
+  lat: 45.50
+  lon: 9.50
+  radius_km: 200
+
+Tuscany:
+  lat: 43.50
+  lon: 11.30
+  radius_km: 180
+
+Calabria:
+  lat: 39.30
+  lon: 16.30
+  radius_km: 150
+
+Apulia:
+  lat: 41.10
+  lon: 16.50
+  radius_km: 200
+
+Sicily:
+  lat: 37.60
+  lon: 14.00
+  radius_km: 200
+
+Sardinia:
+  lat: 40.10
+  lon: 9.10
+  radius_km: 200
+
+Corsica:
+  lat: 42.10
+  lon: 9.10
+  radius_km: 100
+
+Cyprus:
+  lat: 35.10
+  lon: 33.40
+  radius_km: 120
+
+Crete:
+  lat: 35.20
+  lon: 24.80
+  radius_km: 150
+
+Rhodes:
+  lat: 36.40
+  lon: 28.20
+  radius_km: 50
+
+Malta:
+  lat: 35.95
+  lon: 14.50
+  radius_km: 30
+
+Bavaria:
+  lat: 48.95
+  lon: 11.50
+  radius_km: 200
+
+Saxony:
+  lat: 51.10
+  lon: 13.20
+  radius_km: 200
+
+Burgundy:
+  lat: 47.10
+  lon: 4.80
+  radius_km: 200
+
+Normandy:
+  lat: 49.00
+  lon: 0.30
+  radius_km: 150
+
+Brittany:
+  lat: 48.10
+  lon: -3.00
+  radius_km: 150
+
+Aquitaine:
+  lat: 44.80
+  lon: 0.20
+  radius_km: 200
+
+Flanders:
+  lat: 51.00
+  lon: 3.50
+  radius_km: 100
+
+Catalonia:
+  lat: 41.80
+  lon: 1.50
+  radius_km: 150
+
+Aragon:
+  lat: 41.50
+  lon: -0.80
+  radius_km: 150
+
+Castile:
+  lat: 40.00
+  lon: -3.70
+  radius_km: 250
+
+Bulgaria:
+  lat: 42.70
+  lon: 25.50
+  radius_km: 250
+
+Peloponnese:
+  lat: 37.40
+  lon: 22.20
+  radius_km: 100
+
+Morea:
+  lat: 37.40
+  lon: 22.20
+  radius_km: 100
+  note: "Medieval name for the Peloponnese."
+
+Epirus:
+  lat: 39.60
+  lon: 20.80
+  radius_km: 100
+
+Greece:
+  lat: 38.00
+  lon: 23.00
+  radius_km: 250
+
+# --- Geographic features (rivers used as place markers) ---
+Danube:
+  lat: 44.80
+  lon: 22.00
+  radius_km: 400
+  broad: true
+  note: "Danube basin; mid-river near Iron Gates."
+
+Rhine:
+  lat: 50.00
+  lon: 7.50
+  radius_km: 300
+  broad: true
+
+Bosphorus:
+  lat: 41.10
+  lon: 29.05
+  radius_km: 30
