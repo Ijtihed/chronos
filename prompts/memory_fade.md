@@ -1,6 +1,6 @@
 # Memory Fade Framing
 
-> **Model tier:** LOCAL (Ollama llama3.1:8b)
+> **Model tier:** Gemini (`CHRONOS_GEMINI_MODEL`, default `gemini-3-flash-preview`)
 > **Purpose:** One line showing the player's memory fading from the world during observation mode.
 > **Volume:** Once per observation turn. Must be fast.
 

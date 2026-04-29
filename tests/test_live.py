@@ -171,6 +171,12 @@ class TestFullTurnLoopLive:
 
 class TestModelTierCompliance:
     @pytest.mark.asyncio
-    async def test_action_parser_uses_local_ollama(self, state):
-        from backend.config import OLLAMA_URL
-        assert "localhost" in OLLAMA_URL or "127.0.0.1" in OLLAMA_URL
+    async def test_action_parser_uses_gemini(self, state):
+        """After the all-Gemini migration, action_parser routes through call_llm
+        which dispatches to Gemini. Verify the provider config is present and
+        that no OLLAMA_URL exists in backend.config (migration complete)."""
+        import backend.config as cfg
+        assert hasattr(cfg, "GEMINI_API_KEY"), "GEMINI_API_KEY must exist in config"
+        assert not hasattr(cfg, "OLLAMA_URL"), (
+            "OLLAMA_URL should not exist in config after all-Gemini migration"
+        )

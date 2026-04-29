@@ -196,7 +196,7 @@ class NPCEffect(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# NPCPOVResponse — future: structured NPC POV (not yet wired; POV is text)
+# NPCPOVResponse — structured NPC POV (ambient mode)
 # ---------------------------------------------------------------------------
 
 class NPCPOVResponse(BaseModel):
@@ -205,6 +205,30 @@ class NPCPOVResponse(BaseModel):
     emotional_state: str = ""
     information_known: List[str] = Field(default_factory=list)
     information_unknown: List[str] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# NPCAddressedResponse — structured NPC response (addressed mode)
+# ---------------------------------------------------------------------------
+
+class NPCAddressedResponse(BaseModel):
+    """Response schema for NPCs who are directly addressed by the player.
+
+    `reply`    -- 1-2 sentences spoken directly at the player (always present)
+    `internal` -- 1 sentence private thought, may be omitted by the model
+    `emotional_state` -- one-word mood
+    """
+    reply: str = ""
+    internal: Optional[str] = None
+    emotional_state: str = ""
+
+    @field_validator("internal", mode="before")
+    @classmethod
+    def coerce_internal(cls, v):
+        """Accept empty string or None for internal thought; normalise to None."""
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return None
+        return v
 
 
 # ---------------------------------------------------------------------------

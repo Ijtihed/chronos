@@ -38,7 +38,7 @@ from backend.llm_schemas import (
     NPCEffect,
     autonomous_action_default,
 )
-from backend.npc_personality import choose_autonomous_action
+from backend.npc_personality import choose_autonomous_action, tick_preoccupation_drift
 from backend.world_drift import (
     tick_disposition_drift,
     tick_needs_decay,
@@ -210,6 +210,7 @@ async def simulate_turn(state: WorldState) -> Tuple[WorldState, List[dict]]:
     tick_disposition_drift(new)
     tick_needs_decay(new)
     tick_rumor_propagation(new)
+    tick_preoccupation_drift(new)
 
     # --- STAGE 2: Scheduled consequences (no LLM) ---
     _process_in_memory_consequences(new)

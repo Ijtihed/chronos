@@ -299,3 +299,71 @@ class TestStorySummary:
         state = apply_action(initial_state, sample_parsed_action)
         summary = build_story_summary(state)
         assert "410" in summary
+
+    def test_summary_caps_recent_events(self, initial_state):
+        """Beyond the recent cap, low-significance ambient events must not
+        all appear in the summary. Otherwise long runs bloat every NPC prompt."""
+        from backend.world_state import Event
+        state = initial_state.model_copy(deep=True)
+        # Add 50 ambient events. Only the last 12 should appear under "Recent".
+        for i in range(50):
+            state.events.append(Event(
+                turn=i,
+                action_type="ambient",
+                description=f"AmbientEvent_{i}_marker",
+                location=state.player.location,
+            ))
+        summary = build_story_summary(state)
+        # Last 12 (38..49) appear, earlier ambient events do NOT.
+        for i in range(38, 50):
+            assert f"AmbientEvent_{i}_marker" in summary
+        # Anything before turn 38 should NOT appear.
+        # (turn 38 is included as the first of the 12-event recent window.)
+        for i in range(0, 38):
+            assert f"AmbientEvent_{i}_marker" not in summary, (
+                f"Event {i} should have been elided from the summary"
+            )
+
+    def test_summary_keeps_priority_events_from_earlier(self, initial_state):
+        """Player actions and deaths from earlier turns must remain in the summary
+        even after newer ambient events push them out of the recent window."""
+        from backend.world_state import Event
+        state = initial_state.model_copy(deep=True)
+        # Add a single player attack at turn 5
+        state.events.append(Event(
+            turn=5,
+            action_type="attack",
+            description="The merchant strikes the centurion in a moment of fury.",
+            location=state.player.location,
+        ))
+        # Then 30 ambient events to push the attack out of the recent window
+        for i in range(30):
+            state.events.append(Event(
+                turn=10 + i,
+                action_type="ambient",
+                description=f"AmbientEvent_{i}",
+                location=state.player.location,
+            ))
+        summary = build_story_summary(state)
+        # The attack event must still appear under "Earlier turning points"
+        assert "strikes the centurion" in summary
+        assert "Earlier turning points" in summary
+
+    def test_summary_elision_count(self, initial_state):
+        """Elision count message appears only when events were dropped."""
+        from backend.world_state import Event
+        state = initial_state.model_copy(deep=True)
+        # Add 1 priority event + 30 low-signal events
+        state.events.append(Event(
+            turn=0, action_type="speak",
+            description="I greet the merchant.",
+            location=state.player.location,
+        ))
+        for i in range(30):
+            state.events.append(Event(
+                turn=1 + i, action_type="ambient",
+                description=f"E_{i}", location=state.player.location,
+            ))
+        summary = build_story_summary(state)
+        # Some events were dropped — the elision note must appear
+        assert "smaller moments now in the past" in summary

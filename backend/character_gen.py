@@ -20,7 +20,7 @@ from pydantic import ValidationError
 
 from backend.llm_provider import call_llm, load_prompt
 from backend.llm_schemas import CharacterGenResponse, character_gen_default
-from backend.npc_personality import generate_personality, calculate_needs
+from backend.npc_personality import generate_personality, calculate_needs, get_initial_preoccupation
 from backend.world_state import Location, NPC, PlayerCharacter, WorldState, Era
 
 logger = logging.getLogger("chronos.character_gen")
@@ -196,4 +196,6 @@ async def _generate_single_npc(
         personality=personality,
         needs=needs,
         current_activity=data.current_activity or f"Going about their duties as a {archetype['role']}.",
+        current_preoccupation=get_initial_preoccupation(arch_key),
+        last_preoccupation_shift_turn=0,
     )

@@ -1,8 +1,8 @@
 # NPC Perception
 
-> **Model tier:** LOCAL (Ollama llama3.1:8b)
+> **Model tier:** Gemini (`CHRONOS_GEMINI_MODEL`, default `gemini-3-flash-preview`)
 > **Purpose:** What the player character honestly thinks about an NPC. Raw, biased, human.
-> **Volume:** Called on click, cached per NPC per minute.
+> **Volume:** Called on click, cached per NPC per minute. Read-only endpoint -- cost is not aggregated to the run total.
 
 ---
 

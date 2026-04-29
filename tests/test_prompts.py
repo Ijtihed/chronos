@@ -79,6 +79,8 @@ class TestActionParserPrompt:
 
 
 class TestNpcPovPrompt:
+    # Updated to include variables added by Fix 2 (player_actions_toward_you,
+    # memory_level, current_preoccupation) and Fix 5 (this_turn_events).
     def test_all_placeholders_fill(self):
         raw = load_prompt(PROMPTS_DIR / "npc_pov.md")
         state = create_initial_state()
@@ -95,6 +97,10 @@ class TestNpcPovPrompt:
             urgent_needs="nothing urgent",
             current_activity=getattr(npc, "current_activity", "") or "Patrolling the walls.",
             relationship_to_player=npc.relationship_to_player,
+            player_actions_toward_you="None -- first contact.",
+            memory_level="faint",
+            current_preoccupation="the immediate situation",
+            already_used_details="",
             player_name=state.player.name,
             era_description=state.era.description,
             era_feel="The empire crumbles around us.",
@@ -107,6 +113,7 @@ class TestNpcPovPrompt:
             historical_context="No sources available.",
             era_description_of_action="Something happened.",
             action_intent="unknown",
+            this_turn_events="Nothing notable.",
         )
         assert "$" not in result, f"Unfilled: {result}"
 
@@ -119,3 +126,35 @@ class TestNpcPovPrompt:
         assert "illiterate" in raw.lower()
         assert "swearing" in raw.lower()
         assert "not the player" in raw.lower()
+
+    def test_includes_player_actions_toward_you_placeholder(self):
+        raw = load_prompt(PROMPTS_DIR / "npc_pov.md")
+        assert "$player_actions_toward_you" in raw
+        assert "$prior_player_interactions" not in raw, (
+            "$prior_player_interactions was renamed to $player_actions_toward_you"
+        )
+
+    def test_includes_current_preoccupation_placeholder(self):
+        raw = load_prompt(PROMPTS_DIR / "npc_pov.md")
+        assert "$current_preoccupation" in raw
+
+    def test_includes_memory_level_placeholder(self):
+        raw = load_prompt(PROMPTS_DIR / "npc_pov.md")
+        assert "$memory_level" in raw
+
+    def test_includes_this_turn_events_placeholder(self):
+        raw = load_prompt(PROMPTS_DIR / "npc_pov.md")
+        assert "$this_turn_events" in raw
+
+    def test_voice_rules_ban_similes(self):
+        raw = load_prompt(PROMPTS_DIR / "npc_pov.md")
+        assert "NO similes" in raw
+
+    def test_voice_rules_ban_metaphors(self):
+        raw = load_prompt(PROMPTS_DIR / "npc_pov.md")
+        assert "NO metaphors" in raw
+
+    def test_banned_phrases_listed(self):
+        raw = load_prompt(PROMPTS_DIR / "npc_pov.md")
+        assert "dark cloud" in raw
+        assert "BANNED" in raw

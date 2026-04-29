@@ -1,5 +1,5 @@
-# Region Knowledge — character's impression of a region
-# Model tier: LOCAL (llama3.1:8b)
+# Region Knowledge -- character's impression of a region
+# Model tier: Gemini (`CHRONOS_GEMINI_MODEL`, default `gemini-3-flash-preview`)
 # Called: on demand when player clicks a region on the map
 # Review status: NEEDS USER REVIEW
 ---

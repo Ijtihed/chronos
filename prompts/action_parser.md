@@ -1,6 +1,6 @@
 # Action Parser
 
-> **Model tier:** LOCAL (Ollama llama3.1:8b) — frontier stub
+> **Model tier:** Gemini (`CHRONOS_GEMINI_MODEL`, default `gemini-3-flash-preview`)
 > **Purpose:** Interpret any player decision into structured game state changes
 
 ---

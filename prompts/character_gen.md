@@ -1,8 +1,8 @@
 # Character Generator
 
-> **Model tier:** LOCAL (Ollama llama3.1:8b)
+> **Model tier:** Gemini (`CHRONOS_GEMINI_MODEL`, default `gemini-3-flash-preview`)
 > **Purpose:** Generate a historically grounded character from an era config + archetype
-> **Volume:** Called once per character at run initialization (15-20 calls batched)
+> **Volume:** Called once per character at run initialization (15-20 calls batched, rate-limited via semaphore)
 
 ---
 

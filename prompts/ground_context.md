@@ -1,6 +1,6 @@
-# Ground Context Generator — prompt template
-# Model tier: LOCAL (llama3.1:8b)
-# Called: once at run initialization
+# Ground Context Generator -- prompt template
+# Model tier: Gemini (`CHRONOS_GEMINI_MODEL`, default `gemini-3-flash-preview`)
+# Called: at run initialization and whenever ground_context_stale is set (location change, significant world event)
 # Review status: NEEDS USER REVIEW (per chronos-ai-dev-protocol.mdc)
 ---
 You are generating the ground-level lived experience for a character in a historical simulation.

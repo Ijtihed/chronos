@@ -1,6 +1,6 @@
 # NPC Autonomous Activity (Light)
 
-> **Model tier:** LOCAL (Ollama llama3.1:8b)
+> **Model tier:** Gemini (`CHRONOS_GEMINI_MODEL`, default `gemini-3-flash-preview`)
 > **Purpose:** What an offscreen NPC does this turn. Shorter context, shorter output.
 > **Volume:** All non-local NPCs, every turn. Must be fast.
 

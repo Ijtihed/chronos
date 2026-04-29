@@ -97,6 +97,12 @@ class NPC(BaseModel):
     last_simulated_turn: int = 0
     emotional_state: str = ""
     current_activity: str = ""
+    # Structured log of what the player did to/with this NPC.
+    # Each entry: {turn, year, action_type, intent}. Capped at 5.
+    player_interactions: List[Dict] = Field(default_factory=list)
+    # Thematic preoccupation — rotates every ~6 turns via archetype pool.
+    current_preoccupation: str = ""
+    last_preoccupation_shift_turn: int = 0
 
 
 class Event(BaseModel):
@@ -163,6 +169,11 @@ class WorldState(BaseModel):
     #   "hard"          -> >= hard cap (EUR 2.00 default); further turn
     #                      advancement is blocked by the API
     cost_cap_state: str = "none"
+    # Run-level "do not reuse" list of sensory grounding phrases extracted
+    # from past NPC POVs. Capped at 30 entries with FIFO eviction. Injected
+    # into npc_pov.md and npc_addressed.md as $already_used_details. Resets
+    # per run (new WorldState = empty list).
+    used_grounding_details: List[str] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -420,8 +431,16 @@ def _apply_target_fallback(state: WorldState, action: dict) -> None:
                 npc.disposition = _shift_negative(npc.disposition)
 
 
+_MAX_PLAYER_INTERACTIONS = 5
+
+
 def _update_npc_memory(state: WorldState, action: dict) -> None:
-    """Increase memory for NPCs the player interacted with this turn."""
+    """Increase memory for NPCs the player interacted with this turn.
+
+    Also appends a structured player-interaction record to directly
+    targeted/impacted NPCs so npc_engine can summarize what the player
+    did without injecting raw NPC POV text back.
+    """
     target_raw = (action.get("target") or "").lower()
     impacts = action.get("npc_impacts") or []
     affected_names = {target_raw} if target_raw else set()
@@ -436,6 +455,16 @@ def _update_npc_memory(state: WorldState, action: dict) -> None:
         if any(n in name_lower for n in affected_names if n):
             npc.memory_of_player = min(1.0, npc.memory_of_player + 0.15)
             npc.last_interaction_turn = state.turn
+            # Log structured player-action record (replaces verbatim POV injection).
+            record = {
+                "turn": state.turn,
+                "year": state.current_year or state.era.year_start,
+                "action_type": action.get("action_type", "other"),
+                "intent": (action.get("intent") or "")[:120],
+            }
+            npc.player_interactions.append(record)
+            if len(npc.player_interactions) > _MAX_PLAYER_INTERACTIONS:
+                npc.player_interactions = npc.player_interactions[-_MAX_PLAYER_INTERACTIONS:]
         elif npc.memory_of_player > 0:
             npc.memory_of_player = min(1.0, npc.memory_of_player + 0.05)
 
@@ -444,13 +473,57 @@ def _update_npc_memory(state: WorldState, action: dict) -> None:
 # Story summary (fed into prompts)
 # ---------------------------------------------------------------------------
 
+# Story summary cap: prevents prompt bloat across long runs.
+# At 4 ambient events per turn, an uncapped summary reaches ~200 lines by turn 50,
+# which dominates every NPC POV prompt. We keep two slices:
+#   - the most recent N events (what's happening right now)
+#   - high-significance events from earlier (player actions, deaths, divergences)
+# and drop low-signal ambient activity older than the recent window.
+_STORY_SUMMARY_RECENT_CAP = 12
+_STORY_SUMMARY_PRIORITY_TYPES = frozenset({
+    "speak", "trade", "petition", "threaten", "betray", "attack",
+    "steal", "negotiate", "defend", "fight", "siege", "alliance",
+    "hoard", "prevent", "save", "flee", "death", "travel",
+})
+
+
 def build_story_summary(state: WorldState) -> str:
     if not state.events:
         return "The game has just begun. No actions have been taken yet."
 
     player_loc = get_player_location(state)
     lines = [f"It is now turn {state.turn} (year {state.current_year} AD). Here is what has happened so far:"]
-    for ev in state.events:
+
+    # Two-tier event selection:
+    #   1. The N most recent events (what's happening NOW)
+    #   2. Older events with priority action_types (player decisions, deaths, travel)
+    recent = state.events[-_STORY_SUMMARY_RECENT_CAP:]
+    recent_ids = {id(ev) for ev in recent}
+    older_priority = [
+        ev for ev in state.events[:-_STORY_SUMMARY_RECENT_CAP]
+        if ev.action_type in _STORY_SUMMARY_PRIORITY_TYPES
+        and id(ev) not in recent_ids
+    ]
+    # Cap older priority at half the recent budget so the prompt stays bounded
+    # even on very long runs with many player actions.
+    older_priority = older_priority[-(_STORY_SUMMARY_RECENT_CAP // 2):]
+
+    elided_count = max(
+        0,
+        len(state.events) - len(recent) - len(older_priority),
+    )
+
+    if older_priority:
+        lines.append("Earlier turning points:")
+        for ev in older_priority:
+            target_note = f" (involving {ev.target})" if ev.target else ""
+            lines.append(f"- Turn {ev.turn}: {ev.description}{target_note}")
+        if elided_count:
+            lines.append(f"  (... and {elided_count} smaller moments now in the past)")
+
+    if older_priority:
+        lines.append("Recent events:")
+    for ev in recent:
         target_note = f" (involving {ev.target})" if ev.target else ""
         lines.append(f"- Turn {ev.turn}: {ev.description}{target_note}")
 

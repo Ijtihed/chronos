@@ -11,7 +11,164 @@ import random
 from typing import Dict, List, Optional
 
 from backend.utils import tension_index as _tension_index_util
-from backend.world_state import NPC, NpcNeeds, PersonalityTraits
+from backend.world_state import NPC, NpcNeeds, PersonalityTraits, WorldState
+
+
+# ---------------------------------------------------------------------------
+# Preoccupation system — thematic concerns that rotate every ~6 turns
+# ---------------------------------------------------------------------------
+
+# Per-archetype pools of thematic concerns. Each string is one preoccupation
+# the NPC will voice across several turns before rotating to the next.
+# Order matters: the rotation cycles through this list deterministically.
+ARCHETYPE_PREOCCUPATIONS: Dict[str, List[str]] = {
+    "soldier":   [
+        "the men in my unit",
+        "my rations holding out",
+        "the next enemy move",
+        "my family back home",
+        "the officers above me",
+        "my equipment and blade",
+    ],
+    "merchant":  [
+        "my outstanding debts",
+        "the trade routes closing",
+        "my inventory and what it is worth",
+        "my competitors undercutting me",
+        "the political situation and prices",
+        "my family's security",
+    ],
+    "civilian":  [
+        "food for this week",
+        "my family's safety",
+        "what I heard in the market",
+        "the weather and next harvest",
+        "my neighbor's behavior lately",
+        "the debt I owe and cannot pay",
+    ],
+    "farmer":    [
+        "the harvest and whether it will hold",
+        "the weather turning",
+        "the landlord and what he will demand",
+        "sickness in the livestock",
+        "my children and their futures",
+        "the road and whether it is safe",
+    ],
+    "clergy":    [
+        "my congregation and their state",
+        "my superiors' judgment of me",
+        "my own failing faith",
+        "the state of the city around us",
+        "a sin I keep returning to",
+        "whether God is still listening",
+    ],
+    "priest":    [
+        "my congregation and their state",
+        "my own failing faith",
+        "the state of the city around us",
+        "a sin I keep returning to",
+        "whether God is still listening",
+        "the corruption I see in the church",
+    ],
+    "noble":     [
+        "my reputation at court",
+        "my rivals and their movements",
+        "my holdings and their security",
+        "my family's alliances",
+        "what the rumors say about me",
+        "my legacy after I am gone",
+    ],
+    "scholar":   [
+        "my current research stalling",
+        "the library deteriorating",
+        "my patron's patience running out",
+        "my students' inadequacy",
+        "preserving what matters before it is lost",
+        "a text I cannot interpret",
+    ],
+    "scribe":    [
+        "the record I am keeping and whether it is accurate",
+        "my patron's satisfaction",
+        "the quality of my ink and materials",
+        "a document I cannot verify",
+        "my colleagues and whether they can be trusted",
+        "what I have witnessed and whether to write it down",
+    ],
+    "refugee":   [
+        "where to go after here",
+        "food for today",
+        "my missing family members",
+        "whether to trust anyone here",
+        "getting out before the worst comes",
+        "rumors of somewhere safer",
+    ],
+    "healer":    [
+        "a patient I cannot save",
+        "my dwindling supplies",
+        "the disease spreading faster than I can treat",
+        "my fee going unpaid again",
+        "whether my methods are working",
+        "a death I feel responsible for",
+    ],
+    "caretaker": [
+        "the person I am responsible for",
+        "resources running low",
+        "whether anyone will help us",
+        "the roof that needs fixing",
+        "illness in the household",
+        "what happens to them when I am gone",
+    ],
+    "general":   [
+        "my command and whether they will hold",
+        "the supply lines",
+        "my officers and whether I trust them",
+        "the enemy's intelligence on our position",
+        "the political situation back home",
+        "the cost in men and what it is buying",
+    ],
+}
+
+_DEFAULT_PREOCCUPATIONS = [
+    "the situation here and what it means",
+    "my own safety and those depending on me",
+    "what I will do when this is over",
+    "the people I have lost",
+    "whether any of this matters",
+    "what tomorrow will look like",
+]
+
+PREOCCUPATION_DRIFT_INTERVAL = 6  # turns between shifts
+
+
+def get_initial_preoccupation(archetype: str) -> str:
+    """Return the first preoccupation for an archetype."""
+    pool = ARCHETYPE_PREOCCUPATIONS.get(archetype, _DEFAULT_PREOCCUPATIONS)
+    return pool[0]
+
+
+def tick_preoccupation_drift(state: WorldState) -> None:
+    """Rotate current_preoccupation for NPCs whose interval has elapsed.
+
+    Called from world_engine.simulate_turn Stage 1 alongside other
+    structural drift operations. Pure code, no LLM.
+    """
+    for npc in state.npcs:
+        turns_since_shift = state.turn - npc.last_preoccupation_shift_turn
+        if turns_since_shift < PREOCCUPATION_DRIFT_INTERVAL:
+            continue
+        pool = ARCHETYPE_PREOCCUPATIONS.get(npc.archetype, _DEFAULT_PREOCCUPATIONS)
+        if not npc.current_preoccupation:
+            npc.current_preoccupation = pool[0]
+            npc.last_preoccupation_shift_turn = state.turn
+            continue
+        # Find current index, advance by 1
+        try:
+            idx = pool.index(npc.current_preoccupation)
+            next_idx = (idx + 1) % len(pool)
+        except ValueError:
+            next_idx = 0
+        npc.current_preoccupation = pool[next_idx]
+        npc.last_preoccupation_shift_turn = state.turn
 
 
 # ---------------------------------------------------------------------------

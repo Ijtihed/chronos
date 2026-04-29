@@ -1,7 +1,7 @@
 """Parse player natural language into a structured action via LLM.
 
-Model tier: FAST (Ollama). Short, highly structured JSON; cheap to run
-locally and never the quality bottleneck.
+Model tier: FAST (Gemini). Short, highly structured JSON.
+All calls route to Gemini via call_llm() — Ollama is no longer used.
 """
 
 from __future__ import annotations

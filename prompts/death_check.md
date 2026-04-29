@@ -1,6 +1,6 @@
 # Death Check
 
-> **Model tier:** LOCAL (Ollama llama3.1:8b)
+> **Model tier:** Gemini (`CHRONOS_GEMINI_MODEL`, default `gemini-3-flash-preview`)
 > **Purpose:** Evaluate whether the player's latest action could plausibly lead to their death
 > **Volume:** Called once per turn after player action
 
