@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CHRONOS</title>
 
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 
   <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
@@ -146,9 +146,38 @@
   <!-- ════════════════════════════════════════════════════════════════ -->
   <div id="screen-game" class="screen flex-col w-screen h-screen">
 
-    <!-- Top Bar -->
+    <!-- Ground layer: massive low-contrast location name behind everything.
+         Updated on travel; transitions on location change. The "ground"
+         the player is standing on, felt rather than read.
+         Click on the name → travel popup with neighbor locations. -->
+    <div id="ground">
+      <button id="ground-name" type="button" data-act="travel-menu" aria-label="Travel from here"></button>
+      <div id="ground-meta"></div>
+    </div>
+
+    <!-- Travel popup — appears when ground is clicked, lists neighbors. -->
+    <div id="travel-popup" class="hidden">
+      <div class="travel-popup-label">Travel from here</div>
+      <div id="travel-popup-list"></div>
+    </div>
+
+    <!-- Zoom-out hint, shown only when manuscript is zoomed-out -->
+    <div id="zoom-hint">Press Z to return</div>
+
+    <!-- Edge vignette: dark gradient inward. Intensity adjusts with
+         regional tension (Pass 4). Fixed at viewport bounds. -->
+    <div id="edge-vignette" aria-hidden="true"></div>
+
+    <!-- Memory motes: drifting particles layer (Pass 4). Dormant in Pass 1. -->
+    <div id="memory-motes" aria-hidden="true"></div>
+
+    <!-- Chrome handle: collapsed top bar reveals on hover/click.
+         Sits invisible at top edge until pointer hovers there. -->
+    <div id="chrome-handle" aria-label="Top bar"></div>
+
+    <!-- Top Bar (now hidden by default; revealed on chrome-handle hover) -->
     <header id="top-bar"
-      class="fixed top-0 w-full h-10 bg-black/90 backdrop-blur-sm flex items-center px-5 z-[300] border-b border-white/5">
+      class="fixed top-0 w-full h-10 backdrop-blur-sm flex items-center px-5 z-[300] border-b border-white/5">
       <div class="flex-1 flex items-center min-w-0 gap-4">
         <span id="top-bar-info" class="text-[11px] uppercase tracking-wide text-white/70 truncate">411 AD &middot; Mediolanum</span>
         <div id="clock-element" class="hidden items-center gap-3 shrink-0">
@@ -224,9 +253,13 @@
       </svg>
     </button>
 
-    <!-- Manuscript Column -->
+    <!-- Manuscript surface — full viewport, layered above ground + vignette.
+         Memory rehaul (2026-05-01): no max-w-2xl column; the page IS the
+         experience. Generous padding and a wider reading column inside,
+         but the surface itself is full-width so floating elements (ground,
+         clickable affordances, atmospheric layers) compose with it. -->
     <main id="manuscript" class="custom-scroll overflow-y-auto mt-10 mb-14" style="height: calc(100vh - 96px);">
-      <div class="max-w-2xl mx-auto py-12 px-6" id="manuscript-inner">
+      <div class="manuscript-column mx-auto py-16 px-6" id="manuscript-inner">
 
         <div id="turns-container" class="space-y-0">
 
@@ -329,10 +362,15 @@
       </div>
     </main>
 
-    <!-- Bottom Input Bar -->
+    <!-- Bottom Input Bar — collapses to a thin handle when not in use.
+         Tap/hover the handle, focus the input, or press any key while idle
+         to expand. Auto-collapses 4s after the input is empty + unfocused. -->
     <footer id="bottom-bar"
-      class="fixed bottom-0 w-full h-14 bg-black/90 backdrop-blur-sm z-[100] flex justify-center items-center px-4 border-t border-white/5">
-      <div class="max-w-2xl w-full flex items-center gap-2">
+      class="fixed bottom-0 w-full z-[100] flex justify-center items-center px-4 collapsed">
+      <div id="bottom-bar-handle" aria-hidden="true">
+        <span class="bottom-bar-handle-glyph">\</span>
+      </div>
+      <div class="max-w-2xl w-full flex items-center gap-2 bottom-bar-content">
         <button id="btn-notes" title="Notes"
           class="shrink-0 w-8 h-8 flex items-center justify-center rounded-md border border-white/6 text-white/20 hover:text-white/50 hover:border-white/15 transition-all duration-200 cursor-pointer text-[9px] uppercase tracking-[0.1em]">
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none">

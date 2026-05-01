@@ -448,6 +448,576 @@ html, body {
 }
 
 
+/* ═══════════════════════════════════════════════════════════════════════
+ * MEMORY REHAUL (2026-05-01) — pass 1: substrate
+ * ═══════════════════════════════════════════════════════════════════════
+ *
+ * Ground layer: massive faint location name behind everything.
+ * Edge vignette: dark gradient inward, intensity adjusts with state.
+ * Chrome handle: collapsed top bar, reveals on hover.
+ * Bottom bar collapse: thin handle until activated, then expands.
+ * Manuscript widens out of the narrow column; reading column lives inside.
+ *
+ * This pass adds substrate only — no click-to-act, no decay, no atmosphere
+ * yet. Goal is to verify the visual frame holds up before adding behavior.
+ * ─────────────────────────────────────────────────────────────────── */
+
+
+/* Ground — the felt floor of the moment.
+ *
+ * A full-bleed div behind everything. Massive location name in serif
+ * uppercase, opacity 0.04, letter-spacing wide. Sits below the manuscript
+ * but above #screen-game's black background. Updates on travel via JS.
+ */
+#ground {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+}
+
+#ground-name {
+  font-family: 'Cormorant Garamond', 'EB Garamond', Georgia, serif;
+  font-weight: 400;
+  /* Auto-fit-to-viewport: JS computes font-size from name length so the
+   * full word always reads, never clips. Default sizing here is fallback. */
+  font-size: clamp(60px, 12vw, 200px);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.045);
+  line-height: 0.85;
+  text-align: center;
+  white-space: nowrap;
+  /* Smooth swap on travel: opacity-fade out the old name, fade in new. */
+  transition: opacity 1.6s ease, color 1.6s ease, letter-spacing 1.6s ease;
+  max-width: 92vw;
+  overflow: hidden;
+  text-overflow: clip;
+}
+
+#ground-name.changing {
+  opacity: 0;
+  letter-spacing: 0.2em;
+}
+
+#ground-meta {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.4em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.10);
+  margin-top: 24px;
+  transition: opacity 1.6s ease;
+}
+
+
+/* Edge vignette — dark gradient inward at viewport edges.
+ *
+ * Intensity is set via CSS variable --vignette-intensity (0..1).
+ * Default 0.5 is "background-quiet"; tension can push higher.
+ * Color tint is set via --vignette-tint for state reflection
+ * (e.g. red on death, amber on high tension). Default is plain black.
+ *
+ * Season tint sits as a subtle separate layer (--season-tint) covering
+ * the full viewport at very low opacity, like the ambient temperature
+ * of light in the world.
+ */
+#edge-vignette {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      ellipse at center,
+      transparent 35%,
+      var(--vignette-tint, rgba(0, 0, 0, 0.7)) 100%
+    );
+  opacity: var(--vignette-intensity, 0.7);
+  transition: opacity 2s ease, background 2s ease;
+}
+
+/* Season tint — covers entire viewport, sits between ground and motes.
+ * Very low opacity; you don't notice it directly but the world
+ * "feels" colder in winter, warmer in summer. */
+#edge-vignette::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: var(--season-tint, transparent);
+  pointer-events: none;
+  z-index: 2;
+  transition: background 4s ease;
+}
+
+/* Death stain — when player has died, a slow red shroud spreads. */
+body.is-dead #edge-vignette {
+  /* Pulse subtly on death */
+  animation: deathPulse 6s ease-in-out infinite;
+}
+
+@keyframes deathPulse {
+  0%, 100% { filter: brightness(1.0); }
+  50%      { filter: brightness(1.15); }
+}
+
+/* Season classes on body — ground name color shifts subtly. */
+body.season-winter #ground-name { color: rgba(155, 175, 200, 0.045); }
+body.season-summer #ground-name { color: rgba(220, 195, 145, 0.045); }
+body.season-autumn #ground-name { color: rgba(220, 165, 115, 0.045); }
+/* spring uses default white */
+
+
+/* Memory motes — drifting particles. Defined here, populated in Pass 4. */
+#memory-motes {
+  position: fixed;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.memory-mote {
+  position: absolute;
+  width: 2px;
+  height: 2px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.5);
+  opacity: 0.05;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
+
+/* Manuscript reading column.
+ *
+ * The cards build used max-w-2xl (672px) constraining the reading
+ * surface to a single column. The memory rehaul widens this — the
+ * surface is the page, not a column on it. Reading stays inside a
+ * narrower band but the band is deeper and the surrounding negative
+ * space is part of the experience.
+ */
+.manuscript-column {
+  max-width: 720px;
+  position: relative;
+  z-index: 10;
+}
+
+#manuscript {
+  position: relative;
+  z-index: 10;  /* above ground + vignette */
+}
+
+#manuscript-inner {
+  position: relative;
+}
+
+
+/* Chrome handle — collapsed top bar, sits at top edge of viewport.
+ *
+ * Invisible until pointer hovers within ~40px of the top. Expands to
+ * reveal #top-bar's content on hover. Click also pins it open.
+ */
+#chrome-handle {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 32px;
+  z-index: 295;
+  pointer-events: auto;
+  /* Faint hairline at very top so the handle is discoverable. */
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+/* Top bar — hidden by default in memory mode; revealed when chrome
+ * handle is hovered or pinned via .open. We strip the bg-black/90
+ * background here in CSS since we removed the Tailwind utility class. */
+#top-bar {
+  background: transparent;
+  border-bottom-color: transparent;
+  opacity: 0;
+  transition: opacity 0.4s ease, background 0.4s ease, border-color 0.4s ease;
+  pointer-events: none;
+}
+
+#chrome-handle:hover ~ #top-bar,
+#chrome-handle.pinned ~ #top-bar,
+#top-bar:hover,
+#top-bar.pinned {
+  opacity: 1;
+  background: rgba(0, 0, 0, 0.85);
+  border-bottom-color: rgba(255, 255, 255, 0.05);
+  pointer-events: auto;
+  backdrop-filter: blur(8px);
+}
+
+
+/* Bottom bar collapse.
+ *
+ * Default state: a thin 6px-tall handle at bottom edge with a faint
+ * glyph. Tap the handle, focus the input, or just type any key
+ * (handled by JS) — the bar expands to its full 56px form.
+ *
+ * Auto-collapses 4 seconds after the input is empty AND unfocused.
+ */
+#bottom-bar {
+  height: 14px;  /* collapsed handle height */
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+  background: rgba(0, 0, 0, 0.0);
+  transition: height 0.32s cubic-bezier(0.4, 0, 0.2, 1),
+              background 0.32s ease;
+}
+
+#bottom-bar.expanded {
+  height: 56px;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(8px);
+  border-top-color: rgba(255, 255, 255, 0.05);
+}
+
+#bottom-bar-handle {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+  cursor: pointer;
+  transition: opacity 0.32s ease;
+}
+
+#bottom-bar.expanded #bottom-bar-handle {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.bottom-bar-handle-glyph {
+  display: inline-block;
+  width: 36px;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.10);
+  border-radius: 1px;
+  font-size: 0;  /* hide the literal "/" */
+  transition: background 0.2s ease, width 0.2s ease;
+}
+
+#bottom-bar-handle:hover .bottom-bar-handle-glyph {
+  background: rgba(255, 255, 255, 0.30);
+  width: 48px;
+}
+
+.bottom-bar-content {
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.32s ease, transform 0.32s ease;
+  pointer-events: none;
+}
+
+#bottom-bar.expanded .bottom-bar-content {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+
+/* The body's default bg-black should still show through to the ground. */
+body {
+  background: #000;
+}
+
+#screen-game {
+  position: relative;
+}
+
+
+/* ── Pass 2: click-to-act affordances ─────────────────────────────── *
+ *
+ * Named entities (NPCs, rumors, year stamps, location) become buttons.
+ * They look like text in flow but light up on hover and reveal a faint
+ * cursor change. Clicking dispatches via data-act in app.js.
+ */
+
+.act-name,
+.act-rumor,
+.act-year {
+  display: inline;
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  text-align: inherit;
+  font-style: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  position: relative;
+  transition: color 0.15s ease, text-shadow 0.15s ease;
+}
+
+.act-name {
+  /* NPC names — slight color shift on hover */
+  color: rgba(255, 255, 255, 0.85);
+  font-weight: inherit;
+}
+.act-name:hover {
+  color: rgba(110, 231, 183, 0.95);  /* emerald-300 */
+  text-shadow: 0 0 14px rgba(110, 231, 183, 0.35);
+}
+.act-name:focus-visible {
+  outline: 1px solid rgba(110, 231, 183, 0.6);
+  outline-offset: 2px;
+}
+
+.act-rumor {
+  color: inherit;
+  font-style: italic;
+}
+.act-rumor:hover {
+  color: rgba(252, 211, 77, 0.85);  /* amber-300 */
+  text-shadow: 0 0 14px rgba(252, 211, 77, 0.35);
+}
+.act-rumor:focus-visible {
+  outline: 1px solid rgba(252, 211, 77, 0.6);
+  outline-offset: 2px;
+}
+
+.act-year {
+  color: inherit;
+  letter-spacing: inherit;
+}
+.act-year:hover {
+  color: rgba(255, 255, 255, 0.95);
+  text-shadow: 0 0 16px rgba(255, 255, 255, 0.35);
+}
+.act-year:focus-visible {
+  outline: 1px solid rgba(255, 255, 255, 0.4);
+  outline-offset: 2px;
+}
+
+/* Ground name as a click target — same look but interactive cursor */
+#ground-name {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: opacity 1.6s ease, color 1.6s ease, letter-spacing 1.6s ease, text-shadow 0.4s ease;
+}
+#ground-name:hover {
+  color: rgba(255, 255, 255, 0.075);
+  text-shadow: 0 0 60px rgba(255, 255, 255, 0.05);
+}
+#ground-name:focus-visible {
+  outline: none;
+  color: rgba(255, 255, 255, 0.075);
+}
+
+
+/* ── Travel popup ──────────────────────────────────────────────────── */
+
+#travel-popup {
+  position: fixed;
+  z-index: 9990;
+  width: 320px;
+  background: rgba(10, 10, 10, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 8px;
+  padding: 14px 12px;
+  backdrop-filter: blur(12px);
+  font-family: 'JetBrains Mono', monospace;
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.7);
+  animation: fadeInSlide 0.15s ease;
+}
+
+.travel-popup-label {
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.30);
+  margin-bottom: 10px;
+  padding: 0 4px;
+}
+
+#travel-popup-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.travel-popup-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 9px 10px;
+  background: transparent;
+  border: none;
+  border-left: 2px solid rgba(255, 255, 255, 0.06);
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.70);
+  border-radius: 0 4px 4px 0;
+  margin-bottom: 2px;
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+.travel-popup-row:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.95);
+  border-left-color: rgba(110, 231, 183, 0.5);
+}
+.travel-popup-row.visited .travel-popup-name {
+  color: rgba(255, 255, 255, 0.85);
+}
+.travel-popup-name {
+  font-weight: 500;
+}
+.travel-popup-dist {
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.30);
+}
+.travel-popup-empty {
+  font-size: 11px;
+  font-style: italic;
+  color: rgba(255, 255, 255, 0.30);
+  padding: 8px 6px;
+  line-height: 1.6;
+}
+
+
+/* ── Pass 3: memory decay ──────────────────────────────────────────── *
+ *
+ * Older turns lose words. Each word is wrapped in <span class="m-word">.
+ * Words tagged with .m-word--lost render as "…" instead of the original.
+ * The decay() function in app.js sets these classes per-turn-age.
+ *
+ * Hovering an old turn-block fires .recovering, which animates the lost
+ * words back to readable. Pan/scroll close = same effect via JS.
+ */
+
+.m-word {
+  transition: opacity 0.6s ease, color 0.6s ease;
+  display: inline;
+}
+
+.m-word--lost {
+  /* The literal word is hidden via inline style "display:none";
+   * a "…" placeholder is inserted as a sibling .m-word--ellipsis. */
+}
+
+.m-word--ellipsis {
+  color: rgba(255, 255, 255, 0.18);
+  letter-spacing: 0.08em;
+}
+
+/* When a turn is being "recovered" (hover), lost words reveal themselves
+ * and the ellipsis fades. JS swaps display via class. */
+.turn-block.recovering .m-word--lost {
+  display: inline !important;
+  animation: wordRecover 0.5s ease;
+}
+
+.turn-block.recovering .m-word--ellipsis {
+  display: none;
+}
+
+@keyframes wordRecover {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* Distinct hover/focus state for a turn-block being engaged with. */
+.turn-block {
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+.turn-block:hover {
+  opacity: 1 !important;
+}
+
+
+/* ── Pass 5: zoom-out overview ─────────────────────────────────────── *
+ *
+ * Toggle via Z key or top-bar glyph. When .zoomed-out is on the
+ * manuscript, the inner scales down and the column widens; blocks
+ * become smaller, decay'd words turn into pattern. Reading is hard;
+ * shape is visible. Click any block to zoom back in on it.
+ */
+
+#manuscript-inner {
+  transform-origin: top center;
+  transition: transform 0.7s cubic-bezier(0.4, 0, 0.2, 1),
+              filter 0.7s ease;
+}
+
+#manuscript.zoomed-out {
+  /* Allow the scaled content to overflow naturally */
+  scrollbar-width: thin;
+}
+
+#manuscript.zoomed-out #manuscript-inner {
+  transform: scale(0.45);
+  filter: contrast(1.1);
+}
+
+/* In zoom-out, lost-word ellipses become punctuation-like dots that
+ * reveal the shape of memory loss across the run. */
+#manuscript.zoomed-out .m-word--ellipsis {
+  color: rgba(255, 255, 255, 0.05);
+}
+
+/* Turn-blocks in zoom-out gain a faint border so each is
+ * distinguishable as a "memory" in the constellation. */
+#manuscript.zoomed-out .turn-block {
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  margin-left: 4px;
+  padding-left: 8px;
+  cursor: pointer;
+  transition: opacity 0.4s ease, border-color 0.2s ease,
+              background 0.2s ease, transform 0.4s ease;
+}
+#manuscript.zoomed-out .turn-block:hover {
+  border-left-color: rgba(110, 231, 183, 0.45);
+  background: rgba(110, 231, 183, 0.04);
+  transform: scale(1.02);
+}
+
+/* Hide the bottom bar entirely while zoomed out; it would interfere. */
+#manuscript.zoomed-out ~ #bottom-bar {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* A faint hint at the top: "Press Z to return" */
+#zoom-hint {
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 290;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.20em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.30);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+#manuscript.zoomed-out ~ #zoom-hint {
+  opacity: 1;
+}
+
+
 /* ── Status Dots ─────────────────────────────────────────────────────── */
 
 .status-dot {

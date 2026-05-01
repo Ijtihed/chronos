@@ -292,6 +292,9 @@ function enterGame() {
     turnsContainer.innerHTML = savedNarrative;
     const manuscript = $("#manuscript");
     if (manuscript) manuscript.scrollTop = manuscript.scrollHeight;
+    // Re-apply memory decay to restored turns and rewire hover-recovery.
+    applyMemoryDecay();
+    _wireDecayHoverAll();
   } else {
     if (turnsContainer) turnsContainer.innerHTML = "";
     if (isOldFormat) localStorage.removeItem("chronos_narrative_" + runId);
@@ -348,9 +351,194 @@ function updateTopBar() {
     if (deathName) deathName.textContent = `\u2020 ${state.player_name}`;
   }
 
+  updateGround();
+  updateAtmosphere();
   updateClock();
   updateCostIndicator();
 }
+
+// ── Atmosphere — vignette + season tint, driven by state ──────────────
+//
+// Reads state.current_location.political_tension and the current
+// season (derived from state.turn) to set CSS variables on :root that
+// drive the edge-vignette intensity/tint and the body color tint.
+//
+// Tension vocabulary is loose ("uneasy", "tense", "calm", "stable"...).
+// We bucket into low/medium/high/critical and pick from there.
+
+const _TENSION_TIER = {
+  low: 0, calm: 0, stable: 0, peaceful: 0, quiet: 0,
+  moderate: 1, uneasy: 1, restless: 1, watchful: 1, tense: 1,
+  high: 2, strained: 2, simmering: 2, fearful: 2,
+  critical: 3, explosive: 3, broken: 3, collapsing: 3, rising: 2,
+};
+
+function _tensionTier(s) {
+  if (!s) return 0;
+  const k = String(s).trim().toLowerCase();
+  return _TENSION_TIER[k] != null ? _TENSION_TIER[k] : 1;
+}
+
+function _seasonName(turn) {
+  // Mirror updateClock(): seasons winter/spring/summer/autumn,
+  // 13 weeks each. Turn 0 = winter wk 1.
+  const w = (turn % 52) + 1;
+  const seasons = ["winter", "spring", "summer", "autumn"];
+  return seasons[Math.floor(((w - 1) % 52) / 13)];
+}
+
+// Map (tension, season, dead) → CSS variables.
+function updateAtmosphere() {
+  const root = document.documentElement;
+  if (!state) return;
+
+  const tier = _tensionTier(
+    state.current_location ? state.current_location.political_tension : ""
+  );
+  const season = _seasonName(state.turn || 0);
+  const isDead = state.run_status === "dead_observing";
+
+  // Vignette intensity: 0 (low tension) → 0.95 (critical / dead)
+  let intensity = 0.55 + tier * 0.10;
+  if (isDead) intensity = 0.92;
+
+  // Vignette tint: rgba(r,g,b, a). Default neutral black.
+  // High tension → red-tinged. Dead → deep red. Season also nudges hue.
+  let tintR = 0, tintG = 0, tintB = 0, tintA = 0.85;
+  if (tier >= 2) { tintR = 60; tintG = 0; tintB = 0; tintA = 0.85; }
+  if (tier >= 3) { tintR = 90; tintG = 0; tintB = 0; tintA = 0.92; }
+  if (isDead)    { tintR = 50; tintG = 6;  tintB = 14; tintA = 0.96; }
+  // Season nudge (subtle): winter cold blue tint, summer warm
+  let seasonR = 0, seasonG = 0, seasonB = 0, seasonA = 0;
+  if (season === "winter") { seasonR = 8;  seasonG = 16; seasonB = 30; seasonA = 0.10; }
+  if (season === "summer") { seasonR = 30; seasonG = 18; seasonB = 0;  seasonA = 0.06; }
+  if (season === "autumn") { seasonR = 28; seasonG = 12; seasonB = 0;  seasonA = 0.05; }
+  // Spring is unchanged (default).
+
+  // Apply CSS vars
+  root.style.setProperty("--vignette-intensity", String(intensity));
+  root.style.setProperty(
+    "--vignette-tint",
+    `rgba(${tintR}, ${tintG}, ${tintB}, ${tintA})`
+  );
+  root.style.setProperty(
+    "--season-tint",
+    `rgba(${seasonR}, ${seasonG}, ${seasonB}, ${seasonA})`
+  );
+
+  // Set a season class on body so prose can be subtly color-graded
+  document.body.classList.remove("season-winter", "season-spring", "season-summer", "season-autumn");
+  document.body.classList.add(`season-${season}`);
+
+  // Death stain: persistent red shroud
+  document.body.classList.toggle("is-dead", isDead);
+
+  // Start motes once.
+  _startMotes();
+}
+
+// ── Motes — drifting particles, atmospheric layer ─────────────────────
+
+const _motes = [];
+let _motesRafStarted = false;
+
+function _startMotes() {
+  if (_motesRafStarted) return;
+  const layer = document.getElementById("memory-motes");
+  if (!layer) return;
+
+  const N = 36;
+  for (let i = 0; i < N; i++) {
+    const m = document.createElement("div");
+    m.className = "memory-mote";
+    const x = Math.random() * window.innerWidth;
+    const y = Math.random() * window.innerHeight;
+    m.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+    m.style.opacity = String(0.04 + Math.random() * 0.07);
+    layer.appendChild(m);
+    _motes.push({
+      el: m, x, y,
+      vx: (Math.random() - 0.5) * 0.10,
+      vy: 0.08 + Math.random() * 0.10,
+    });
+  }
+
+  function step() {
+    const W = window.innerWidth;
+    const H = window.innerHeight;
+    for (const m of _motes) {
+      m.x += m.vx;
+      m.y += m.vy;
+      if (m.x < -10) m.x = W + 10;
+      if (m.x > W + 10) m.x = -10;
+      if (m.y < -10) m.y = H + 10;
+      if (m.y > H + 10) m.y = -10;
+      m.el.style.transform = `translate3d(${m.x}px, ${m.y}px, 0)`;
+    }
+    requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+  _motesRafStarted = true;
+}
+
+// ── Ground layer — the felt floor of the moment ──────────────────────
+//
+// The location name renders behind everything as a massive low-contrast
+// glyph. On travel, the old name fades out (via .changing class) and the
+// new one fades in. Year + season meta sits below the name.
+//
+// Drives state-reflective styling: tension intensifies the edge vignette,
+// season tints background hue. (Pass 4 will activate season/tension.)
+
+let _lastGroundLoc = null;
+
+function updateGround() {
+  const nameEl = document.getElementById("ground-name");
+  const metaEl = document.getElementById("ground-meta");
+  if (!nameEl || !state) return;
+
+  const loc = state.current_location;
+  const newName = loc && loc.name ? loc.name : "";
+
+  if (newName !== _lastGroundLoc) {
+    // Animate the change
+    nameEl.classList.add("changing");
+    setTimeout(() => {
+      nameEl.textContent = newName;
+      _fitGroundName(nameEl);
+      _lastGroundLoc = newName;
+      // Remove the changing class to fade in
+      nameEl.classList.remove("changing");
+    }, 600);
+  } else {
+    _fitGroundName(nameEl);
+  }
+
+  if (metaEl) {
+    const year = state.current_year;
+    const era = state.era_name || "";
+    metaEl.textContent = `${year} \u00b7 ${era}`;
+  }
+}
+
+// Auto-fit the ground name to viewport width: pick a font-size such that
+// the word spans ~78% of the viewport width. Recomputed on resize.
+function _fitGroundName(nameEl) {
+  if (!nameEl || !nameEl.textContent) return;
+  const target = window.innerWidth * 0.78;
+  // Binary-ish: try a starting size, scale by ratio of measured width
+  // to target. Two passes converges for monospace-ish text.
+  nameEl.style.fontSize = "200px";
+  const w0 = nameEl.getBoundingClientRect().width || 1;
+  const scaled = Math.max(48, Math.min(360, 200 * (target / w0)));
+  nameEl.style.fontSize = scaled + "px";
+}
+
+// Refit on viewport resize.
+window.addEventListener("resize", () => {
+  const nameEl = document.getElementById("ground-name");
+  if (nameEl) _fitGroundName(nameEl);
+});
 
 // ── LLM provider cost indicator ───────────────────────────────────────
 
@@ -485,6 +673,136 @@ function updateClock() {
   });
 })();
 
+// ── Memory rehaul: zoom-out overview ─────────────────────────────────
+//
+// Press Z (when not focused on an input) to toggle the manuscript
+// into "zoom-out" — every turn becomes small, the run's shape becomes
+// visible. Click a turn-block to zoom back in centered on it.
+
+(function initZoomToggle() {
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "z" && e.key !== "Z") return;
+    // Don't hijack when typing
+    const a = document.activeElement;
+    if (a && (a.tagName === "INPUT" || a.tagName === "TEXTAREA" ||
+              a.isContentEditable)) return;
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    const ms = document.getElementById("manuscript");
+    if (!ms) return;
+    ms.classList.toggle("zoomed-out");
+  });
+
+  // Click on a turn-block while zoomed-out → zoom back in, scrolled
+  // to that block.
+  document.addEventListener("click", (e) => {
+    const ms = document.getElementById("manuscript");
+    if (!ms || !ms.classList.contains("zoomed-out")) return;
+    const block = e.target.closest(".turn-block");
+    if (!block) return;
+    e.preventDefault();
+    e.stopPropagation();
+    ms.classList.remove("zoomed-out");
+    setTimeout(() => {
+      block.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 50);
+  }, true);  // capture phase so we beat other handlers
+})();
+
+
+// ── Memory rehaul: chrome collapse + bottom bar collapse ─────────────
+//
+// The top bar hides itself; hovering the top edge of the screen reveals
+// it, and clicking the chrome-handle pins it open. The bottom input bar
+// collapses to a thin handle when idle (empty + unfocused for 4s),
+// expands on hover/click/keypress.
+
+(function initChromeHandle() {
+  const handle = document.getElementById("chrome-handle");
+  const topbar = document.getElementById("top-bar");
+  if (!handle || !topbar) return;
+
+  // Click chrome-handle → toggle pinned state.
+  handle.addEventListener("click", (e) => {
+    e.preventDefault();
+    handle.classList.toggle("pinned");
+  });
+
+  // Click outside top-bar / chrome-handle → unpin (so the bar fades again).
+  document.addEventListener("click", (e) => {
+    if (!handle.classList.contains("pinned")) return;
+    if (handle.contains(e.target) || topbar.contains(e.target)) return;
+    // Don't unpin on hamburger interactions either
+    const ham = document.getElementById("hamburger-panel");
+    if (ham && ham.contains(e.target)) return;
+    handle.classList.remove("pinned");
+  });
+})();
+
+(function initBottomBarCollapse() {
+  const bar = document.getElementById("bottom-bar");
+  const handle = document.getElementById("bottom-bar-handle");
+  const input = document.getElementById("player-input");
+  if (!bar || !handle || !input) return;
+
+  let collapseTimer = null;
+
+  function expand() {
+    bar.classList.add("expanded");
+    if (collapseTimer) { clearTimeout(collapseTimer); collapseTimer = null; }
+  }
+
+  function scheduleCollapse() {
+    if (collapseTimer) clearTimeout(collapseTimer);
+    collapseTimer = setTimeout(() => {
+      // Don't collapse if input has content or is focused
+      if (document.activeElement === input) return;
+      if (input.value && input.value.length > 0) return;
+      // Or if a turn is in progress
+      if (window.turnInProgress) return;
+      bar.classList.remove("expanded");
+    }, 4000);
+  }
+
+  handle.addEventListener("click", () => {
+    expand();
+    setTimeout(() => input.focus(), 50);
+  });
+
+  // Hover-handle: expand on pointer-enter
+  handle.addEventListener("pointerenter", expand);
+
+  // Focus expands; blur schedules collapse
+  input.addEventListener("focus", expand);
+  input.addEventListener("blur", scheduleCollapse);
+  input.addEventListener("input", () => {
+    expand();
+    if (collapseTimer) { clearTimeout(collapseTimer); collapseTimer = null; }
+  });
+
+  // Global keypress: if any printable key fires and the bar is collapsed
+  // and no other input is focused, expand and pipe the keystroke into the
+  // input field so the player can just start typing.
+  document.addEventListener("keydown", (e) => {
+    if (bar.classList.contains("expanded")) return;
+    // Ignore if any input/textarea/contenteditable is currently focused
+    const a = document.activeElement;
+    if (a && (a.tagName === "INPUT" || a.tagName === "TEXTAREA" ||
+              a.isContentEditable)) return;
+    // Only printable keys
+    if (e.key.length !== 1) return;
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    expand();
+    setTimeout(() => {
+      input.focus();
+      input.value = (input.value || "") + e.key;
+    }, 50);
+  });
+
+  // Initial state: collapsed
+  bar.classList.remove("expanded");
+})();
+
+
 // ── Input handling ────────────────────────────────────────────────────
 
 function setupInput() {
@@ -536,6 +854,7 @@ async function submitTurn(text) {
 
   const turnsContainer = $("#turns-container");
   const block = document.createElement("div");
+  block.id = `turn-${Date.now()}`;
   block.className = "turn-block mb-8";
   block.innerHTML =
     `<p class="text-sm italic text-white/55 mb-3 pl-3 border-l border-white/15">${esc(text)}</p>` +
@@ -579,6 +898,8 @@ async function submitTurn(text) {
     await renderTurnStaggered(block, text, data);
     updateTopBar();
     updateTurnDimming();
+    applyMemoryDecay();
+    _wireDecayHoverAll();
     saveRunToStorage();
 
     if (data.death) {
@@ -671,12 +992,152 @@ function sleep(ms) {
 // action_parser fails — "X attempts something in Y." — so we can suppress it.
 const _ERA_FALLBACK_RE = /attempts something in /i;
 
+// ── Memory rehaul: data-act dispatch ──────────────────────────────────
+//
+// The 2026-05-01 rehaul makes named entities click-to-act. Each
+// interactive element carries data-act="<verb>" plus payload data-*
+// attributes. A single delegated click handler routes to the right
+// behavior. Keeps render code declarative + concentrates dispatch.
+//
+// Verbs:
+//   speak    — data-name="Lucius"          → prefill "Speak to Lucius — "
+//   verify   — data-rumor="..."            → prefill "I try to verify the rumor that ..."
+//   skip     — (no data)                   → open skip popup
+//   travel   — data-loc-id="..."           → submit a travel turn
+
+document.addEventListener("click", function (e) {
+  const target = e.target.closest("[data-act]");
+  if (!target) return;
+  const act = target.getAttribute("data-act");
+  if (!act) return;
+  e.preventDefault();
+  e.stopPropagation();
+
+  const input = document.getElementById("player-input");
+  const obsInput = document.getElementById("obs-input");
+  const expand = (txt) => {
+    // Expand the bottom bar and prefill the input. The
+    // initBottomBarCollapse IIFE listens for input events; setting
+    // value + focus + dispatching expand is enough.
+    const bar = document.getElementById("bottom-bar");
+    if (bar) bar.classList.add("expanded");
+    const useInput = (state && state.run_status === "dead_observing")
+      ? obsInput
+      : input;
+    if (!useInput) return;
+    useInput.value = txt;
+    useInput.focus();
+    useInput.setSelectionRange(useInput.value.length, useInput.value.length);
+  };
+
+  if (act === "speak") {
+    const name = target.getAttribute("data-name") || "";
+    if (name) expand(`Speak to ${name} \u2014 `);
+  } else if (act === "verify") {
+    const rumor = target.getAttribute("data-rumor") || "";
+    if (rumor) expand(`I try to verify the rumor that ${rumor}`);
+  } else if (act === "skip") {
+    // Defer to the existing skip popup / control.
+    const skipBtn = document.getElementById("btn-skip");
+    if (skipBtn) skipBtn.click();
+  } else if (act === "travel") {
+    const locName = target.getAttribute("data-loc-name") || "";
+    if (locName) expand(`I travel to ${locName}.`);
+    _hideTravelPopup();
+  } else if (act === "travel-menu") {
+    _toggleTravelPopup(target);
+  }
+});
+
+// Travel popup — neighbors of the player's current location.
+function _toggleTravelPopup(anchor) {
+  const popup = document.getElementById("travel-popup");
+  const list = document.getElementById("travel-popup-list");
+  if (!popup || !list || !state) return;
+
+  // If already open, close.
+  if (!popup.classList.contains("hidden")) {
+    _hideTravelPopup();
+    return;
+  }
+
+  const loc = state.current_location;
+  const neighbors = loc && loc.neighbors ? loc.neighbors : {};
+  const known = state.known_locations || [];
+  const knownById = {};
+  for (const k of known) knownById[k.id] = k;
+
+  let h = "";
+  const ids = Object.keys(neighbors);
+  if (ids.length === 0) {
+    h = `<div class="travel-popup-empty">There is nowhere from here you have heard of yet.</div>`;
+  } else {
+    for (const id of ids) {
+      const turns = neighbors[id];
+      const k = knownById[id];
+      const name = k ? k.name : id;
+      const visited = (state.visited_locations || []).includes(id);
+      h += `<button type="button" class="travel-popup-row${visited ? " visited" : ""}"`
+        + ` data-act="travel" data-loc-id="${esc(id)}" data-loc-name="${esc(name)}">`
+        + `<span class="travel-popup-name">${esc(name)}</span>`
+        + `<span class="travel-popup-dist">${esc(String(turns))} turns</span>`
+        + `</button>`;
+    }
+  }
+  list.innerHTML = h;
+  popup.classList.remove("hidden");
+
+  // Position the popup centered horizontally near the bottom of the ground.
+  // Anchor is the ground-name button. We position absolutely below it.
+  const r = anchor.getBoundingClientRect();
+  popup.style.left = `${Math.max(20, Math.min(window.innerWidth - 320, r.left + r.width / 2 - 160))}px`;
+  popup.style.top  = `${Math.min(window.innerHeight - 220, r.bottom + 16)}px`;
+
+  // Click outside closes
+  setTimeout(() => {
+    document.addEventListener("click", _onTravelOutside, { once: true, capture: true });
+  }, 0);
+}
+
+function _onTravelOutside(e) {
+  const popup = document.getElementById("travel-popup");
+  if (!popup) return;
+  if (popup.contains(e.target)) {
+    // Re-arm for next outside click
+    setTimeout(() => {
+      document.addEventListener("click", _onTravelOutside, { once: true, capture: true });
+    }, 0);
+    return;
+  }
+  _hideTravelPopup();
+}
+
+function _hideTravelPopup() {
+  const popup = document.getElementById("travel-popup");
+  if (popup) popup.classList.add("hidden");
+}
+
+// Helper: render an NPC name as a click-to-act target.
+function _npcLink(name) {
+  return `<button type="button" class="act-name" data-act="speak" data-name="${esc(name)}">${esc(name)}</button>`;
+}
+
+// Helper: render a rumor body as a click-to-act target.
+function _rumorLink(text) {
+  return `<button type="button" class="act-rumor" data-act="verify" data-rumor="${esc(text)}">${esc(text)}</button>`;
+}
+
+// Helper: render the year stamp as a click-to-act target.
+function _yearLink(year) {
+  return `<button type="button" class="act-year" data-act="skip">${esc(String(year))} AD</button>`;
+}
+
 async function renderTurnStaggered(el, playerText, data) {
   const pa = data.parsed_action || {};
   const { npc_responses, player_view: pv } = data;
   const ambient = data.ambient_activity || [];
 
-  let h = `<div class="text-[11px] uppercase tracking-[0.15em] text-white/55 mb-4 font-semibold">${pv.current_year} AD</div>`;
+  let h = `<div class="text-[11px] uppercase tracking-[0.15em] text-white/55 mb-4 font-semibold">${_yearLink(pv.current_year)}</div>`;
 
   // ── Ambient activity (what people nearby are doing) ───────────────────
   if (ambient.length) {
@@ -685,9 +1146,9 @@ async function renderTurnStaggered(el, playerText, data) {
     for (const a of ambient) {
       h += `<p class="text-sm leading-relaxed text-white/35">`;
       if (a.interacts_with) {
-        h += `<span class="text-white/45 font-medium">${esc(a.npc_name)}</span> and <span class="text-white/45 font-medium">${esc(a.interacts_with)}</span> \u2014 `;
+        h += `${_npcLink(a.npc_name)} and ${_npcLink(a.interacts_with)} \u2014 `;
       } else {
-        h += `<span class="text-white/45 font-medium">${esc(a.npc_name)}</span> \u2014 `;
+        h += `${_npcLink(a.npc_name)} \u2014 `;
       }
       h += `${esc(a.activity)}</p>`;
     }
@@ -713,7 +1174,7 @@ async function renderTurnStaggered(el, playerText, data) {
   const rumors = pv.rumors || [];
   if (rumors.length) {
     for (const r of rumors) {
-      h += `<p class="text-sm leading-relaxed italic text-amber-300/40 mb-4">${esc(r.description)}</p>`;
+      h += `<p class="text-sm leading-relaxed italic text-amber-300/40 mb-4">${_rumorLink(r.description)}</p>`;
     }
   }
 
@@ -730,7 +1191,7 @@ async function renderTurnStaggered(el, playerText, data) {
     // Addressed NPCs get a slightly brighter left-border to signal direct speech
     const borderClass = isAddressed ? "border-white/40" : "border-white/20";
     h += `<div id="${id}" class="npc-block-stagger pl-4 border-l-2 ${borderClass} my-4">`;
-    h += `<div class="text-[10px] uppercase tracking-[0.15em] text-white/75 mb-1.5 font-semibold">${esc(r.npc_name)}</div>`;
+    h += `<div class="text-[10px] uppercase tracking-[0.15em] text-white/75 mb-1.5 font-semibold">${_npcLink(r.npc_name)}</div>`;
     h += `<p class="text-sm leading-relaxed text-white/70 npc-pov-text"></p>`;
     if (r.internal) {
       h += `<p class="text-xs leading-relaxed text-white/55 italic npc-internal-text mt-1.5"></p>`;
@@ -762,6 +1223,186 @@ async function renderTurnStaggered(el, playerText, data) {
     }
   }
 }
+
+// ── Memory decay — words drop out of older turns ──────────────────────
+//
+// After every turn render, walk all .turn-block elements and apply
+// progressive word-loss. The newest turn keeps every word; turns 1, 2,
+// 3+ ago lose proportionally more. Lost words are hidden and replaced
+// with a "…" sibling. Hovering a turn-block recovers the lost words.
+
+// Wrap every word inside body-text paragraphs into <span class="m-word">
+// so we can selectively hide them. Idempotent via dataset flag.
+//
+// Walks text nodes only; preserves nested elements like .act-name and
+// .act-rumor buttons that are part of the content. Each text run between
+// elements is independently word-wrapped. The button content itself is
+// NOT decayed (so NPC names always read; you can always click them).
+function _wrapWordsForDecay(blockEl) {
+  if (!blockEl || blockEl.dataset.wordsWrapped === "1") return;
+  // Body-text paragraph types we want decay on.
+  const targets = blockEl.querySelectorAll(
+    "p.npc-pov-text, p.npc-internal-text, " +
+    "p.text-sm.leading-loose, p.text-sm.leading-relaxed"
+  );
+  targets.forEach((el) => {
+    if (!el.textContent || !el.textContent.trim()) return;
+    // Drop word-stream class so the post-rewrap spans aren't held at
+    // opacity:0 by the streaming CSS.
+    el.classList.remove("word-stream");
+    // Walk child nodes; for each text-node, replace with word-wrapped HTML.
+    // For element children (e.g. buttons), leave them untouched.
+    const newChildren = [];
+    el.childNodes.forEach((node) => {
+      if (node.nodeType === Node.TEXT_NODE) {
+        const text = node.textContent;
+        if (!text || !text.trim()) {
+          newChildren.push(text); // preserve whitespace
+          return;
+        }
+        // Build wrapped HTML for this text segment.
+        const words = text.split(/(\s+)/);
+        const wrapped = words.map((w) => {
+          if (/^\s+$/.test(w)) return w;
+          return `<span class="m-word">${esc(w)}</span>`;
+        }).join("");
+        newChildren.push(wrapped);
+      } else if (node.nodeType === Node.ELEMENT_NODE) {
+        // Push the element's outerHTML untouched — buttons stay clickable.
+        newChildren.push(node.outerHTML);
+      }
+    });
+    el.innerHTML = newChildren.join("");
+  });
+  // Also wrap the rumor button bodies — rumor lines are entirely <button>
+  // elements with text inside. We wrap the words inside the button so they
+  // can decay, but keep the button element so the click still works.
+  const rumorButtons = blockEl.querySelectorAll(".act-rumor");
+  rumorButtons.forEach((btn) => {
+    if (btn.dataset.wordsWrapped === "1") return;
+    const text = btn.textContent;
+    if (!text || !text.trim()) return;
+    const words = text.split(/(\s+)/);
+    btn.innerHTML = words.map((w) => {
+      if (/^\s+$/.test(w)) return w;
+      return `<span class="m-word">${esc(w)}</span>`;
+    }).join("");
+    btn.dataset.wordsWrapped = "1";
+  });
+  blockEl.dataset.wordsWrapped = "1";
+}
+
+// Deterministic per-word "decay" — same word in the same turn-position
+// always gets the same age-loss order so re-renders are stable.
+function _wordSeedHash(s) {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+  return h >>> 0;
+}
+
+// Apply decay to a single block at age N (0 = newest, no loss).
+// drop_fraction grows with age. Lost words have display:none + a sibling
+// "…" placeholder appended (one per consecutive run of lost words).
+function _applyDecayToBlock(blockEl, age) {
+  if (!blockEl) return;
+  _wrapWordsForDecay(blockEl);
+  const words = blockEl.querySelectorAll(".m-word");
+  if (words.length === 0) return;
+
+  // Drop fraction by age: 0=0, 1=0.05, 2=0.18, 4=0.40, 8=0.65, 15+=0.80
+  let drop;
+  if (age <= 0) drop = 0;
+  else if (age === 1) drop = 0.05;
+  else if (age === 2) drop = 0.18;
+  else drop = Math.min(0.80, 0.18 + (age - 2) * 0.07);
+
+  // Pick which words to drop. Use a deterministic hash on (block id, index)
+  // so the same word always goes first as the block ages.
+  const blockId = blockEl.id || blockEl.getAttribute("data-block-id") || "";
+  if (!blockId) return;
+
+  // First, restore all words (in case we're re-applying with a different age)
+  words.forEach((w) => {
+    w.classList.remove("m-word--lost");
+    w.style.display = "";
+  });
+  // Remove old ellipses
+  blockEl.querySelectorAll(".m-word--ellipsis").forEach((e) => e.remove());
+
+  if (drop <= 0) return;
+
+  // Compute drop priority: each word gets a deterministic pseudo-random
+  // score in [0, 1) seeded by (blockId, position). We drop words below
+  // a threshold computed from the desired drop fraction. The same word
+  // in the same block always lands at the same score, so sequential
+  // decay from age 2 → age 3 simply expands the set of dropped words.
+  //
+  // We also protect short words and capitalized words (likely names) —
+  // they're load-bearing for "the spine of the sentence" and shouldn't
+  // be the first to go.
+  const totalWords = words.length;
+  const scored = Array.from(words).map((w, i) => {
+    const text = w.textContent;
+    const cap = /^[A-Z]/.test(text);
+    const short = text.length <= 3;
+    // Base score: deterministic [0..1)
+    const base = (_wordSeedHash(blockId + ":" + i) % 1000) / 1000;
+    // Protect: capitalized + short words get +0.4 (less likely to drop)
+    const protectBonus = (cap ? 0.30 : 0) + (short ? 0.15 : 0);
+    return { w, i, score: base + protectBonus };
+  });
+  scored.sort((a, b) => a.score - b.score);
+
+  const nDrop = Math.floor(drop * totalWords);
+  for (let k = 0; k < nDrop; k++) {
+    const w = scored[k].w;
+    w.classList.add("m-word--lost");
+    w.style.display = "none";
+  }
+
+  // Walk the words in DOM order, insert "…" placeholders for runs of lost words.
+  let inLostRun = false;
+  Array.from(words).forEach((w) => {
+    if (w.classList.contains("m-word--lost")) {
+      if (!inLostRun) {
+        const dots = document.createElement("span");
+        dots.className = "m-word--ellipsis";
+        dots.textContent = "\u2026";
+        w.parentNode.insertBefore(dots, w);
+        inLostRun = true;
+      }
+    } else {
+      inLostRun = false;
+    }
+  });
+}
+
+// Apply decay across all turns. Newest = age 0.
+function applyMemoryDecay() {
+  const blocks = document.querySelectorAll(".turn-block");
+  const total = blocks.length;
+  blocks.forEach((block, index) => {
+    const age = total - 1 - index;
+    _applyDecayToBlock(block, age);
+  });
+}
+
+// Wire hover-to-recover on turn blocks. Idempotent via dataset flag.
+function _wireDecayHover(blockEl) {
+  if (!blockEl || blockEl.dataset.recoverWired === "1") return;
+  blockEl.addEventListener("pointerenter", () => {
+    blockEl.classList.add("recovering");
+  });
+  blockEl.addEventListener("pointerleave", () => {
+    blockEl.classList.remove("recovering");
+  });
+  blockEl.dataset.recoverWired = "1";
+}
+
+function _wireDecayHoverAll() {
+  document.querySelectorAll(".turn-block").forEach(_wireDecayHover);
+}
+
 
 // ── Turn dimming — older turns recede ─────────────────────────────────
 
@@ -1327,6 +1968,7 @@ async function executeSkip(ticks) {
 
   const turnsContainer = $("#turns-container");
   const block = document.createElement("div");
+  block.id = `turn-${Date.now()}`;
   block.className = "turn-block mb-8";
   const label = ticks === 30 ? "1 month" : `${ticks} turn${ticks > 1 ? "s" : ""}`;
   block.innerHTML =
@@ -1367,6 +2009,8 @@ async function executeSkip(ticks) {
 
     updateTopBar();
     updateTurnDimming();
+    applyMemoryDecay();
+    _wireDecayHoverAll();
     saveRunToStorage();
 
     if (
