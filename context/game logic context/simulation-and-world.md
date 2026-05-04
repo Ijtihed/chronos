@@ -26,6 +26,18 @@ Historical maps exist as open data and are a core layer of the game. The physica
 
 The map is not decorative. It is the geography of information. Where you are determines what you can know.
 
+### Globe and war-table
+
+The map is rendered as two surfaces, both 3D, both still partial-knowledge filtered (no omniscient view).
+
+**The globe** is the wide view. The earth as a sphere — orbited, not panned. Era-correct historical borders project onto it. Player marker, NPC markers, event markers all sit at their lat/lon. Earth is dark grey-black per the project palette, atmosphere is a subtle blue limb glow, not photoreal. The globe replaces the flat Leaflet map shipped in Phase 2; the flat view is kept behind a `?flat=1` URL fallback until the globe is proven.
+
+**The war-table** is the regional view. Toggleable from the globe with `T`. The era's region rises as real terrain (DEM heightmaps, NASA SRTM downsampled). The camera tilts to ~45° as if leaning over a physical table. NPC and event markers cast shadows. Borders extrude vertically. The era label appears massive and faint behind the table, mirroring the manuscript's ground name. This is the dimensional version of the regional map — the same data, made physical.
+
+Both surfaces feed from the same data layer. Knowledge Matrix filtering, event-tier rendering (`witnessed` / `known` / `rumor_reliable` / `rumor_unreliable`), region-knowledge-on-click, and NPC perception popups all carry forward unchanged from Phase 2.5. What changes is the **physical dimensionality of how the player engages**, not what the player can see.
+
+The intent is single, repeated across all three of CHRONOS's spatial surfaces (manuscript, globe, war-table): the world is a thing the player **handles**, not a flat panel they **read**. See [manuscript-as-artifact.md](manuscript-as-artifact.md) for the equivalent statement about the manuscript.
+
 ### Region knowledge on the map
 
 When the player selects a region on the map, the game generates what the character would plausibly know about that region. This is not an encyclopedia entry — it is the character's own understanding, filtered through who they are.

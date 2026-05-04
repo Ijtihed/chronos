@@ -207,6 +207,51 @@ The map is no longer just geography -- it is **the character's understanding of 
 
 ---
 
+## PHASE 2.6 — Spatial Substrate (manuscript depth + globe + war-table)
+
+**Goal:** The player handles the world as a physical, dimensional thing. The manuscript becomes a 3D stack of memories, the map becomes a globe, and a regional war-table view with real terrain becomes available. Three surfaces, all dimensional, all still partial-knowledge filtered. No new gameplay verbs — this is the *spatial substrate* for everything Phase 2.5 already shipped.
+
+**Why this exists between 2.5 and 3:** Re-opens two previously-closed roadmap decisions. The 3D globe was cut from Phase 2 in a design session (original cut reasoning unknown to the 2026-05-04 session that re-opened it). The tilted relief / war-table view was deferred from `open-questions.md`. Both are now in scope. The manuscript-as-3D-artifact is a wholly new design statement, documented in [manuscript-as-artifact.md](manuscript-as-artifact.md).
+
+### What exists at the end of this phase
+
+- **Manuscript-as-stack** — the narrative is a depth-stacked 3D artifact. Older turns recede into z, atmospheric haze marks distance in time, scrolling pulls the camera back through the stack, hovering a deep block lifts it forward. Memory decay reads as both word loss and atmospheric distance. CSS 3D transforms only — no WebGL.
+- **Globe** — the flat Leaflet map is replaced by a 3D globe (Three.js). All Phase 2 / 2.5 functionality preserved: era-correct historical borders, character-aware event markers, region-knowledge-on-click, NPC perception popups, save-view restoration, visited/unvisited NPC distinction. Earth is dark grey-black per the existing palette, atmosphere is a subtle blue limb glow, not photoreal.
+- **War-table** — a separate dimensional view of the era's region, toggleable from the globe with `T`. Real DEM terrain (NASA SRTM 30m, downsampled). Markers cast shadows. Borders extrude vertically. Per-era heightmaps pre-built offline, served as PNG via a new endpoint.
+- **Feature flags** — each surface is independently toggleable. `?flat=1` URL param disables the manuscript stack and falls the map back to Leaflet. `T` key toggles war-table from globe. Any single piece can be backed out without touching the others.
+- **Flat Leaflet retired (but kept in tree)** — `frontend/map.js` stays as a fallback behind `?flat=1` until the globe is proven across an extended playtest. After that it can be removed.
+
+### Success criteria
+
+- [ ] Manuscript-as-stack: 30+ turn run reads as a coherent depth stack; older turns visibly recede; hover-to-recover still works; zoom-out becomes a pull-back through the stack; all existing memory-decay behavior preserved.
+- [ ] Globe: era switch loads correct borders; player + NPC + event markers project at correct lat/lon; click handlers fire region/event/perception panels identically to the flat map; save-view restoration works.
+- [ ] War-table: 5 era DEMs built; terrain renders at 60fps on M4 Max; all marker click behavior matches the globe; `T` round-trips cleanly.
+- [ ] All Phase 2 / 2.5 success criteria still pass under the globe (this is a substrate change, not a regression).
+- [ ] No backend simulation, prompt, or LLM cost changes.
+
+### Definition of success
+
+The world has **volume** the player can handle. Manuscript scrolls in z, not just y. Map orbits as a sphere, not a plane. Region presents as a tilted physical table with real terrain. None of these surfaces add information the player wasn't supposed to have — the Knowledge Matrix, region-knowledge filtering, and event-tier rendering are all unchanged. What changes is the **physical dimensionality of how the player engages**. The artifact is a stack. The earth is a sphere. The region is a table.
+
+### How to verify
+
+1. **Manuscript stack** — Play 30+ turns. Confirm: each turn-block recedes one z-step from the next; opacity ramp + blur ramp visible; hovering a deep block lifts it forward and clears its blur; the zoom-out (`Z` key) becomes a parallax pull-back through the stack rather than a 2D scale; observation mode (`observation-muted` filter) still composes correctly with the depth filters; `?flat=1` URL param falls back to the pre-stack manuscript.
+2. **Globe** — For each of 5 eras: load run, confirm correct borders project on the sphere; place 3 NPC markers and cross-check coordinates against the structured state; click a region, confirm region-knowledge panel; click an event marker, confirm event panel; click an NPC marker, confirm perception popup; confirm save-view restoration across reload; `?flat=1` falls back to Leaflet.
+3. **War-table** — Press `T` from the globe. Confirm: terrain rises from a DEM heightmap at the era's regional bounding box; markers cast shadows; borders extrude; click handlers fire identically to the globe; `T` again or `Esc` returns to the globe; era label appears massive and faint behind the table.
+4. **Performance** — Long-run perf: 100+ turn-block manuscript stays interactive on M4 Max; globe + full marker set holds 60fps; war-table holds 60fps with DEM loaded.
+5. **No regressions** — Full Phase 2 / 2.5 verification checklist passes under the new substrate.
+
+### What is explicitly NOT in this phase
+
+- 3D scenes generated for events (a future Phase 3 pivot conversation; deferred 2026-05-04).
+- Marginalia (Pass 7, separate session).
+- Pinboard (separate session).
+- Any backend simulation, LLM, or prompt changes.
+- Removal of `frontend/map.js` — kept as `?flat=1` fallback until the globe is proven.
+- Any test reorganization — frontend has no module system, that's acknowledged tech debt out of scope here.
+
+---
+
 ## PHASE 3 — Scene Illustrations
 
 **Goal:** When the player experiences a major event — their character's defining moment, an encounter with a key NPC, a turning point in the run — a diffusion-generated scene illustration renders what they are experiencing.
@@ -424,6 +469,8 @@ A single-player, turn-based historical simulation. You are assigned a random min
 - **Diffusion model provider** — affects Phase 3 architecture. Candidate selected 2026-04-22 (mflux + FLUX.2 Klein 9B distilled, POC in `scripts/imagegen_poc/`). Final commit at Phase 3 kickoff. See [visuals.md](visuals.md) and Phase 3 Technical note.
 - **NPC relationship graph granularity** — affects Phase 5 scope significantly. Resolve before Phase 5 begins.
 
+**Closed in Phase 2.6 kickoff (2026-05-04):** the 3D globe (re-opened from Phase 2 cut) and the tilted relief / war-table view (closed from `open-questions.md` General). Both now in scope as Phase 2.6 (Spatial Substrate). Original Phase 2 cut reasoning for the globe is unknown to the re-opening session; recorded honestly in the Phase 2 completion log.
+
 ---
 
 ## Phase completion log
@@ -496,7 +543,7 @@ Use this shape:
   - *Border drift* not tested (borders are static per era in Phase 2).
   - *Post-1886* not tested (no post-1886 eras in current set).
 - **Planned vs actual:**
-  - *3D globe* planned. Shipped as **2D Leaflet** per design session pivot. Globe/terrain deferred.
+  - *3D globe* planned. Shipped as **2D Leaflet** per design session pivot. Globe/terrain deferred. **Re-opened 2026-05-04** as Phase 2.6 (Spatial Substrate). Original cut reasoning is unknown to the session that re-opened it; flagged honestly so future readers know.
   - *aourednik/historical-basemaps* confirmed as primary source. 5 files pulled, simplified, documented in sources.md.
   - *visited_locations* tracking added to world state model (not originally planned -- required for marker design requirement).
   - 27 map-specific tests + 126 total offline tests.
@@ -589,6 +636,10 @@ audit of run `17565bdc41f7` (2026-04-24). Five problems diagnosed, five fixes sh
 
 **Test count:** 736 offline + 13 live = 749 total. 23 new tests added.
 Zero regressions against the pre-fix baseline.
+
+### Phase 2.6
+
+*(in flight — kickoff 2026-05-04)*
 
 ### Phase 3
 

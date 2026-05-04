@@ -6,7 +6,7 @@
 
 - Does multiplayer ever make sense? (Multiple players assigned different characters in the same world, experiencing the same events from different sides)
 - Is there any meta-progression across runs? (Does anything carry over, or is each run truly isolated?)
-- **Terrain view:** A tilted 3D relief/war-table view of the era's region. Cut from Phase 2. Decide when to add — could be a standalone enhancement or bundled with a future phase.
+- ~~**Terrain view:** A tilted 3D relief/war-table view of the era's region. Cut from Phase 2. Decide when to add — could be a standalone enhancement or bundled with a future phase.~~ **Resolved** — in scope as Phase 2.6 (Spatial Substrate). Real DEM terrain (NASA SRTM 30m, downsampled), regional bounding box per era, tilted ~45°, toggleable from the globe with `T`. (2026-05-04)
 - **Perspective switching:** The ability to switch which character you're observing the simulation through — same world, different lens. Architecturally supported by the simulation-first design. Not currently scoped to any phase.
 
 ## Roadmap-blocking — resolve before the phase listed
@@ -49,6 +49,8 @@ Tracking:
 
 ## Closed
 
+- [x] **3D globe (re-opened from Phase 2 cut)** — In scope as Phase 2.6 (Spatial Substrate). Replaces the flat Leaflet map with a Three.js sphere. Era-correct historical borders project on the sphere. All Phase 2 / 2.5 functionality preserved (event markers with character-aware filtering, region-knowledge-on-click, NPC perception popups, save-view restoration). Earth is dark grey-black per the existing palette, atmosphere is a subtle blue limb glow — not photoreal. The flat Leaflet map is kept as a `?flat=1` fallback until the globe is proven across a playtest. **Original Phase 2 cut reasoning is unknown to the session that re-opened it (2026-05-04); flagged honestly so future readers know.** Decision point if the globe doesn't land: revert to Leaflet via the fallback flag, no data layer changes required. (2026-05-04)
+- [x] **Manuscript as 3D physical artifact** — In scope as Phase 2.6 (Spatial Substrate). The narrative is a depth-stacked 3D object. Older turns recede into z, atmospheric haze marks distance in time, scrolling pulls the camera back through the stack, hovering a deep block lifts it forward. CSS 3D transforms only — no WebGL, no new dependencies. Memory decay reads as both word loss (existing) and atmospheric distance (new). Design intent documented in [manuscript-as-artifact.md](manuscript-as-artifact.md). (2026-05-04)
 - [x] **Phase 0 era selection** — Roman Late Empire, ~410 AD (Ariminum). Chosen for richest Project Gutenberg coverage. (2026-03-31)
 - [x] **Phase 0 model tier for action parser** — Local Ollama (`llama3.1:8b`) as frontier stub. Frontier swap point labeled in code. (2026-03-31)
 - [x] **UI metaphor** — Present-tense stream. The world advances, pauses at decision points. No journal/dispatch framing. (2026-03-31)

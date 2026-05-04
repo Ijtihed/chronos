@@ -4,6 +4,8 @@
 
 This document is the source of truth for CHRONOS imagery. It covers POV, body treatment, prompt construction, style, and provider choice. Phase 3 integration work references these rules.
 
+**3D in CHRONOS (Phase 2.6 addendum, 2026-05-04).** 3D geometry is now part of CHRONOS's visual language as of Phase 2.6 (Spatial Substrate) — the manuscript is a depth-stacked artifact, the map is a globe, and the regional view is a war-table with real terrain. This expands the visual surface but does **not** change Phase 3's rules: scene illustrations remain photoreal first-person stills (FLUX via mflux, see Provider section). The 3D substrate and the FLUX still images are different visual languages serving different purposes. A future "3D scenes generated for events" idea was floated and explicitly **deferred** — not in any phase, requires its own design conversation, would replace rather than augment Phase 3's image stack. See [manuscript-as-artifact.md](manuscript-as-artifact.md) and [simulation-and-world.md](simulation-and-world.md) for the manuscript and map sides of the 3D substrate.
+
 ## First-person POV is mandatory
 
 Every CHRONOS scene illustration is rendered from the player character's first-person point of view. The viewer's own body appears in the lower foreground as the compositional anchor (hand, forearm, feet, lap, etc.), with the scene composed behind and around it. The camera is the character's eyes. No third-person framing. No visible face of the viewer. No photographer implied.

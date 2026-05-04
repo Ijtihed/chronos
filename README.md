@@ -52,12 +52,14 @@ open http://localhost:8000
 |--------|-----|
 | Submit action | Type + Enter |
 | Toggle map | Press M (not in text input) |
+| Toggle war-table (regional 3D terrain view) | Press T while map is open |
 | NPC perception | Click green marker on map |
 | Word definition | Highlight a word in the narrative |
 | Menu | Hamburger icon (top right) |
 | Connections (NPC interaction graph) | Menu → Connections |
 | New run | Menu → New Run |
 | Continue saved run | Start screen → Continue |
+| Disable 3D substrate (manuscript depth + globe) | Append `?flat=1` to the URL — falls back to flat Leaflet + non-stacked manuscript |
 
 ## Ingest historical corpus (optional, improves NPC grounding)
 
@@ -118,10 +120,12 @@ backend/              Python server (FastAPI)
   hke/                   Historical Knowledge Engine (RAG — Chroma + Gutenberg/Wikipedia)
 frontend/             Browser UI
   index.html              Manuscript-style UI (Tailwind)
-  app.js                  Game loop, turn submission, narrative rendering
-  map.js                  Leaflet map with historical borders + NPC markers
+  app.js                  Game loop, turn submission, narrative rendering, manuscript depth-stack (Pass 6)
+  globe.js                Three.js 3D globe — replaces flat Leaflet map (Phase 2.6)
+  wartable.js             Three.js regional war-table view with real DEM terrain (Phase 2.6, T-key toggle)
+  map.js                  Legacy Leaflet flat map. Kept as ?flat=1 fallback while the globe is being proven.
   graph.js                d3-force player-centric NPC interaction graph
-  geo/                    GeoJSON border files + Natural Earth coastlines
+  geo/                    GeoJSON border files + Natural Earth coastlines + per-era DEM heightmaps (terrain/)
 prompts/              LLM prompt templates (design artifacts)
 context/              Game design docs (source of truth)
 tests/                ~820 automated tests
@@ -142,6 +146,7 @@ tests/                ~820 automated tests
 | POST | `/api/run/{id}/reset` | Reset run |
 | GET | `/api/runs` | List all runs |
 | GET | `/api/geo/{era_key}` | Historical border GeoJSON for an era |
+| GET | `/api/geo/terrain/{era_key}` | DEM heightmap PNG for an era (war-table) |
 | GET | `/api/health` | Health check |
 
 The turn endpoint handles everything. Type "go to Ravenna" and it routes to travel. Type "wait" and your character acts on their own. Type "start a revolt" and the simulation figures out what happens.

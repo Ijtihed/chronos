@@ -1,13 +1,68 @@
-# CHRONOS — Commit & Context Hygiene (hard rule)
+---
+description: Ask before starting new work whether to push existing tested changes
+alwaysApply: true
+---
 
-After **any** change — no matter how small — do the following before moving on:
+# CHRONOS — Commit & push hygiene
 
-1. **Update context docs** if the change affects design, architecture, or decisions. The relevant files in `context/game logic context/` must reflect what was changed. If a design decision was made, record it in `open-questions.md` as closed. If a feature was added or modified, update the relevant design doc.
+You **never** auto-commit or auto-push. The user is in charge of when work
+ships. But long-lived uncommitted work in the tree is a hazard, so when the
+user pivots to something new, you offer to push what's done first.
 
-2. **Run tests** to confirm nothing broke: `python -m pytest tests/ --ignore=tests/test_live.py -q`
+## When the user starts something new
 
-3. **Commit and push** with a clear message describing what changed and why.
+A "topic switch" is when the user clearly moves on from the work just
+completed: a new request unrelated to the prior thread, "let's do X", "moving
+on", "now I want to...", etc. (Not: follow-up tweaks, bug fixes, or
+clarifications on the same feature.)
 
-4. **Never leave uncommitted work.** Every change lands in git immediately. The user should be able to pull at any point and have a working, documented codebase.
+At that moment, **before starting the new work**, check the tree state:
 
-This applies to: code changes, prompt edits, context doc updates, config changes, test additions, and frontend modifications. No exceptions.
+1. Run `git status` and `git diff --stat`.
+2. If **all** of the following are true, ask the user if they want to push
+   first:
+   - **Substantial:** more than ~200 changed lines across tracked files, or
+     a feature is functionally complete.
+   - **Well tested:** the offline test suite passes (`pytest tests/ -m "not
+     live" -q`); any new code added in this session has its own tests.
+   - **In-session:** the changes were made this session, or the user has
+     already acknowledged them.
+3. If the user says yes, commit and push per the protocol below. If they say
+   no, drop it and proceed with the new task.
+
+If the diff is smaller than ~200 lines, do not interrupt — just start the
+new work. The user can still ask for a push at any time.
+
+## Hard "do not auto-stage" carveouts
+
+Stop and warn instead of staging if `git status` includes any of:
+
+- `.env`, `.env.*`, files matching `*.key`, `*.pem`, `*credential*`,
+  `*secret*`, `*.token`
+- Files larger than 1 MB
+- Files outside the project tree
+- Anything not explicitly listed in this session's diff scope when the user
+  selected "this session only"
+
+Surface these to the user. Don't bury them in a commit they didn't review.
+
+## When the user explicitly asks to commit / push
+
+Follow the existing system protocol (HEREDOC commit messages, no force
+push, never amend pushed commits, never modify git config). The "ask before
+new work" trigger does not apply when the user gave the command directly.
+
+## After a push
+
+Report compactly: branch + remote, commit hash(es), one-line title each.
+Then move on to the new topic. Do not include the diff stat unless asked.
+
+## Never
+
+- Never push to `main` without explicit user confirmation, even on small
+  diffs.
+- Never include files the user hasn't seen ("scope_check: ask_first" is the
+  default — when in doubt, list the files and ask).
+- Never amend or force-push without an explicit user request.
+- Never stage `.env` or secret-suffix files. If `.gitignore` is missing
+  them, flag it and stop.
