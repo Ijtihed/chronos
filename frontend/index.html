@@ -418,6 +418,27 @@
   <div id="map-container" class="hidden fixed top-10 left-0 right-0 bottom-0 z-[200] bg-black">
     <div id="map" class="w-full h-full"></div>
 
+    <!-- Loading overlay: covers the canvas while borders + place      -->
+    <!-- labels load on first show. globe.js show() adds .ready to the -->
+    <!-- container once at least one border arc has been added so this -->
+    <!-- fades out. Mirror of #wartable-loading; same dots-pulse, same -->
+    <!-- vocabulary, so the loading experience is consistent across    -->
+    <!-- the three 3D surfaces.                                        -->
+    <div id="map-loading"
+         class="absolute inset-0 z-[20] flex flex-col items-center justify-center bg-black pointer-events-none transition-opacity duration-500">
+      <div class="text-[10px] uppercase tracking-[0.25em] text-white/35 font-medium mb-5">
+        Globe
+      </div>
+      <div class="dots-pulse flex gap-1.5 mb-6">
+        <span class="w-1 h-1 rounded-full bg-white/40"></span>
+        <span class="w-1 h-1 rounded-full bg-white/40"></span>
+        <span class="w-1 h-1 rounded-full bg-white/40"></span>
+      </div>
+      <div class="text-[10px] uppercase tracking-[0.18em] text-white/25" id="map-loading-stage">
+        Loading borders&hellip;
+      </div>
+    </div>
+
     <!-- Map control toolbar — bottom-center, large + clearly labeled.
          Single canonical strip so new players immediately see what
          they can do. -->
@@ -591,6 +612,25 @@
   <!-- pin-on-drop draggable nodes. Snapshot on open; no live updates. -->
   <!-- ════════════════════════════════════════════════════════════════ -->
   <div id="graph-container" class="hidden fixed top-10 left-0 right-0 bottom-0 z-[200] bg-black">
+    <!-- Loading overlay: covers the canvas while the interaction      -->
+    <!-- graph is being fetched and the d3 simulation is being         -->
+    <!-- initialized. graph.js show() adds .ready to the container     -->
+    <!-- once updateGraph() has placed the player + at least one node, -->
+    <!-- fading this out. Same vocabulary as the other two overlays.   -->
+    <div id="graph-loading"
+         class="absolute inset-0 z-[20] flex flex-col items-center justify-center bg-black pointer-events-none transition-opacity duration-500">
+      <div class="text-[10px] uppercase tracking-[0.25em] text-white/35 font-medium mb-5">
+        Connections
+      </div>
+      <div class="dots-pulse flex gap-1.5 mb-6">
+        <span class="w-1 h-1 rounded-full bg-white/40"></span>
+        <span class="w-1 h-1 rounded-full bg-white/40"></span>
+        <span class="w-1 h-1 rounded-full bg-white/40"></span>
+      </div>
+      <div class="text-[10px] uppercase tracking-[0.18em] text-white/25" id="graph-loading-stage">
+        Loading interaction graph&hellip;
+      </div>
+    </div>
     <div class="absolute inset-0 flex flex-col">
       <div id="graph-header"
            class="shrink-0 h-9 flex items-center justify-between px-5 border-b border-white/5 bg-black/80 backdrop-blur-sm">

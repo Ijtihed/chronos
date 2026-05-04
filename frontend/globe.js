@@ -1067,6 +1067,21 @@
     if (!container) return;
     container.classList.remove("hidden");
     isVisible = true;
+
+    // Loading overlay: same pattern as the war-table. Cover the canvas
+    // until borders are loaded so the user doesn't see a black sphere
+    // for the second or two it takes the GeoJSON to fetch + project.
+    // For era changes we reset to the loading state; for re-opens
+    // with the same era and existing borders we leave .ready alone
+    // and the overlay stays faded.
+    const stageEl = document.getElementById("map-loading-stage");
+    const setStage = (s) => { if (stageEl) stageEl.textContent = s; };
+    const eraChanged = eraKeyArg && eraKeyArg !== currentEraKey;
+    if (eraChanged || borderGroup.children.length === 0) {
+      container.classList.remove("ready");
+      setStage("Loading borders\u2026");
+    }
+
     if (runIdArg && runIdArg !== currentRunId) {
       _firstMarkerPlacement = true;
       perceptionCache = {};
@@ -1074,13 +1089,38 @@
     }
     if (runIdArg) currentRunId = runIdArg;
 
-    if (eraKeyArg && eraKeyArg !== currentEraKey) {
+    if (eraChanged) {
       _defaultOrbit = _eraOrbit(eraKeyArg);
       camOrbit.theta = _defaultOrbit.theta;
       camOrbit.phi = _defaultOrbit.phi;
       camOrbit.dist = _defaultOrbit.dist;
       _applyOrbitToCamera();
-      loadBorders(eraKeyArg);
+      // Fire-and-forget border load; mark ready in its callback path.
+      loadBorders(eraKeyArg).then(() => {
+        setStage("Placing markers\u2026");
+        _markGlobeReady(container);
+      }).catch(() => {
+        setStage("Borders failed");
+      });
+    } else {
+      // Same era; if borders already loaded from a prior show, mark
+      // ready immediately. If they haven't (very rare race), fall
+      // back to a quick deferred check.
+      if (borderGroup.children.length > 0) {
+        _markGlobeReady(container);
+      } else {
+        // Borders are still loading from the previous show()'s
+        // fire-and-forget. Poll briefly.
+        let _polls = 0;
+        const _check = () => {
+          if (borderGroup.children.length > 0) {
+            _markGlobeReady(container);
+          } else if (_polls++ < 40) {
+            setTimeout(_check, 100);
+          }
+        };
+        _check();
+      }
     }
 
     // Restore prior view if we have one.
@@ -1106,6 +1146,17 @@
       camera.updateProjectionMatrix();
       renderer.setSize(w, h, false);
     }
+  }
+
+  function _markGlobeReady(container) {
+    // Defer two animation frames so we get at least one painted
+    // frame at full size before the overlay fades; prevents catching
+    // a flash of empty canvas during the transition.
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        container.classList.add("ready");
+      });
+    });
   }
 
   function hide() {

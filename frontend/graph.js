@@ -899,6 +899,14 @@ const ChronosGraph = (function () {
     visible = true;
     currentRunId = runId || null;
 
+    // Loading overlay: same pattern as the war-table and globe. Cover
+    // the SVG until interaction_graph fetch + d3 simulation init
+    // complete. .ready is added at the bottom of the success path.
+    container.classList.remove("ready");
+    var stageEl = document.getElementById("graph-loading-stage");
+    var setStage = function (s) { if (stageEl) stageEl.textContent = s; };
+    setStage("Loading interaction graph\u2026");
+
     var titleYear = document.getElementById("graph-title-year");
     var titleName = document.getElementById("graph-title-name");
     if (titleYear) titleYear.textContent = "Loading...";
@@ -906,6 +914,7 @@ const ChronosGraph = (function () {
 
     if (!runId) {
       console.warn("ChronosGraph.show() called without runId");
+      setStage("No run loaded");
       return;
     }
 
@@ -913,13 +922,22 @@ const ChronosGraph = (function () {
       var res = await fetch("/api/run/" + encodeURIComponent(runId) + "/interaction_graph");
       if (!res.ok) throw new Error("HTTP " + res.status);
       var data = await res.json();
+      setStage("Placing nodes\u2026");
       // Force a paint frame before measuring so the freshly-unhidden SVG
       // has real dimensions when the simulation initializes.
       await new Promise(function (r) { requestAnimationFrame(function () { r(); }); });
       updateGraph(data);
+      // Two RAFs so we get at least one painted simulation frame
+      // before the overlay fades out.
+      requestAnimationFrame(function () {
+        requestAnimationFrame(function () {
+          container.classList.add("ready");
+        });
+      });
     } catch (e) {
       console.warn("interaction_graph fetch failed:", e);
       if (titleYear) titleYear.textContent = "Error";
+      setStage("Failed to load");
     }
   }
 

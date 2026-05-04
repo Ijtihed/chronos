@@ -2788,15 +2788,17 @@ body.chronos-stacked-manuscript #turns-container[data-has-turn="1"] .manuscript-
 }
 
 
-/* War-table loading overlay -- hides the empty/black canvas and the
- * empty era label while terrain + borders + place labels load on
- * first show. wartable.js show() adds .ready to #wartable-container
- * once the terrain mesh exists, fading this out. */
-#wartable-container.ready #wartable-loading {
+/* Loading overlays. Same pattern across the three 3D surfaces
+ * (war-table, globe, connections graph): the overlay sits on top of
+ * the canvas at z-[20], the JS adds `.ready` to the container once
+ * its first paint is meaningful, and the overlay fades out via the
+ * `transition-opacity duration-500` Tailwind classes baked into the
+ * markup. After fade, pointer-events drop to none so clicks reach
+ * the canvas underneath.
+ */
+#wartable-container.ready #wartable-loading,
+#map-container.ready #map-loading,
+#graph-container.ready #graph-loading {
   opacity: 0;
-}
-#wartable-container.ready #wartable-loading {
-  /* Once faded, take it out of the layer stack so clicks pass
-   * through to the canvas. */
   pointer-events: none;
 }
