@@ -273,6 +273,44 @@
          experience. Generous padding and a wider reading column inside,
          but the surface itself is full-width so floating elements (ground,
          clickable affordances, atmospheric layers) compose with it. -->
+    <!-- ════════════════════════════════════════════════════════════════ -->
+    <!-- CORRIDOR MANUSCRIPT (Phase 2.8 Phase A)                          -->
+    <!--                                                                  -->
+    <!-- The 3D corridor of past turns. Activated by                      -->
+    <!-- body.chronos-corridor-manuscript (default on; ?flat=1 disables). -->
+    <!-- When on: this overlay is visible AND #manuscript is hidden via   -->
+    <!-- CSS. When off: #manuscript is visible AND this is hidden.        -->
+    <!--                                                                  -->
+    <!-- See frontend/corridor.js for the runtime; manuscript-as-artifact -->
+    <!-- and roadmap.md Phase 2.8 for design intent.                      -->
+    <!-- ════════════════════════════════════════════════════════════════ -->
+    <div id="corridor-container" class="hidden fixed top-10 left-0 right-0 bottom-0 bg-black overflow-hidden">
+      <!-- Three.js canvas for connection lines + fog. Cards are DOM      -->
+      <!-- elements above this (corridor.js _projectCards each frame).   -->
+      <!-- Canvas is created lazily by corridor.js init() so we can be    -->
+      <!-- sure the container has real dimensions first.                  -->
+      <!-- Loading overlay -- same vocabulary as the war-table / globe.   -->
+      <div id="corridor-loading"
+           class="absolute inset-0 z-[20] flex flex-col items-center justify-center bg-black pointer-events-none transition-opacity duration-500">
+        <div class="text-[10px] uppercase tracking-[0.25em] text-white/35 font-medium mb-5">
+          Corridor
+        </div>
+        <div class="dots-pulse flex gap-1.5 mb-6">
+          <span class="w-1 h-1 rounded-full bg-white/40"></span>
+          <span class="w-1 h-1 rounded-full bg-white/40"></span>
+          <span class="w-1 h-1 rounded-full bg-white/40"></span>
+        </div>
+        <div class="text-[10px] uppercase tracking-[0.18em] text-white/25">
+          Walking the path&hellip;
+        </div>
+      </div>
+      <!-- Hint at the bottom telling the player how to navigate.         -->
+      <div id="corridor-hint"
+           class="absolute bottom-6 left-1/2 -translate-x-1/2 z-[15] text-[10px] uppercase tracking-[0.18em] text-white/35 bg-black/55 backdrop-blur-sm border border-white/10 rounded-md px-4 py-2 pointer-events-none">
+        WASD or arrows to walk &mdash; drag to look &mdash; press Z for the constellation
+      </div>
+    </div>
+
     <main id="manuscript" class="custom-scroll overflow-y-auto mt-10 mb-14" style="height: calc(100vh - 96px);">
       <div class="manuscript-column mx-auto py-16 px-6" id="manuscript-inner">
 
@@ -905,6 +943,13 @@
     or the in-overlay Close button closes it.
   -->
   <script src="wartable.js"></script>
+  <!--
+    corridor.js installs window.ChronosCorridor when 3D is on
+    (?flat=1 is not set). Replaces the vertical scroll manuscript
+    with a 3D corridor of past turns. See manuscript-as-artifact.md
+    Phase 2.8 for design intent.
+  -->
+  <script src="corridor.js"></script>
   <script src="graph.js"></script>
   <script src="app.js"></script>
 

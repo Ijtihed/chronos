@@ -76,6 +76,11 @@ function hideTutorial() {
   if (!flat) {
     document.body.classList.add("chronos-stacked-manuscript");
     document.body.classList.add("chronos-globe-default");
+    // Phase 2.8: corridor manuscript replaces the depth-stack as the
+    // primary view. The depth-stack class above stays set for the
+    // ?flat=1 fallback path; with chronos-corridor-manuscript on,
+    // CSS hides #manuscript so the depth-stack is never seen.
+    document.body.classList.add("chronos-corridor-manuscript");
   }
 })();
 
@@ -391,6 +396,14 @@ function enterGame() {
     applyMemoryDecay();
     applyDepthLayering();
     _wireDecayHoverAll();
+    // Phase 2.8: hand the restored .turn-block elements to the
+    // corridor so they get placed along the path. Connection edges
+    // for restored turns are sparse (no per-turn data); new turns
+    // submitted after restore will have full edges.
+    if (typeof ChronosCorridor !== "undefined") {
+      ChronosCorridor.show();
+      ChronosCorridor.restoreFromContainer();
+    }
   } else {
     if (turnsContainer) turnsContainer.innerHTML = "";
     if (runId && (isOldFormat || isPoisoned)) {
@@ -422,6 +435,13 @@ function enterGame() {
     // Show the depth-discovery hint once per browser. Disappears the
     // moment the player scrolls or hovers a turn-block.
     _maybeShowDepthHint();
+    // Phase 2.8: register the freshly-built intro card with the
+    // corridor and bring it on-screen.
+    if (typeof ChronosCorridor !== "undefined") {
+      ChronosCorridor.show();
+      const intro = turnsContainer.querySelector(".manuscript-intro");
+      if (intro) ChronosCorridor.addIntroCard(intro);
+    }
   }
 
   if (state.run_status === "dead_observing") {
@@ -796,6 +816,17 @@ function updateClock() {
     if (a && (a.tagName === "INPUT" || a.tagName === "TEXTAREA" ||
               a.isContentEditable)) return;
     if (e.metaKey || e.ctrlKey || e.altKey) return;
+    // Phase 2.8: when the corridor is the active manuscript view,
+    // Z toggles the constellation overview (camera pulled back above
+    // the path) instead of the legacy zoomed-out scroll.
+    if (
+      typeof ChronosCorridor !== "undefined" &&
+      ChronosCorridor.isVisible() &&
+      document.body.classList.contains("chronos-corridor-manuscript")
+    ) {
+      ChronosCorridor.toggleConstellation();
+      return;
+    }
     const ms = document.getElementById("manuscript");
     if (!ms) return;
     ms.classList.toggle("zoomed-out");
@@ -1024,6 +1055,16 @@ async function submitTurn(text) {
   // flat intro for 5-30s while the spinner runs and conclude the 3D
   // isn't working at all.
   applyDepthLayering();
+
+  // Phase 2.8: route the in-flight block into the corridor. The block
+  // is now in #turns-container; addTurn moves it to #corridor-cards
+  // and registers it in the 3D scene at the next path position.
+  // turnData is null at this point (we don't have parsed_action yet);
+  // notifyTurnComplete will fill it in after /turn returns.
+  if (typeof ChronosCorridor !== "undefined") {
+    if (!ChronosCorridor.isVisible()) ChronosCorridor.show();
+    ChronosCorridor.addTurn(block, null);
+  }
 
   // Phase 2.7: race the inner thought against /turn. Kick off
   // immediately, render in the slot as soon as it arrives. Failure is
@@ -1389,6 +1430,14 @@ async function renderTurnStaggered(el, playerText, data) {
   el.innerHTML = playerLineHtml + thoughtHtml + h;
   el.scrollIntoView({ behavior: "smooth" });
 
+  // Phase 2.8: hand full turn data to the corridor so it can compute
+  // significance, register connection edges (action -> NPC reaction,
+  // action -> divergence, NPC <-> NPC), and update the card's tier
+  // styling. Idempotent if already added by submitTurn.
+  if (typeof ChronosCorridor !== "undefined") {
+    ChronosCorridor.notifyTurnComplete(el, data);
+  }
+
   for (let i = 0; i < npcIds.length; i++) {
     const { id, internal } = npcIds[i];
     const npcEl = document.getElementById(id);
@@ -1652,6 +1701,14 @@ function _maybeShowDepthHint() {
 
 function applyDepthLayering() {
   const enabled = document.body.classList.contains("chronos-stacked-manuscript");
+  // Phase 2.8: when the corridor manuscript is the active view, the
+  // depth-stack inline transforms would FIGHT the corridor's per-frame
+  // projection writes. Skip applyDepthLayering's transform writes when
+  // corridor is on. The function still runs (so data-has-turn etc.
+  // gets toggled), but the transform-setting branch is muted.
+  const corridorActive =
+    document.body.classList.contains("chronos-corridor-manuscript") &&
+    typeof ChronosCorridor !== "undefined";
 
   // Force the 3D context onto the inner element directly via inline
   // style. Three previous attempts via stylesheet rules failed for
@@ -1660,13 +1717,13 @@ function applyDepthLayering() {
   // stylesheet rule short of !important, and nothing in the cascade
   // sets these with !important. This is the belt-and-suspenders fix.
   const inner = document.getElementById("manuscript-inner");
-  if (inner && enabled) {
+  if (inner && enabled && !corridorActive) {
     inner.style.perspective = "1400px";
     inner.style.perspectiveOrigin = "50% 30%";
     inner.style.transformStyle = "preserve-3d";
   }
   const tc = document.getElementById("turns-container");
-  if (tc && enabled) {
+  if (tc && enabled && !corridorActive) {
     tc.style.transformStyle = "preserve-3d";
   }
 
@@ -1677,7 +1734,10 @@ function applyDepthLayering() {
   // INLINE style here -- belt-and-suspenders for the same reason
   // applyDepthLayering is now setting transforms directly on blocks.
   if (tc) {
-    const intro = tc.querySelector(".manuscript-intro");
+    // The intro might have been moved into #corridor-cards by the
+    // corridor; scope our query so we don't set styles on the corridor's
+    // copy.
+    const intro = corridorActive ? null : tc.querySelector(".manuscript-intro");
     if (total > 0) {
       tc.setAttribute("data-has-turn", "1");
       if (intro) {
@@ -1706,6 +1766,13 @@ function applyDepthLayering() {
       block.style.transform = "";
       block.style.filter = "";
       block.removeAttribute("data-deep");
+      return;
+    }
+    // Phase 2.8: corridor owns the transform on its cards. Skip per-
+    // block transform writes when corridor is active. The block still
+    // gets the --turn-z / --turn-blur CSS variables for any code that
+    // reads them, but the inline transform/filter is left alone.
+    if (corridorActive) {
       return;
     }
     // Aggressive recession curve. Bumped from -300 to -360 because
@@ -1769,12 +1836,18 @@ window.chronosDiag = function chronosDiag() {
       ChronosWarTable_kind: typeof ChronosWarTable === "undefined"
         ? "undefined"
         : (ChronosWarTable.show ? "object" : typeof ChronosWarTable),
+      ChronosCorridor_kind: typeof ChronosCorridor === "undefined"
+        ? "undefined"
+        : (ChronosCorridor.show ? "object" : typeof ChronosCorridor),
       // state, runId, eraKey are module-scope `let`s, not on window.
       // We poke the closure references directly here.
       state_loaded: !!state,
       runId_loaded: !!runId,
       eraKey_loaded: !!eraKey,
     },
+    corridor: typeof ChronosCorridor === "undefined" || !ChronosCorridor.getDiag
+      ? "(unavailable)"
+      : ChronosCorridor.getDiag(),
     manuscript_inner_perspective: innerCS ? innerCS.perspective : "(no element)",
     manuscript_inner_transform_style: innerCS ? innerCS.transformStyle : "(no element)",
     turns_container_has_data: tc ? tc.getAttribute("data-has-turn") : "(no element)",
@@ -2365,6 +2438,14 @@ async function executeSkip(ticks) {
     `<div class="turn-spinner"><div class="turn-spinner-ring"></div><span class="streaming-dots">\u00b7 \u00b7 \u00b7</span></div>`;
   turnsContainer.appendChild(block);
   block.scrollIntoView({ behavior: "smooth" });
+
+  // Phase 2.8: a time-skip block also lands as a card in the corridor.
+  // No connection edges (skip has no parsed_action / npc_responses);
+  // it just shows up as a "time passes" marker along the path.
+  if (typeof ChronosCorridor !== "undefined") {
+    if (!ChronosCorridor.isVisible()) ChronosCorridor.show();
+    ChronosCorridor.addTurn(block, null);
+  }
 
   try {
     const res = await fetch(`/api/run/${runId}/skip`, {

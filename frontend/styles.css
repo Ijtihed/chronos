@@ -2899,7 +2899,207 @@ body.chronos-stacked-manuscript #turns-container[data-has-turn="1"] .manuscript-
  */
 #wartable-container.ready #wartable-loading,
 #map-container.ready #map-loading,
-#graph-container.ready #graph-loading {
+#graph-container.ready #graph-loading,
+#corridor-container.ready #corridor-loading {
   opacity: 0;
   pointer-events: none;
 }
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+ * PHASE 2.8 -- Corridor manuscript
+ * ═══════════════════════════════════════════════════════════════════════
+ *
+ * The 3D corridor of past turns. Three.js renders connection lines on
+ * a transparent canvas; turn-block DOM elements are projected onto the
+ * canvas each frame by corridor.js _projectCards() and positioned via
+ * inline transform: translate3d. This file styles the cards, the NPC
+ * nodes, and the divergence markers; manages visibility of the
+ * #corridor-container vs the legacy #manuscript via the body class.
+ *
+ * Activation: body.chronos-corridor-manuscript (default on, ?flat=1
+ * disables). When the body class is on:
+ *   - #corridor-container is visible (its own .hidden controls show/hide)
+ *   - #manuscript is HIDDEN (the legacy vertical scroll)
+ * When the body class is off:
+ *   - #corridor-container is hidden
+ *   - #manuscript is visible
+ * ─────────────────────────────────────────────────────────────────── */
+
+body.chronos-corridor-manuscript #manuscript {
+  display: none !important;
+}
+body:not(.chronos-corridor-manuscript) #corridor-container {
+  display: none !important;
+}
+
+/* The container is full-bleed below the top bar.                       */
+#corridor-container {
+  z-index: 8; /* above the ground/vignette but below modal overlays */
+}
+
+/* The card layer sits inside the container, transparent, with cards
+ * positioned absolutely by corridor.js. perspective is set inline by
+ * corridor.js init() too -- belt-and-suspenders so a stylesheet drift
+ * doesn't break the depth. */
+#corridor-cards {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* Each turn-block, once moved into the corridor, becomes a .corridor-
+ * card. The transform is set inline every frame by _projectCards;
+ * everything else (size, padding, typography, decay, hover-recover,
+ * inner-thought slot, NPC stagger blocks) inherits from the existing
+ * Pass 1-7 rules. This file just adds the corridor-specific
+ * presentation: card chrome, tier-based size/glow, hover lift.
+ *
+ * Width is constrained so cards don't span the whole viewport at
+ * close range -- they're MEANT to be readable as discrete pages.
+ */
+.corridor-card {
+  width: 540px;
+  max-width: min(60vw, 600px);
+  background: rgba(8, 8, 10, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 22px 26px;
+  backdrop-filter: blur(6px);
+  box-shadow: 0 18px 64px rgba(0, 0, 0, 0.55);
+  /* Don't transition transform -- corridor.js writes it inline every
+   * frame. Transitioning would lag every redraw by 50ms. Filter and
+   * opacity are fine to ease. */
+  will-change: transform, opacity;
+}
+
+/* Tier-based emphasis. The tier is set as data-significance-tier by
+ * corridor.js addTurn() based on parsed_action.significance_score.
+ * Decisions get a subtle warm-amber rim and a faint inset glow so
+ * they read as "important nodes" in the corridor at a glance. Filler
+ * gets desaturated/dimmer chrome so it visually recedes even when at
+ * the same camera distance.
+ */
+.corridor-card[data-significance-tier="decision"] {
+  border-color: rgba(252, 211, 77, 0.32);
+  box-shadow:
+    0 0 0 1px rgba(252, 211, 77, 0.12) inset,
+    0 22px 80px rgba(0, 0, 0, 0.55),
+    0 0 36px rgba(252, 211, 77, 0.06);
+  background: rgba(14, 12, 8, 0.82);
+}
+.corridor-card[data-significance-tier="filler"] {
+  border-color: rgba(255, 255, 255, 0.04);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+  background: rgba(6, 6, 8, 0.72);
+}
+
+/* The most recent turn carries .is-current. Bumped border + a faint
+ * cool-emerald accent so the player can see at a glance "this is the
+ * present." Removed when a newer turn is added. */
+.corridor-card.is-current {
+  border-color: rgba(110, 231, 183, 0.28);
+  box-shadow:
+    0 0 0 1px rgba(110, 231, 183, 0.12) inset,
+    0 22px 80px rgba(0, 0, 0, 0.55),
+    0 0 32px rgba(110, 231, 183, 0.05);
+}
+
+/* Hover lifts the card forward. We can't translateZ (transform is
+ * being driven by corridor.js inline each frame), but we CAN bump
+ * opacity, brightness, and add a subtle scale animation. The existing
+ * .recovering class still composes here -- hovering also recovers
+ * any decayed words. corridor.js sets pointer-events:auto on cards
+ * within reading range; this rule fires when hover is possible. */
+.corridor-card:hover {
+  filter: brightness(1.18);
+  border-color: rgba(255, 255, 255, 0.18);
+  z-index: 99999 !important;
+}
+
+/* The intro card -- anchored at the deepest point of the corridor,
+ * marks "where the run started." Slightly larger and warmer.        */
+.corridor-card.corridor-card-intro {
+  width: 560px;
+  background: rgba(12, 10, 6, 0.82);
+  border-color: rgba(202, 138, 4, 0.18);
+  box-shadow:
+    0 0 0 1px rgba(202, 138, 4, 0.10) inset,
+    0 22px 80px rgba(0, 0, 0, 0.55);
+}
+
+/* NPC nodes -- small text labels off to the side of the path. Each
+ * unique NPC gets one node that lives in the corridor and is the
+ * target of action -> NPC connection lines.                         */
+.corridor-npc-node {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  background: rgba(0, 0, 0, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-left-width: 2px;
+  border-left-color: rgba(161, 161, 170, 0.45);
+  border-radius: 4px;
+  padding: 6px 10px;
+  min-width: 110px;
+  backdrop-filter: blur(3px);
+  user-select: none;
+  white-space: nowrap;
+}
+.corridor-npc-node .cnn-name {
+  font-size: 11px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.85);
+  letter-spacing: 0.02em;
+}
+.corridor-npc-node .cnn-role {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: rgba(255, 255, 255, 0.4);
+  margin-top: 2px;
+}
+
+/* Divergence anchor markers -- the off-path target of dashed amber
+ * connection lines. "DIVERGENCE" label + a one-line snippet of the
+ * canonical event the player superseded.                            */
+.corridor-divergence-marker {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  background: rgba(35, 25, 0, 0.72);
+  border: 1px dashed rgba(252, 211, 77, 0.45);
+  border-radius: 4px;
+  padding: 8px 12px;
+  max-width: 260px;
+  backdrop-filter: blur(3px);
+  user-select: none;
+}
+.corridor-divergence-marker .cdm-label {
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: rgba(252, 211, 77, 0.7);
+  margin-bottom: 4px;
+}
+.corridor-divergence-marker .cdm-text {
+  font-size: 10px;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+/* The hint banner ("WASD to walk...") fades after the player has
+ * interacted with the corridor for the first time. corridor.js can
+ * toggle a body class to hide it permanently per session. */
+#corridor-hint {
+  transition: opacity 0.6s ease;
+}
+body.chronos-corridor-hinted #corridor-hint {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Observation mode tints the corridor exactly as it tints the legacy
+ * manuscript. The .observation-muted filter is set on #manuscript by
+ * enterObservationMode; we also apply it to #corridor-container. */
+body.is-dead #corridor-container {
+  filter: contrast(0.85) brightness(0.7) saturate(0.7);
+}
+
