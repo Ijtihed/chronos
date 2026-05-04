@@ -9,3 +9,4 @@ ollama
 beautifulsoup4
 SPARQLWrapper
 google-genai>=1.73,<2
+Pillow

@@ -1007,6 +1007,11 @@ body {
  * manuscript, the inner scales down and the column widens; blocks
  * become smaller, decay'd words turn into pattern. Reading is hard;
  * shape is visible. Click any block to zoom back in on it.
+ *
+ * NOTE on interaction with Pass 6 (manuscript depth-stack): when the
+ * stacked-manuscript flag is on, this Pass 5 transform is replaced by
+ * a depth-axis pull-back (scale + translateZ). See the Pass 6 block
+ * further down for the override.
  */
 
 #manuscript-inner {
@@ -2416,4 +2421,202 @@ body.map-legend-hidden #map-legend {
     font-size: 9px;
     padding: 4px 8px;
   }
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+ * MEMORY REHAUL — pass 6: manuscript depth-stack (2026-05-04)
+ * ═══════════════════════════════════════════════════════════════════════
+ *
+ * Phase 2.6 (Spatial Substrate). The manuscript is a physical object.
+ * Each turn-block is a layer in z; older turns recede into depth and
+ * dim atmospherically. Hovering a deep block lifts it forward and
+ * clears its haze (composes with Pass 3 .recovering for word recovery).
+ *
+ * Activation:
+ *   body.chronos-stacked-manuscript  (set in app.js, default ON)
+ *
+ * Disable for any reason via:
+ *   ?flat=1 URL parameter         (universal opt-out)
+ *   body.chronos-no-3d            (Safari fallback if 3D context broken)
+ *
+ * No DOM changes. Works off the existing .turn-block + per-block
+ * --turn-z CSS variable set by applyDepthLayering() in app.js.
+ *
+ * Per-block math (mirrors applyMemoryDecay age curve):
+ *   age 0 = -0px,  opacity 1.00, blur 0px
+ *   age 1 = -40px, opacity 0.96, blur 0.3px
+ *   age 5 = -200px, opacity 0.80, blur 1.5px
+ *   age 20+= floor: -800px, opacity 0.30, blur 3px
+ *
+ * Composition with Pass 5 zoom-out: when .zoomed-out is set, the
+ * existing scale(0.45) is augmented to a deeper translateZ pull-back
+ * so the constellation reads as parallax depth, not just a flat scale.
+ * ─────────────────────────────────────────────────────────────────── */
+
+/* Establish the 3D context.
+ *
+ * IMPORTANT: perspective MUST live on #manuscript-inner, not on
+ * #manuscript. #manuscript is the scroll container (overflow-y:auto),
+ * and per CSS spec a scroll container creates a stacking context that
+ * effectively flattens descendant 3D transforms in Chromium and
+ * Webkit — the visual depth disappears. Earlier this rule was on
+ * #manuscript and the manuscript looked completely flat regardless of
+ * applyDepthLayering() math; this is the fix.
+ *
+ * The scroller stays flat (good — scrollbars and viewport intersection
+ * behave normally), and the inner element holds the 3D space.
+ */
+body.chronos-stacked-manuscript #manuscript-inner {
+  perspective: 1400px;
+  perspective-origin: 50% 30%;
+  transform-style: preserve-3d;
+}
+
+/* Per-block depth.
+ *
+ * --turn-z is set by app.js applyDepthLayering() to a negative pixel
+ * value (newest = 0, deeper = more negative). --turn-blur is similarly
+ * a string like "0.6px". --turn-opacity is already used by Pass 1
+ * (updateTurnDimming); we reuse it here so the two effects sum.
+ *
+ * filter:blur is GPU-heavy; capped at 3px in the JS so we don't melt
+ * laptops on long runs. content-visibility:auto on very deep blocks
+ * lets the browser skip layout/paint for blocks the reader can't see
+ * meaningfully anyway.
+ */
+body.chronos-stacked-manuscript #manuscript-inner .turn-block {
+  transform: translateZ(var(--turn-z, 0px));
+  filter: blur(var(--turn-blur, 0px));
+  transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1),
+              filter 0.6s ease,
+              opacity 0.8s ease;
+  /* Preserve-3d so nested transforms (NPC blocks etc) inherit the
+   * stacking context cleanly. */
+  transform-style: preserve-3d;
+  /* Will-change only on the transform/filter we actually animate. */
+  will-change: transform, filter;
+}
+
+/* Hover lifts the block forward (toward the camera) and clears haze.
+ * Composes with the existing .recovering rule (Pass 3) which reveals
+ * lost words on hover. */
+body.chronos-stacked-manuscript #manuscript-inner .turn-block:hover,
+body.chronos-stacked-manuscript #manuscript-inner .turn-block.recovering {
+  transform: translateZ(0px);
+  filter: blur(0px);
+  opacity: 1 !important;
+}
+
+/* Very-deep blocks: skip rendering until they enter the viewport.
+ * --turn-deep is set on blocks beyond age 20 by applyDepthLayering. */
+body.chronos-stacked-manuscript #manuscript-inner .turn-block[data-deep="1"] {
+  content-visibility: auto;
+  contain-intrinsic-size: 240px;
+}
+
+/* Pass 5 + Pass 6 combined: zoomed-out becomes a pull-back through
+ * the stack. The Pass 5 scale stays (so the column still shows the
+ * shape of the run) but we add a strong translateZ on the inner so
+ * the deep blocks separate from the recent ones in apparent space. */
+body.chronos-stacked-manuscript #manuscript.zoomed-out #manuscript-inner {
+  transform: translateZ(-280px) scale(0.5);
+}
+
+/* Decayed-word ellipses sit on the same z-plane as their parent block,
+ * so the depth treatment doesn't pop them out of the page. Already
+ * implicit but make it explicit for clarity. */
+body.chronos-stacked-manuscript .m-word--ellipsis {
+  transform: translateZ(0);
+}
+
+/* Observation mode (post-death) composes naturally: the existing
+ * .observation-muted filter on body / manuscript stacks under the
+ * per-block blur. No special rule needed. */
+
+
+/* ── First-stack-reveal: one-shot intro animation ────────────────────
+ *
+ * On a fresh entry into the manuscript there are no turn-blocks yet,
+ * so the depth-stack metaphor is invisible. The intro div drops in
+ * from far away (translateZ(-1100) -> 0) over ~1.4s, blur -> 0, so the
+ * player's first visible action is a block coming TOWARD them through
+ * space. The depth treatment becomes obvious instantly even on a
+ * first turn. Runs once per intro -- the keyframe is forwards-only
+ * and the JS doesn't re-add the class on subsequent renders.
+ */
+body.chronos-stacked-manuscript #manuscript-inner .manuscript-intro.first-stack-reveal {
+  animation: stackRevealIn 1.4s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+  transform-style: preserve-3d;
+}
+
+@keyframes stackRevealIn {
+  0% {
+    opacity: 0;
+    transform: translateZ(-1300px) scale(0.92);
+    filter: blur(4px);
+  }
+  60% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+    transform: translateZ(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+/* When the FIRST real turn-block appears, the intro should recede
+ * with the rest of the stack. Treat it like an extra-deep turn-block:
+ * once any .turn-block exists in the same container, the intro takes
+ * a deep z and gentle blur. JS handles by setting data-has-turn on
+ * #turns-container; a sibling-selector approach in pure CSS would be
+ * too brittle.
+ */
+body.chronos-stacked-manuscript #turns-container[data-has-turn="1"] .manuscript-intro {
+  transform: translateZ(-260px);
+  filter: blur(1.6px);
+  opacity: 0.55;
+  transition: transform 0.8s ease, filter 0.8s ease, opacity 0.8s ease;
+}
+body.chronos-stacked-manuscript #turns-container[data-has-turn="1"] .manuscript-intro:hover {
+  transform: translateZ(0);
+  filter: blur(0);
+  opacity: 1;
+}
+
+
+/* ── Depth-discovery hint -- one-shot, bottom-center, dismissible ──── */
+
+#depth-hint {
+  position: fixed;
+  bottom: 78px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1500;
+  background: rgba(0, 0, 0, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 6px;
+  padding: 10px 16px;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.78);
+  pointer-events: none;
+  backdrop-filter: blur(8px);
+  animation: depthHintIn 0.6s ease 1.2s both;
+}
+
+#depth-hint.dismiss {
+  animation: depthHintOut 0.6s ease both;
+}
+
+@keyframes depthHintIn {
+  from { opacity: 0; transform: translate(-50%, 12px); }
+  to   { opacity: 1; transform: translate(-50%, 0); }
+}
+
+@keyframes depthHintOut {
+  from { opacity: 1; transform: translate(-50%, 0); }
+  to   { opacity: 0; transform: translate(-50%, 12px); }
 }

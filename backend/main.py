@@ -208,6 +208,44 @@ async def get_geo(era_key: str):
         raise HTTPException(500, f"Failed to load border data: {exc}")
 
 
+# Phase 2.6 (Spatial Substrate) — DEM heightmap for the war-table.
+#
+# Returns an 8-bit grayscale PNG sized to TILE_PIXELS (1024) covering
+# the era's regional bounding box. The frontend war-table reads this
+# as a displacement texture for its terrain mesh.
+#
+# See backend/geo/terrain.py for the honest limitation: real SRTM data
+# is not bundled in the kickoff commit; the source today is a
+# deterministic procedural noise. The endpoint contract is stable;
+# real DEM data drops in via a follow-up build script.
+#
+# bbox is returned in headers so the frontend doesn't need to keep its
+# own copy of the era bounding box.
+@app.get("/api/geo/terrain/{era_key}")
+async def get_terrain(era_key: str):
+    from fastapi.responses import Response
+    from backend.geo.terrain import get_terrain_png, get_bbox
+
+    bbox = get_bbox(era_key)
+    if bbox is None:
+        raise HTTPException(404, f"No terrain bbox configured for era '{era_key}'")
+    try:
+        png_bytes = get_terrain_png(era_key)
+    except Exception as exc:  # noqa: BLE001 - surface a useful 500 either way
+        raise HTTPException(500, f"Failed to generate terrain: {exc}") from exc
+    return Response(
+        content=png_bytes,
+        media_type="image/png",
+        headers={
+            "Cache-Control": "public, max-age=86400",
+            "X-Terrain-Bbox-South": str(bbox.south_lat),
+            "X-Terrain-Bbox-West": str(bbox.west_lon),
+            "X-Terrain-Bbox-North": str(bbox.north_lat),
+            "X-Terrain-Bbox-East": str(bbox.east_lon),
+        },
+    )
+
+
 # Place labels (cities + small named regions) for zoom-dependent
 # rendering on the map. Returned with a 'tier' field so the frontend
 # can fade them in at different zoom levels:

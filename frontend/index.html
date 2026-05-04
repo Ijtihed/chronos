@@ -5,6 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CHRONOS</title>
 
+  <!-- Inline 1x1 transparent favicon so the browser stops asking for /favicon.ico
+       and emitting a 404 on every page load. Keeps the console clean. -->
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='black'/%3E%3C/svg%3E">
+
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 
@@ -531,6 +535,38 @@
   </div>
 
   <!-- ════════════════════════════════════════════════════════════════ -->
+  <!-- WAR-TABLE OVERLAY (Phase 2.6)                                   -->
+  <!--                                                                 -->
+  <!-- Tilted regional 3D view. Toggleable from the globe with `T`.    -->
+  <!-- Esc returns to the globe. Mounted as its own overlay rather     -->
+  <!-- than inside #map-container so the globe can stay alive          -->
+  <!-- underneath and resume cleanly on dismiss.                       -->
+  <!-- ════════════════════════════════════════════════════════════════ -->
+  <div id="wartable-container" class="hidden fixed top-10 left-0 right-0 bottom-0 z-[210] bg-black">
+    <!-- Canvas mounts inside here (created lazily by wartable.js).     -->
+    <!-- Massive faint era label hanging behind the table.              -->
+    <div id="wartable-era-label"
+         class="pointer-events-none absolute inset-0 flex items-center justify-center select-none">
+      <span class="text-white/[0.04] uppercase tracking-[0.3em]"
+            style="font-family: 'Cormorant Garamond', Georgia, serif; font-size: clamp(48px, 9vw, 160px); white-space: nowrap;"></span>
+    </div>
+    <!-- Toolbar: just a reset and a close. The war-table is
+         intentionally low-chrome — most interaction is direct
+         (drag, wheel, click). -->
+    <div class="fixed bottom-6 left-1/2 -translate-x-1/2 z-[999] flex items-stretch gap-1 bg-black/90 backdrop-blur-md border border-white/15 rounded-lg p-1 shadow-2xl">
+      <button id="wartable-reset"
+        class="h-10 px-3 flex items-center gap-2 text-white/85 hover:text-white hover:bg-white/10 rounded-md transition-colors cursor-pointer text-[11px] uppercase tracking-[0.12em]">
+        Reset view
+      </button>
+      <div class="w-px self-stretch bg-white/15 mx-1"></div>
+      <button id="wartable-close"
+        class="h-10 px-3 flex items-center gap-2 text-white/85 hover:text-white hover:bg-white/10 rounded-md transition-colors cursor-pointer text-[11px] uppercase tracking-[0.12em]">
+        Close (T)
+      </button>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════════ -->
   <!-- CONNECTIONS GRAPH OVERLAY                                       -->
   <!--                                                                 -->
   <!-- Player-centric NPC interaction graph. Read-only visualization   -->
@@ -706,7 +742,27 @@
     can't resolve. The bundle resolves them all together. ~270KB.
   -->
   <script src="https://unpkg.com/d3@7/dist/d3.min.js"></script>
+  <!--
+    Three.js for the 3D globe (Phase 2.6) and the war-table. Loaded
+    as a UMD bundle from unpkg so the rest of the frontend stays
+    build-step-free. ~600KB minified.
+  -->
+  <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
   <script src="map.js"></script>
+  <!--
+    globe.js installs itself as window.ChronosMap when body has class
+    `chronos-globe-default` (set by app.js initSpatialFlags() unless
+    ?flat=1 is in the URL). Loaded AFTER map.js so the globe wins
+    when active. With ?flat=1, the legacy ChronosMap from map.js
+    remains in place because globe.js early-returns.
+  -->
+  <script src="globe.js"></script>
+  <!--
+    wartable.js installs window.ChronosWarTable when 3D is on
+    (i.e. ?flat=1 is NOT set). T-key opens it from the globe; Esc
+    or the in-overlay Close button closes it.
+  -->
+  <script src="wartable.js"></script>
   <script src="graph.js"></script>
   <script src="app.js"></script>
 

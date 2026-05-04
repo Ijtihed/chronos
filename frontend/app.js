@@ -8,6 +8,24 @@
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => document.querySelectorAll(sel);
 
+// ── Phase 2.6 feature flags ───────────────────────────────────────────
+//
+// The 3D substrate (manuscript depth-stack + globe) is on by default.
+// `?flat=1` URL parameter disables both — falls back to the pre-Pass-6
+// flat manuscript and the legacy Leaflet map. Easy back-out if either
+// surface breaks for a given user. See manuscript-as-artifact.md.
+//
+// `body.chronos-no-3d` is reserved for browser fallback (Safari has had
+// historic 3D context bugs); not auto-set today, but the CSS reads it.
+(function initSpatialFlags() {
+  const params = new URLSearchParams(window.location.search);
+  const flat = params.get("flat") === "1";
+  if (!flat) {
+    document.body.classList.add("chronos-stacked-manuscript");
+    document.body.classList.add("chronos-globe-default");
+  }
+})();
+
 let state = null;
 let runId = null;
 let eraKey = null;
@@ -318,6 +336,7 @@ function enterGame() {
     if (manuscript) manuscript.scrollTop = manuscript.scrollHeight;
     // Re-apply memory decay to restored turns and rewire hover-recovery.
     applyMemoryDecay();
+    applyDepthLayering();
     _wireDecayHoverAll();
   } else {
     if (turnsContainer) turnsContainer.innerHTML = "";
@@ -328,7 +347,15 @@ function enterGame() {
     const loc = state.current_location;
     const year = state.current_year;
 
-    let h = `<div class="mb-10">`;
+    // Intro block.
+    //
+    // Tagged manuscript-intro so the Pass 6 depth CSS treats it as the
+    // baseline layer in the stack (sits at z=0 on entry, then recedes
+    // when the first real turn-block appears). The .first-stack-reveal
+    // class triggers a one-shot CSS keyframe that drops the block in
+    // from depth to z=0 over ~1.4s, visibly establishing the 3D
+    // metaphor on first paint even though there are no turn-blocks yet.
+    let h = `<div class="mb-10 manuscript-intro first-stack-reveal">`;
     h += `<div class="text-[11px] uppercase tracking-[0.15em] text-white/55 mb-4 font-semibold">${esc(state.era_name)} \u2014 ${year} AD</div>`;
     h += `<p class="text-sm leading-loose text-white/60 mb-4">${esc(state.era_description)}</p>`;
     h += `<p class="text-sm leading-loose text-white/60 mb-3">${esc(state.player_description)}</p>`;
@@ -339,6 +366,9 @@ function enterGame() {
     h += `</div>`;
     turnsContainer.innerHTML = h;
     saveRunToStorage();
+    // Show the depth-discovery hint once per browser. Disappears the
+    // moment the player scrolls or hovers a turn-block.
+    _maybeShowDepthHint();
   }
 
   if (state.run_status === "dead_observing") {
@@ -925,6 +955,7 @@ async function submitTurn(text) {
     updateTopBar();
     updateTurnDimming();
     applyMemoryDecay();
+    applyDepthLayering();
     _wireDecayHoverAll();
     saveRunToStorage();
 
@@ -1442,6 +1473,97 @@ function updateTurnDimming() {
   });
 }
 
+
+// ── Pass 6: manuscript depth-stack ────────────────────────────────────
+//
+// Phase 2.6 (Spatial Substrate). Each turn-block sits at a per-block
+// z-depth; older turns recede into the page and pick up atmospheric
+// haze (filter:blur via --turn-blur). Hover lifts a deep block forward,
+// composing with the existing .recovering class from Pass 3 so memory
+// recovery and depth recovery happen as one gesture.
+//
+// No DOM mutation. Sets per-block CSS custom properties only:
+//   --turn-z       e.g. "-200px"
+//   --turn-blur    e.g. "1.2px"
+// And a data attribute used by CSS to skip rendering very-deep blocks:
+//   data-deep="1"  on blocks beyond age 20
+//
+// Math (mirrors the applyMemoryDecay age curve so depth and decay
+// progress in lockstep):
+//   age 0 (newest) → z=0,    blur 0
+//   each step back → z -= 40px, blur += 0.3px
+//   floors:          z >= -800px, blur <= 3px
+//
+// Skipped entirely when the chronos-stacked-manuscript body class is
+// off (e.g. ?flat=1) — the existing Pass 1 dimming alone applies.
+// Show a one-shot hint that the manuscript has depth -- only ever
+// shown the first time per browser, dismissed on first scroll, hover,
+// or after 8 seconds. Without this nobody discovers the stack metaphor
+// because empty manuscripts have nothing to recede against.
+function _maybeShowDepthHint() {
+  if (!document.body.classList.contains("chronos-stacked-manuscript")) return;
+  try {
+    if (localStorage.getItem("chronos_depth_hint_seen") === "1") return;
+  } catch (_) { /* private browsing -- show anyway */ }
+  if (document.getElementById("depth-hint")) return;
+  const hint = document.createElement("div");
+  hint.id = "depth-hint";
+  hint.textContent = "Scroll to step back through time \u2014 turns recede into depth";
+  document.body.appendChild(hint);
+  const dismiss = () => {
+    if (!hint.parentNode) return;
+    hint.classList.add("dismiss");
+    try { localStorage.setItem("chronos_depth_hint_seen", "1"); } catch (_) {}
+    setTimeout(() => { if (hint.parentNode) hint.parentNode.removeChild(hint); }, 700);
+  };
+  setTimeout(dismiss, 8000);
+  const ms = document.getElementById("manuscript");
+  if (ms) ms.addEventListener("scroll", dismiss, { once: true, passive: true });
+  document.addEventListener("pointerdown", dismiss, { once: true });
+}
+
+function applyDepthLayering() {
+  const enabled = document.body.classList.contains("chronos-stacked-manuscript");
+  const blocks = document.querySelectorAll(".turn-block");
+  const total = blocks.length;
+  // Mark the container the first time any real turn-block exists so
+  // the intro block recedes (CSS rule keys off [data-has-turn="1"]).
+  const tc = document.getElementById("turns-container");
+  if (tc) {
+    if (total > 0) tc.setAttribute("data-has-turn", "1");
+    else tc.removeAttribute("data-has-turn");
+  }
+  blocks.forEach((block, index) => {
+    const age = total - 1 - index;
+    if (!enabled) {
+      // Clear in case we toggled the flag mid-session.
+      block.style.removeProperty("--turn-z");
+      block.style.removeProperty("--turn-blur");
+      block.removeAttribute("data-deep");
+      return;
+    }
+    // Recession curve. Tuned so a 2-turn run already feels obviously
+    // dimensional. age=1 at z=-150 (10.7% smaller against perspective
+    // 1400) reads as one clear step back, not "is it 3D? hard to tell".
+    //
+    //   age 0  -> z=0,     blur 0
+    //   age 1  -> z=-150,  blur 0.7
+    //   age 2  -> z=-260,  blur 1.2
+    //   age 5  -> z=-575,  blur 2.5
+    //   age 10 -> z=-1000, blur 3 (capped)
+    //   age 20+ floor -> z=-1300, blur 3
+    const z = Math.max(-1300, -150 * age - 5 * age * age);
+    const blur = Math.min(3, age * 0.7);
+    block.style.setProperty("--turn-z", z + "px");
+    block.style.setProperty("--turn-blur", blur.toFixed(2) + "px");
+    if (age > 20) {
+      block.setAttribute("data-deep", "1");
+    } else {
+      block.removeAttribute("data-deep");
+    }
+  });
+}
+
 // ── Death / observation ───────────────────────────────────────────────
 
 function showDeathMarker(cause) {
@@ -1668,6 +1790,23 @@ document.addEventListener("keydown", (e) => {
     if (document.activeElement === $("#player-input")) return;
     if (document.activeElement === $("#obs-input")) return;
     if (mapBtn) mapBtn.click();
+  }
+});
+
+// T key — Phase 2.6 war-table toggle. Opens the regional 3D terrain
+// view from the globe (or anywhere). Esc and the in-overlay close
+// button dismiss; wartable.js handles those itself.
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "t" && e.key !== "T") return;
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  if (!state || !runId || !eraKey) return;
+  const a = document.activeElement;
+  if (a && (a.tagName === "INPUT" || a.tagName === "TEXTAREA" || a.isContentEditable)) return;
+  if (typeof ChronosWarTable === "undefined") return;
+  if (ChronosWarTable.isVisible()) {
+    ChronosWarTable.hide();
+  } else {
+    ChronosWarTable.show(state, eraKey, runId);
   }
 });
 
@@ -2036,6 +2175,7 @@ async function executeSkip(ticks) {
     updateTopBar();
     updateTurnDimming();
     applyMemoryDecay();
+    applyDepthLayering();
     _wireDecayHoverAll();
     saveRunToStorage();
 
