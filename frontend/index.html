@@ -80,7 +80,13 @@
       <span class="text-[10px] font-semibold uppercase tracking-[0.2em] text-white/40">Chronos</span>
     </header>
 
-    <main class="w-full max-w-2xl mx-auto flex flex-col space-y-10 pt-16 pb-24 flex-1 custom-scroll overflow-y-auto px-6">
+    <!-- The loading main is wrapped in a 3D-perspective parent so each
+         .stagger-item recedes into space and animates forward as it
+         reveals. This is the player's FIRST encounter with CHRONOS's
+         spatial substrate -- they see the depth metaphor before any
+         turn ever fires. See styles.css "Loading screen 3D depth"
+         section for the keyframes. -->
+    <main class="w-full max-w-2xl mx-auto flex flex-col space-y-10 pt-16 pb-24 flex-1 custom-scroll overflow-y-auto px-6 loading-3d-stack">
 
       <!-- Era identity -->
       <section class="space-y-3 stagger-item" style="--i:0;">
@@ -370,6 +376,9 @@
         <div id="btn-graph-hamburger" class="group cursor-pointer">
           <span id="graph-btn-text"
             class="text-sm text-white/50 hover:text-white transition-colors uppercase tracking-widest">Connections</span>
+        </div>
+        <div id="btn-tutorial" class="group cursor-pointer">
+          <span class="text-sm text-white/50 hover:text-white transition-colors uppercase tracking-widest">How it works</span>
         </div>
         <div class="space-y-4">
           <div id="btn-new-run" class="group cursor-pointer">
@@ -745,6 +754,77 @@
       </div>
     </div>
   </div>
+
+  <!-- ════════════════════════════════════════════════════════════════ -->
+  <!-- TUTORIAL OVERLAY                                                -->
+  <!--                                                                 -->
+  <!-- Shown once on first visit (gated by                             -->
+  <!-- localStorage["chronos_tutorial_seen"]). Re-openable from the    -->
+  <!-- hamburger menu via #btn-tutorial. Explains the three surfaces   -->
+  <!-- (manuscript / globe / war-table), the inner-thought, and the    -->
+  <!-- core "you are a lens, not a protagonist" thesis.                -->
+  <!-- ════════════════════════════════════════════════════════════════ -->
+  <div id="tutorial-overlay" class="hidden fixed inset-0 z-[600] bg-black/85 backdrop-blur-md flex items-center justify-center p-6">
+    <div id="tutorial-card"
+         class="relative bg-zinc-950/95 border border-white/10 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto custom-scroll">
+      <button id="btn-tutorial-close"
+              class="absolute top-3 right-3 text-white/30 hover:text-white/70 transition-colors text-base px-2 py-1 cursor-pointer z-10">
+        &times;
+      </button>
+
+      <div class="px-10 pt-12 pb-10 space-y-7">
+        <header class="space-y-2">
+          <div class="text-[10px] uppercase tracking-[0.25em] text-emerald-400/60 font-semibold">How this works</div>
+          <h1 class="text-2xl text-white tracking-tight">CHRONOS is a world you observe</h1>
+          <p class="text-sm leading-relaxed text-white/60">You are dropped into a random era as a random minor figure. The world simulates whether you act or not. NPCs have their own lives. Sometimes nobody cares. When you die, people forget you, and then the run is over.</p>
+        </header>
+
+        <section class="space-y-3 pt-3 border-t border-white/5">
+          <div class="text-[10px] uppercase tracking-[0.18em] text-white/35 font-semibold">The three surfaces</div>
+
+          <div class="flex gap-4 items-start">
+            <div class="text-[10px] uppercase tracking-[0.15em] text-amber-300/70 font-semibold w-24 shrink-0 pt-1">Manuscript</div>
+            <p class="text-sm leading-relaxed text-white/65 flex-1">Your run as a physical record. Each turn sits in front of the previous one; older turns recede into depth and lose words as memory fades. Hover an old turn to lift it forward and recover its words. Press <kbd class="text-white/85 bg-white/10 px-1.5 py-0.5 rounded text-[10px]">Z</kbd> to pull back through the entire stack and see the run as a constellation.</p>
+          </div>
+
+          <div class="flex gap-4 items-start">
+            <div class="text-[10px] uppercase tracking-[0.15em] text-emerald-300/70 font-semibold w-24 shrink-0 pt-1">Globe</div>
+            <p class="text-sm leading-relaxed text-white/65 flex-1">The world as a 3D sphere. Press <kbd class="text-white/85 bg-white/10 px-1.5 py-0.5 rounded text-[10px]">M</kbd>. Drag to orbit, wheel to zoom. Click your green marker (or the &ldquo;You&rdquo; button) to slam-zoom to your location. Click any region to see what your character knows about it. Click an event marker to see what the character has heard.</p>
+          </div>
+
+          <div class="flex gap-4 items-start">
+            <div class="text-[10px] uppercase tracking-[0.15em] text-blue-300/70 font-semibold w-24 shrink-0 pt-1">War&#8209;table</div>
+            <p class="text-sm leading-relaxed text-white/65 flex-1">A tilted regional view with real terrain. Press <kbd class="text-white/85 bg-white/10 px-1.5 py-0.5 rounded text-[10px]">T</kbd>. The places you know glow on the table; rumors glow amber, confirmed knowledge glows teal. Event markers carry inline captions. This is where you read what you know.</p>
+          </div>
+        </section>
+
+        <section class="space-y-3 pt-3 border-t border-white/5">
+          <div class="text-[10px] uppercase tracking-[0.18em] text-white/35 font-semibold">How a turn works</div>
+          <p class="text-sm leading-relaxed text-white/65">Type anything in the bottom bar &mdash; any decision, any scale, any ambition. The game never tells you what to do. The simulation interprets and responds. Sometimes nothing happens, because nothing was at stake.</p>
+          <p class="text-sm leading-relaxed text-white/65">The moment you hit <kbd class="text-white/85 bg-white/10 px-1.5 py-0.5 rounded text-[10px]">Enter</kbd>, your character&rsquo;s <em class="text-white/80">inner thought</em> appears under your action &mdash; in italic serif, the only place the game speaks in your own internal voice. Read it. Your action is one thread; the world is many.</p>
+        </section>
+
+        <section class="space-y-3 pt-3 border-t border-white/5">
+          <div class="text-[10px] uppercase tracking-[0.18em] text-white/35 font-semibold">Other things to know</div>
+          <ul class="text-sm leading-relaxed text-white/60 space-y-1.5 pl-1">
+            <li>&middot; You travel by typing &mdash; "go to Ravenna" routes you there. Travel costs turns.</li>
+            <li>&middot; The only source of information is other people. Find them. Ask them.</li>
+            <li>&middot; When a need is critical the character may act on their own.</li>
+            <li>&middot; Press <kbd class="text-white/85 bg-white/10 px-1.5 py-0.5 rounded text-[10px]">Esc</kbd> to back out of any overlay. The hamburger menu has connections (NPC graph), notes, and a way to start a new run.</li>
+          </ul>
+        </section>
+
+        <footer class="pt-4 border-t border-white/5 flex items-center justify-between">
+          <span class="text-[10px] text-white/25 uppercase tracking-wider">You can reopen this from the menu anytime</span>
+          <button id="btn-tutorial-begin"
+                  class="text-[11px] uppercase tracking-[0.18em] text-emerald-300/85 hover:text-emerald-200 border border-emerald-500/30 hover:border-emerald-400/50 px-5 py-2 rounded-md cursor-pointer transition-colors">
+            Begin
+          </button>
+        </footer>
+      </div>
+    </div>
+  </div>
+
 
   <!-- ════════════════════════════════════════════════════════════════ -->
   <!-- FLOATING ELEMENTS                                               -->

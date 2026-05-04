@@ -8,6 +8,68 @@
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => document.querySelectorAll(sel);
 
+// ── Tutorial / how-it-works overlay ──────────────────────────────────
+//
+// Shown automatically on the first visit (gated by
+// localStorage["chronos_tutorial_seen"]). Re-openable from the
+// hamburger menu via #btn-tutorial. Esc closes.
+//
+// The wiring is here at the top of app.js so the auto-show fires
+// before any other JS gets a chance to do anything else with the
+// screen. The hamburger button binding lives in the menu wiring
+// further down.
+function showTutorial() {
+  const overlay = document.getElementById("tutorial-overlay");
+  if (!overlay) return;
+  overlay.classList.remove("hidden");
+}
+function hideTutorial() {
+  const overlay = document.getElementById("tutorial-overlay");
+  if (!overlay) return;
+  overlay.classList.add("hidden");
+  try { localStorage.setItem("chronos_tutorial_seen", "1"); } catch (_) {}
+}
+(function initTutorial() {
+  // Auto-show only on first visit -- don't re-show on every reload.
+  let seen = false;
+  try {
+    seen = localStorage.getItem("chronos_tutorial_seen") === "1";
+  } catch (_) {}
+  if (!seen) {
+    // Defer one frame so the start screen has a chance to paint
+    // first (otherwise the modal flashes against an empty page).
+    requestAnimationFrame(() => showTutorial());
+  }
+  document.addEventListener("DOMContentLoaded", () => {
+    const close = document.getElementById("btn-tutorial-close");
+    const begin = document.getElementById("btn-tutorial-begin");
+    const trigger = document.getElementById("btn-tutorial");
+    if (close) close.addEventListener("click", hideTutorial);
+    if (begin) begin.addEventListener("click", hideTutorial);
+    if (trigger) trigger.addEventListener("click", () => {
+      // From the menu: open the tutorial AND close the menu.
+      showTutorial();
+      const panel = document.getElementById("hamburger-panel");
+      const overlay = document.getElementById("hamburger-overlay");
+      if (panel) panel.classList.remove("open");
+      if (overlay) overlay.classList.add("hidden");
+    });
+    // Esc closes if open.
+    document.addEventListener("keydown", (e) => {
+      if (e.key !== "Escape") return;
+      const ov = document.getElementById("tutorial-overlay");
+      if (ov && !ov.classList.contains("hidden")) hideTutorial();
+    });
+    // Click outside the card closes it.
+    const ov = document.getElementById("tutorial-overlay");
+    if (ov) {
+      ov.addEventListener("click", (e) => {
+        if (e.target === ov) hideTutorial();
+      });
+    }
+  });
+})();
+
 // ── Phase 2.6 feature flags ───────────────────────────────────────────
 //
 // The 3D substrate (manuscript depth-stack + globe) is on by default.
@@ -1599,47 +1661,80 @@ function _maybeShowDepthHint() {
 
 function applyDepthLayering() {
   const enabled = document.body.classList.contains("chronos-stacked-manuscript");
+
+  // Force the 3D context onto the inner element directly via inline
+  // style. Three previous attempts via stylesheet rules failed for
+  // reasons I don't fully understand (cascade conflict? specificity?
+  // browser render-engine quirk?). Inline style cannot lose to any
+  // stylesheet rule short of !important, and nothing in the cascade
+  // sets these with !important. This is the belt-and-suspenders fix.
+  const inner = document.getElementById("manuscript-inner");
+  if (inner && enabled) {
+    inner.style.perspective = "1400px";
+    inner.style.perspectiveOrigin = "50% 30%";
+    inner.style.transformStyle = "preserve-3d";
+  }
+  const tc = document.getElementById("turns-container");
+  if (tc && enabled) {
+    tc.style.transformStyle = "preserve-3d";
+  }
+
   const blocks = document.querySelectorAll(".turn-block");
   const total = blocks.length;
   // Mark the container the first time any real turn-block exists so
-  // the intro block recedes (CSS rule keys off [data-has-turn="1"]).
-  // Also strip the .first-stack-reveal class from the intro div: the
-  // keyframe's end-state (translateZ(0)) is stuck via fill-mode:both
-  // and would otherwise win against our recede-the-intro rule in the
-  // cascade. Removing the class drops the animation and lets the
-  // [data-has-turn="1"] rule project the intro into deep z.
-  const tc = document.getElementById("turns-container");
+  // the intro block recedes. We also force the intro recede via
+  // INLINE style here -- belt-and-suspenders for the same reason
+  // applyDepthLayering is now setting transforms directly on blocks.
   if (tc) {
+    const intro = tc.querySelector(".manuscript-intro");
     if (total > 0) {
       tc.setAttribute("data-has-turn", "1");
-      const intro = tc.querySelector(".manuscript-intro");
-      if (intro) intro.classList.remove("first-stack-reveal");
+      if (intro) {
+        intro.classList.remove("first-stack-reveal");
+        if (enabled) {
+          intro.style.transform = "translateZ(-500px)";
+          intro.style.filter = "blur(2.2px)";
+          intro.style.opacity = "0.5";
+          intro.style.transition =
+            "transform 0.9s cubic-bezier(0.4,0,0.2,1), filter 0.9s ease, opacity 0.9s ease";
+          intro.style.transformStyle = "preserve-3d";
+        }
+      }
     } else {
       tc.removeAttribute("data-has-turn");
+      if (intro) {
+        intro.style.transform = "";
+        intro.style.filter = "";
+        intro.style.opacity = "";
+      }
     }
   }
   blocks.forEach((block, index) => {
     const age = total - 1 - index;
     if (!enabled) {
-      block.style.removeProperty("--turn-z");
-      block.style.removeProperty("--turn-blur");
+      block.style.transform = "";
+      block.style.filter = "";
       block.removeAttribute("data-deep");
       return;
     }
-    // Recession curve, dramatically bumped (2026-05-04 afternoon).
-    // Earlier curves (-90 then -150 px per age step) were visually
-    // ambiguous against perspective:1400px -- could read as flat with
-    // light dimming. New curve makes age=1 unmistakably "behind"
-    // (-300 px = ~21% smaller) and age=5 clearly distant.
+    // Aggressive recession curve. Bumped from -300 to -360 because
+    // even at -300 a 2-turn run still felt subtle to the user.
     //
     //   age 0  -> z=0,     blur 0
-    //   age 1  -> z=-300,  blur 1.0
-    //   age 2  -> z=-540,  blur 1.6
-    //   age 3  -> z=-780,  blur 2.2
-    //   age 5  -> z=-1250, blur 3 (capped)
-    //   age 10 -> floor:    z=-1800, blur 3
-    const z = Math.max(-1800, -300 * age - 20 * age * age);
+    //   age 1  -> z=-360,  blur 1.0
+    //   age 2  -> z=-660,  blur 1.6
+    //   age 3  -> z=-960,  blur 2.2
+    //   age 5  -> z=-1500 (clamped at -1800)
+    //   age 12+ -> z=-1800, content-visibility:auto
+    const z = Math.max(-1800, -360 * age - 30 * age * age);
     const blur = Math.min(3, age * 0.9);
+    // INLINE transform -- bypasses any cascade conflict.
+    block.style.transform = "translateZ(" + z + "px)";
+    block.style.filter = "blur(" + blur.toFixed(2) + "px)";
+    block.style.transformStyle = "preserve-3d";
+    block.style.transition =
+      "transform 0.6s cubic-bezier(0.4,0,0.2,1), filter 0.6s ease, opacity 0.8s ease";
+    // Keep the CSS variables too in case anything reads them.
     block.style.setProperty("--turn-z", z + "px");
     block.style.setProperty("--turn-blur", blur.toFixed(2) + "px");
     if (age > 12) {

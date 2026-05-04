@@ -2788,6 +2788,107 @@ body.chronos-stacked-manuscript #turns-container[data-has-turn="1"] .manuscript-
 }
 
 
+/* ── Loading screen 3D depth ─────────────────────────────────────────
+ *
+ * The very first thing the player encounters in CHRONOS is the
+ * loading screen. Make the spatial-substrate metaphor obvious from
+ * THERE, not "obvious eventually after you submit a turn." Each
+ * .stagger-item sits in 3D space; they slide forward from depth as
+ * they reveal, in a deeper, more dramatic way than the existing
+ * subtle fadeInUp.
+ */
+.loading-3d-stack {
+  perspective: 1600px;
+  perspective-origin: 50% 30%;
+  transform-style: preserve-3d;
+}
+
+.loading-3d-stack > * {
+  transform-style: preserve-3d;
+}
+
+/* Override the existing .stagger-item animation when inside the
+ * loading-3d-stack with a depth-aware version. The .stagger-item
+ * already has animation-delay scaled by --i; we keep that, just
+ * swap the keyframes for ones that move along z. */
+.loading-3d-stack .stagger-item {
+  animation-name: loadingStackReveal;
+  animation-duration: 0.95s;
+  animation-timing-function: cubic-bezier(0.22, 0.61, 0.36, 1);
+  animation-fill-mode: both;
+  /* delay already set by inline --i via the existing rule */
+  transform-origin: 50% 50%;
+}
+
+@keyframes loadingStackReveal {
+  0% {
+    opacity: 0;
+    transform: translateZ(-1400px) translateY(40px);
+    filter: blur(6px);
+  }
+  60% {
+    opacity: 1;
+    filter: blur(0.5px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateZ(0) translateY(0);
+    filter: blur(0);
+  }
+}
+
+/* Once revealed, give each loading section a slight permanent recession
+ * relative to its index, so the loading screen READS as a stack of
+ * cards in space (rather than reverting to flat after the animation).
+ * The era info card sits closest, "What came before" recedes, "Voices"
+ * recedes more, character reveal floats in front of "Voices" because
+ * it's the most current. This is set after the animation finishes via
+ * a JS hook, but we also apply it here as the final-frame transform
+ * so it sticks even if JS doesn't run.
+ *
+ * NOTE: this depth is intentionally subtle (not the full -300/-600/...
+ * scale of the manuscript) because the loading screen is ABOUT being
+ * read; we want the player to see the metaphor without being unable
+ * to read the words.
+ */
+.loading-3d-stack > section.stagger-item:nth-of-type(2),
+.loading-3d-stack > section.stagger-item:nth-of-type(3) {
+  /* "What came before" + the historical events list */
+}
+
+/* Loading event cards individually recede a bit so the stack of three
+ * historical cards reads as physical depth, not just three boxes. */
+.loading-3d-stack #loading-events > div:nth-child(1) {
+  --card-z: -20px;
+}
+.loading-3d-stack #loading-events > div:nth-child(2) {
+  --card-z: -50px;
+}
+.loading-3d-stack #loading-events > div:nth-child(3) {
+  --card-z: -85px;
+}
+.loading-3d-stack #loading-events > div {
+  transform: translateZ(var(--card-z, 0));
+  transition: transform 0.4s ease;
+}
+.loading-3d-stack #loading-events > div:hover {
+  transform: translateZ(0);
+}
+
+.loading-3d-stack #loading-voices > blockquote:nth-child(1) {
+  transform: translateZ(-30px);
+}
+.loading-3d-stack #loading-voices > blockquote:nth-child(2) {
+  transform: translateZ(-70px);
+}
+.loading-3d-stack #loading-voices > blockquote {
+  transition: transform 0.4s ease;
+}
+.loading-3d-stack #loading-voices > blockquote:hover {
+  transform: translateZ(0);
+}
+
+
 /* Loading overlays. Same pattern across the three 3D surfaces
  * (war-table, globe, connections graph): the overlay sits on top of
  * the canvas at z-[20], the JS adds `.ready` to the container once
