@@ -16,6 +16,9 @@
 | **Diffusion model provider** (local vs API, stack choice) | **Phase 3** kickoff — candidate selected 2026-04-22 (see Tracking below) |
 | **Session length target** (short vs multi-day runs) | **Phase 5** pacing |
 | **NPC relationship graph granularity** (NPC-NPC ties, indirect influence) | **Phase 5** scope |
+| **Phase 2.8 Phase B — "cut the continuity" semantics** | Phase 2.8 Phase B kickoff |
+| **Phase 2.8 Phase B — persistence model** (versioned snapshots vs action-log replay) | Phase 2.8 Phase B kickoff |
+| **Phase 2.8 Phase B — NPC memory consistency under past-edits** | Phase 2.8 Phase B kickoff |
 
 Tracking:
 
@@ -46,6 +49,34 @@ Tracking:
 - ~~**Loading screen events from hardcoded config:** Loading screen voices/events were hardcoded per era config, not from the Events DB.~~ **Resolved** — preview endpoint now draws loading_events from the Events DB (Phase 2.5).
 - **Prompt coverage gap beyond action_parser.md:** Fix 1 and Fix 3 gave `prompts/action_parser.md` a canonical 17-type vocabulary constraint and few-shot routing examples, then hardened it with an in-code ALIASES drift normalizer. The other ~10 prompts (npc_pov, autonomous_action, autonomous_action_light, death_check, erasure, character_gen, ground_context, npc_perception, memory_fade, region_knowledge) were never audited for similar drift-resistant vocabulary or output-shape constraints. Each one is an independent potential source of LLM output drift in its own downstream path. Likely scope: a per-prompt audit pass analogous to the Fix 1 audit, looking for (a) places downstream code branches on exact strings from the prompt output, and (b) vocabulary constraints missing from the prompt. Surfaced by Fix 1 audit (2026-04-21).
 - **Frontend test infrastructure:** `frontend/app.js` is ~1300 lines of vanilla JS with no module system and no test runner. The Addressed-mode rendering, internal-thought stream, preoccupation styling, and four-state placeholder system all ship without unit coverage. A bug in any of those manifests as silent failure for the player. Picking a runner is a real choice with trade-offs: Vitest + jsdom adds Node tooling to a project that has none today; Playwright tests the actual browser behavior but slows the feedback loop. Defer until either (a) a frontend bug ships in production or (b) the next significant frontend addition forces the question. Surfaced by 2026-04-30 architecture review and confirmed in 2026-05-01 cleanup batch (Item B3 deferred).
+
+## Phase 2.8 Phase B blockers (corridor manuscript — editing the past)
+
+> Phase A (read-only corridor) ships without these resolved. Phase B (editing the past — player cuts a connection between two moments and the simulation rewrites from that point) is **blocked** until all three are answered in writing. Documented per `chronos-ai-dev-protocol.mdc`: when a task touches an open question, surface it and ask before proceeding.
+
+**1. What does "cut the continuity" mean mechanically?** Three plausible semantics, each with very different state implications:
+
+- *Undo and replay.* Mark the action as undone, replay the simulation forward from there. Player loses any consequences that happened in between but the world stays fully consistent. Simplest semantics; most punishing for the player ("that took five turns to play out and now it's gone").
+- *Mark superseded but preserve history.* The original arc remains in the corridor as a faded ghost-branch; the new branch grows alongside it. The player can switch between branches at any time. Most generous to the player; hardest to render and reason about.
+- *Branch into a new timeline.* The current run forks; the player picks one to continue. The other becomes a saved snapshot they can revisit but not run. Middle-ground.
+
+Pick before any Phase B code. The picked semantics determines almost everything else.
+
+**2. Persistence model.** Today CHRONOS persists the *current* state only. Editing the past requires either:
+
+- *Versioned state snapshots* keyed by turn. Simpler conceptually; requires storing a snapshot per turn (~50KB compressed × 60 turns = 3MB per run). Feasible.
+- *Action log + replay.* Store every player action and every random seed; rewinding means replaying the engine from turn N. Smaller on disk; requires the engine to be deterministic given the same seeds, which it currently isn't (LLM calls have temperature; ground context regenerates). Would need a "replay mode" path that reuses cached LLM outputs.
+
+Both are real architecture changes. Pick before any Phase B code.
+
+**3. NPC memory consistency under past-edits.** When the player edits the past, do NPCs' memories of the player update?
+
+- If yes: NPC POV prompts must accept "you remember A happened, but actually B happened" framing without leaking the meta-fact that the player edited time. Hard to write coherently; risks breaking immersion.
+- If no: editing the past has no consequence on what NPCs say in their POVs after the edit. The world feels unaffected, which makes the editing feature weightless — why edit if nothing changes downstream?
+
+The honest answer is probably "yes, with prompt-level disguise" but the design effort to make it land is non-trivial. Pick before any Phase B code.
+
+---
 
 ## Closed
 

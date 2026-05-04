@@ -252,6 +252,65 @@ The world has **volume** the player can handle. Manuscript scrolls in z, not jus
 
 ---
 
+## PHASE 2.8 — The corridor manuscript
+
+**Goal:** Replace the manuscript-as-depth-stack (Phase 2.6) with a manuscript-as-corridor: past turns hang in 3D space along a path the character actually walked, causal connections between turns are drawn as visible lines, and the player navigates the past by moving the camera through the corridor. Decisions stand out spatially; filler turns recede along the path. Reading the past is travel.
+
+**Why this exists right after 2.6/2.7:** Phase 2.6 (depth-stack) made the manuscript visibly 3D but didn't transform what the player *does* with it — depth-stack reads as a slightly-3D scroll, not as a place. Phase 2.8 replaces the metaphor with one that does: a corridor in space the player walks through, with connections between turns drawn explicitly. Design intent in [manuscript-as-artifact.md](manuscript-as-artifact.md).
+
+This phase ships in two halves:
+- **Phase A — read-only corridor** (this round). Visualization only. Player walks, sees connections, can't yet edit.
+- **Phase B — editable corridor** (future round). Player cuts a connection between two moments → the simulation rewrites from that point forward. Three open questions block Phase B; see [open-questions.md](open-questions.md) "Phase 2.8 Phase B blockers." Phase B is in the roadmap as a future phase, not in scope this round.
+
+### What exists at the end of this phase (Phase A only)
+
+- **Corridor manuscript** — Three.js + CSS3DRenderer scene replacing the vertical scroll. Each turn card hangs at a 3D position along a meandering path. Turn cards are the existing `.turn-block` DOM, so the entire memory-decay system, click affordances, inner-thought rendering, and ambient/voices markup work unchanged.
+- **Connection lines** drawn between turns, by type:
+  - Action → consequence (solid, color matches consequence kind)
+  - Action → divergence (dashed, amber, points to a side-anchored canonical-event marker)
+  - Action → NPC reaction (thin line to NPC node, color = sentiment)
+  - NPC ↔ NPC (faint, dashed, when both NPCs were present and interacted)
+- **Significance-weighted cards.** Cards size, brightness, and slight off-path anchoring scale with `parsed.significance_score`. Decisions stand out spatially; filler turns are small dim points.
+- **Camera navigation.** WASD / arrows for movement, mouse-drag for pivot. Forward = walking back in time. The current turn (newest) is in front of the player at rest.
+- **Composes with existing systems.** Memory decay strips words from far cards. Observation mode tints the corridor. Erasure dissolves cards along the path, oldest first. Inner thought renders inside the front-most card. Time-skip lays a long featureless segment of corridor.
+- **Feature flag** `body.chronos-corridor-manuscript` (on by default). `?flat=1` URL parameter falls back to the flat scroll (not the Phase 2.6 depth-stack — Phase 2.8 subsumes and removes that view from the active code path; the depth-stack lived for ~5 commits across one afternoon and never satisfied the design intent).
+
+### Success criteria
+
+- [ ] A 30-turn run reads as a coherent corridor in space; the player can navigate to any turn by walking the camera there.
+- [ ] At least three of the four connection types are visible by turn 10 of a typical run (action→consequence is the most common; NPC reactions accumulate quickly).
+- [ ] Decisions (significance ≥ 0.8) are visually distinct from filler at a glance, without the player having to read text.
+- [ ] All Phase 2.5/2.6/2.7 success criteria still pass: memory decay still works on cards, hover-recover still works, inner thought still renders, observation mode still tints, erasure still dissolves cleanly.
+- [ ] `?flat=1` falls back to the legacy flat scroll without errors.
+- [ ] Performance: 60fps on M4 Max with 60 turns and ~240 connection lines.
+
+### Definition of success
+
+The player's run *has a shape*. After 20 turns the corridor reads as a visible record of where the character has been and what they've done — the betrayals and the consequences are physically connected, the people met and the rumors heard are wired together, the decisions stand out from the filler. Pressing back walks you through your own past as a place. **The manuscript is no longer a record. It is a memory the player inhabits.**
+
+### How to verify
+
+1. **Build & run** — full corridor renders on a fresh run. No black screen, no missing cards.
+2. **Decision visibility** — submit a high-significance action (e.g. "betray the abbot to the Visigoths"). Confirm the resulting card is visibly larger / brighter / off-path compared to filler turns.
+3. **Connection lines** — submit an action that schedules a consequence (e.g. hostile action against an NPC). Skip 3+ turns until the consequence fires. Confirm a line is drawn from the source turn forward to the consequence turn.
+4. **NPC connections** — interact with an NPC. Confirm a line is drawn from the player's turn to the NPC's node, color-matched to sentiment.
+5. **Memory decay in space** — play 30+ turns. Walk back through the corridor. Confirm distant cards have lost words AND look distant.
+6. **Hover-recover** — hover any past card. Confirm it lifts forward and recovers its words, just like Phase 2.6.
+7. **Observation mode** — die mid-run. Confirm the corridor tints and the player can still navigate but not add new turns.
+8. **Erasure** — play to erasure. Confirm cards dissolve along the path, oldest first, ending with an empty path.
+9. **`?flat=1`** — append `?flat=1` to the URL. Confirm the legacy flat scroll renders.
+10. **Performance** — long-run check at 60 turns, 60fps target.
+
+### What is explicitly NOT in this phase
+
+- **Editing the past** (Phase B, deferred — three open questions block).
+- **3D scene illustrations** (Phase 3 / future Phase 6, deferred).
+- **Marginalia** in the corridor (deferred to a separate session, anchored at card position when it ships).
+- **Branching timelines / saved alternate histories** (Phase B and beyond).
+- **The Phase 2.6 depth-stack as a separate view.** Removed; subsumed by the corridor.
+
+---
+
 ## PHASE 3 — Scene Illustrations
 
 **Goal:** When the player experiences a major event — their character's defining moment, an encounter with a key NPC, a turning point in the run — a diffusion-generated scene illustration renders what they are experiencing.
