@@ -1596,10 +1596,20 @@ function applyDepthLayering() {
   const total = blocks.length;
   // Mark the container the first time any real turn-block exists so
   // the intro block recedes (CSS rule keys off [data-has-turn="1"]).
+  // Also strip the .first-stack-reveal class from the intro div: the
+  // keyframe's end-state (translateZ(0)) is stuck via fill-mode:both
+  // and would otherwise win against our recede-the-intro rule in the
+  // cascade. Removing the class drops the animation and lets the
+  // [data-has-turn="1"] rule project the intro into deep z.
   const tc = document.getElementById("turns-container");
   if (tc) {
-    if (total > 0) tc.setAttribute("data-has-turn", "1");
-    else tc.removeAttribute("data-has-turn");
+    if (total > 0) {
+      tc.setAttribute("data-has-turn", "1");
+      const intro = tc.querySelector(".manuscript-intro");
+      if (intro) intro.classList.remove("first-stack-reveal");
+    } else {
+      tc.removeAttribute("data-has-turn");
+    }
   }
   blocks.forEach((block, index) => {
     const age = total - 1 - index;

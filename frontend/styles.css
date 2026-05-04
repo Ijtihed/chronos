@@ -2595,15 +2595,17 @@ body.chronos-stacked-manuscript #manuscript-inner .manuscript-intro.first-stack-
  * too brittle.
  */
 body.chronos-stacked-manuscript #turns-container[data-has-turn="1"] .manuscript-intro {
-  transform: translateZ(-260px);
-  filter: blur(1.6px);
-  opacity: 0.55;
-  transition: transform 0.8s ease, filter 0.8s ease, opacity 0.8s ease;
+  transform: translateZ(-500px) !important;
+  filter: blur(2.2px) !important;
+  opacity: 0.5 !important;
+  transition: transform 0.9s cubic-bezier(0.4, 0, 0.2, 1),
+              filter 0.9s ease,
+              opacity 0.9s ease;
 }
 body.chronos-stacked-manuscript #turns-container[data-has-turn="1"] .manuscript-intro:hover {
-  transform: translateZ(0);
-  filter: blur(0);
-  opacity: 1;
+  transform: translateZ(0) !important;
+  filter: blur(0) !important;
+  opacity: 1 !important;
 }
 
 

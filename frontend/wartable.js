@@ -405,17 +405,17 @@
       _handleClick(e);
     });
 
-    // T toggles back to globe; Esc returns to globe.
+    // Esc closes the war-table. T (open AND close) is owned by the
+    // single handler in app.js — this module used to have its own T
+    // listener that dueled with app.js's listener, producing a
+    // bounce-on-close where the table immediately reopened. Single
+    // owner, no bounce.
     document.addEventListener("keydown", (e) => {
       if (!isVisible) return;
+      if (e.key !== "Escape") return;
       const a = document.activeElement;
       if (a && (a.tagName === "INPUT" || a.tagName === "TEXTAREA")) return;
-      if (e.key === "t" || e.key === "T") {
-        if (e.metaKey || e.ctrlKey || e.altKey) return;
-        hide();
-      } else if (e.key === "Escape") {
-        hide();
-      }
+      hide();
     });
   }
 
@@ -1111,11 +1111,37 @@
     if (!container) return;
     container.classList.remove("hidden");
     isVisible = true;
+
+    // The container was display:none when init() ran, so the canvas
+    // mounted at 0x0 and the renderer is sized at 0x0. Now that the
+    // container is visible the canvas has real dimensions; size the
+    // renderer + camera IMMEDIATELY (before async terrain load) so
+    // the first paint happens at full size instead of black-then-pop
+    // 1-2s later when terrain finishes loading.
+    if (renderer && camera) {
+      const w = container.clientWidth || window.innerWidth;
+      const h = container.clientHeight || window.innerHeight;
+      if (w > 0 && h > 0) {
+        camera.aspect = w / h;
+        camera.updateProjectionMatrix();
+        renderer.setSize(w, h, false);
+      }
+    }
+
     if (runIdArg) currentRunId = runIdArg;
-    if (eraKey && eraKey !== currentEraKey) {
-      currentEraKey = eraKey;
+    // Reload terrain when the era changes OR when the terrain mesh
+    // doesn't exist yet (e.g. first show, or a previous show's
+    // terrain load errored out before it could create the mesh).
+    // Setting currentEraKey only AFTER successful load prevents a
+    // failed first attempt from poisoning all subsequent shows.
+    if (eraKey && (eraKey !== currentEraKey || !terrainMesh)) {
       const ok = await _loadTerrain(eraKey);
-      if (ok) await _loadBorders(eraKey);
+      if (ok) {
+        currentEraKey = eraKey;
+        await _loadBorders(eraKey);
+      } else {
+        console.warn("[wartable] terrain load failed; will retry on next show");
+      }
     }
     const saved = _loadViewState();
     if (saved) {

@@ -446,13 +446,20 @@
     _saveViewState();
   }
 
+  // Center on the player and zoom CLOSE. The previous version only
+  // moved the camera in if it was already wide-enough -- if the user
+  // had panned somewhere and clicked "You", camera might rotate to the
+  // player but stay zoomed out, defeating the purpose. New behavior:
+  // always rotate to player AND always zoom to a close "city level"
+  // distance (1.18 = 18% above the surface, ~150 km eye height).
   function centerOnPlayer() {
     if (!lastPlayerLatLng) return;
     const phi = (90 - lastPlayerLatLng.lat) * Math.PI / 180;
     const theta = (lastPlayerLatLng.lon + 180) * Math.PI / 180;
     camOrbit.theta = theta;
     camOrbit.phi = phi;
-    camOrbit.dist = Math.min(camOrbit.dist, 1.9);
+    camOrbit.dist = 1.18;
+    _autoRotate = false;
     _applyOrbitToCamera();
     _saveViewState();
   }
@@ -733,9 +740,10 @@
           ? pv.player_name + (pv.player_role ? " — " + pv.player_role : "")
           : "",
         zIndex: 1000,
-        onClick: function () {
-          if (!_isUserNavigating()) centerOnPlayer();
-        },
+        // Click the player marker to center + zoom in close. Always
+        // re-center, even if the user has panned away — that's the
+        // whole point of clicking it.
+        onClick: function () { centerOnPlayer(); },
       });
     }
 
