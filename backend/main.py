@@ -20,6 +20,7 @@ from pydantic import BaseModel
 
 from backend.action_parser import parse_action
 from backend.character_gen import generate_run
+from backend.inner_thought import generate_inner_thought
 from backend.death_engine import (
     apply_death,
     check_death,
@@ -405,6 +406,36 @@ async def reset_run(run_id: str):
 async def take_turn(run_id: str, req: TurnRequest):
     async with _session_locks[run_id]:
         return await _execute_turn(run_id, req)
+
+
+# Phase 2.7 — instant inline inner thought.
+#
+# Fires from the frontend the moment the player hits Enter, in PARALLEL
+# with the main /turn POST. Returns a single sentence in the character's
+# voice. Renders under the input field while the rest of the turn loads.
+#
+# Why a separate endpoint and not folded into /turn:
+#   - Latency. /turn does up to 12+ LLM calls (NPC POVs, ambient,
+#     consequences). The inner thought needs to render in <1.5s; bundling
+#     it into /turn would mean waiting for the whole simulation.
+#   - Independent failure mode. If the thought call errors, we want the
+#     turn to continue cleanly without the noise.
+#   - The thought is informationally orthogonal to the turn outcome —
+#     it's the player's reaction to their OWN action, not to what the
+#     world does next. No reason to gate it behind world simulation.
+#
+# Cost: ~$0.0002 per call → ~€0.002 / 10-turn run, well under the cap.
+# State changes: NONE. Read-only against the current state snapshot.
+@app.post("/api/run/{run_id}/inner_thought")
+async def inner_thought_endpoint(run_id: str, req: TurnRequest):
+    state = await _load_or_404(run_id)
+    if state.run_status not in {"active"}:
+        return {"inner_thought": ""}
+    text = (req.player_input or "").strip()
+    if not text:
+        return {"inner_thought": ""}
+    thought = await generate_inner_thought(text, state)
+    return {"inner_thought": thought}
 
 
 async def _execute_turn(run_id: str, req: TurnRequest) -> dict:

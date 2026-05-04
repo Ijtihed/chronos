@@ -245,6 +245,29 @@ class GroundContextResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# InnerThoughtResponse — inner_thought.py (Phase 2.7)
+# ---------------------------------------------------------------------------
+
+class InnerThoughtResponse(BaseModel):
+    """Player's first inner reaction the moment they hit Enter on an action.
+
+    A single sentence, second person ("you..."), in the character's voice.
+    Renders under the input field while the rest of the turn loads. See
+    prompts/inner_thought.md for the design intent and calibration table.
+    """
+    inner_thought: str = ""
+
+    @field_validator("inner_thought", mode="before")
+    @classmethod
+    def coerce_inner_thought(cls, v):
+        if v is None:
+            return ""
+        if not isinstance(v, str):
+            return ""
+        return v.strip()
+
+
+# ---------------------------------------------------------------------------
 # leaks_raw_numbers — narrative output safety check
 # ---------------------------------------------------------------------------
 

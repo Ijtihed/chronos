@@ -27,6 +27,7 @@ Call sites (all now route to Gemini):
 - `character_gen` — player + NPCs at run start (8-15 concurrent, rate-limited via semaphore)
 - `ground_context` — HCE run-start + refresh
 - `erasure` — the final narrative passage when the run ends (fires exactly once)
+- `inner_thought` — Phase 2.7. Player's first inner reaction the moment they hit Enter. Single second-person sentence in the character's voice. Renders under the input field while the rest of the turn loads. Fires from a separate endpoint (`/api/run/{id}/inner_thought`) in parallel with `/turn`, ~$0.0002 per call (~€0.002 per 10-turn run).
 
 **NoOp fallback.** When Gemini is unavailable:
 - `GEMINI_API_KEY` is unset → ERROR log; all calls return `("...", cost=$0)`

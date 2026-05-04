@@ -2641,3 +2641,66 @@ body.chronos-stacked-manuscript #turns-container[data-has-turn="1"] .manuscript-
   from { opacity: 1; transform: translate(-50%, 0); }
   to   { opacity: 0; transform: translate(-50%, 12px); }
 }
+
+
+/* ── Phase 2.7: instant inline inner thought ─────────────────────────
+ *
+ * Renders inside the just-created turn-block while /turn is still
+ * loading. Sits between the player's typed action (italic, white-15
+ * border) and the spinner. On arrival it fades in; on the full turn
+ * render it's preserved in place so the player can keep reading it
+ * as part of the permanent record.
+ *
+ * Visual: muted serif italic (Cormorant Garamond, the same family as
+ * the manuscript ground name) so the thought reads as INTERIOR and
+ * differentiated from the typewriter-monospace surface around it.
+ */
+
+.inner-thought-slot {
+  position: relative;
+  margin: 4px 0 12px 12px;
+  padding-left: 12px;
+  border-left: 2px solid rgba(255, 255, 255, 0.08);
+  min-height: 14px;
+  transition: opacity 0.4s ease;
+}
+
+.inner-thought-slot.pending {
+  opacity: 0.4;
+}
+
+.inner-thought-slot.resolved {
+  opacity: 1;
+  animation: innerThoughtIn 0.6s ease-out both;
+}
+
+.inner-thought-dots {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 12px;
+  letter-spacing: 0.45em;
+  color: rgba(255, 255, 255, 0.18);
+  padding: 4px 0;
+}
+
+.inner-thought-text {
+  font-family: 'Cormorant Garamond', 'EB Garamond', Georgia, serif;
+  font-size: 17px;
+  line-height: 1.45;
+  font-style: italic;
+  color: rgba(255, 255, 255, 0.62);
+  margin: 0;
+  letter-spacing: 0.01em;
+}
+
+@keyframes innerThoughtIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+    filter: blur(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}

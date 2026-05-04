@@ -888,6 +888,47 @@ function setupInput() {
   }
 }
 
+// Phase 2.7 — instant inline inner thought.
+//
+// Hits /api/run/{id}/inner_thought in parallel with the main /turn
+// POST. When the response arrives, fills the .inner-thought-slot
+// inside the just-created turn-block. The slot starts in .pending
+// state showing dots; on success it swaps to the resolved-state with
+// the thought text. On failure (empty response, network error) the
+// slot is simply removed from layout and the rest of the turn renders
+// without it — no error UI.
+//
+// Renders BEFORE /turn finishes, giving the player something to read
+// in the second between input and full simulation completion.
+async function _fetchAndRenderInnerThought(rid, text, block) {
+  if (!rid || !text || !block) return;
+  let thought = "";
+  try {
+    const res = await fetch(`/api/run/${rid}/inner_thought`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ player_input: text }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      thought = (data && data.inner_thought) ? String(data.inner_thought).trim() : "";
+    }
+  } catch (e) {
+    // Silent — the absence of an inner thought is acceptable.
+  }
+  const slot = block.querySelector(".inner-thought-slot");
+  if (!slot) return;
+  if (thought) {
+    slot.classList.remove("pending");
+    slot.classList.add("resolved");
+    slot.innerHTML = `<p class="inner-thought-text">${esc(thought)}</p>`;
+  } else {
+    // Collapse out of layout cleanly so the turn render below docks
+    // up against the player's typed action.
+    slot.remove();
+  }
+}
+
 async function submitTurn(text) {
   if (!text || !runId || turnInProgress) return;
   turnInProgress = true;
@@ -912,12 +953,22 @@ async function submitTurn(text) {
   const block = document.createElement("div");
   block.id = `turn-${Date.now()}`;
   block.className = "turn-block mb-8";
+  // The block has three slots:
+  //   - the player's typed action (italic, immediate)
+  //   - the inner thought placeholder (Phase 2.7) — fills in <1.5s
+  //   - the spinner (replaced by the full turn render when /turn returns)
   block.innerHTML =
     `<p class="text-sm italic text-white/55 mb-3 pl-3 border-l border-white/15">${esc(text)}</p>` +
+    `<div class="inner-thought-slot pending"><div class="inner-thought-dots">\u00b7 \u00b7 \u00b7</div></div>` +
     `<div class="turn-spinner"><div class="turn-spinner-ring"></div><span class="streaming-dots">\u00b7 \u00b7 \u00b7</span></div>`;
   turnsContainer.appendChild(block);
   block.scrollIntoView({ behavior: "smooth" });
   saveRunToStorage();
+
+  // Phase 2.7: race the inner thought against /turn. Kick off
+  // immediately, render in the slot as soon as it arrives. Failure is
+  // silent — the slot just collapses out of layout when empty.
+  _fetchAndRenderInnerThought(runId, text, block);
 
   try {
     const res = await fetch(`/api/run/${runId}/turn`, {
@@ -1258,7 +1309,24 @@ async function renderTurnStaggered(el, playerText, data) {
 
   h += `<div class="mt-6 mb-2"><div class="w-full h-px bg-white/[0.03]"></div></div>`;
 
-  el.innerHTML = h;
+  // Phase 2.7: preserve a resolved inner-thought slot across the
+  // re-render so the player can keep reading it as part of the
+  // permanent turn record. The slot is rendered between the player's
+  // typed action and the year stamp.
+  const existingThought = el.querySelector(".inner-thought-slot.resolved");
+  let thoughtHtml = "";
+  if (existingThought) {
+    thoughtHtml = existingThought.outerHTML;
+  }
+  // Preserve the player's typed action header that was set when the
+  // block was created. _wrapWordsForDecay later rewires its words.
+  const existingPlayerLine = el.querySelector("p.text-sm.italic");
+  let playerLineHtml = "";
+  if (existingPlayerLine) {
+    playerLineHtml = existingPlayerLine.outerHTML;
+  }
+
+  el.innerHTML = playerLineHtml + thoughtHtml + h;
   el.scrollIntoView({ behavior: "smooth" });
 
   for (let i = 0; i < npcIds.length; i++) {
