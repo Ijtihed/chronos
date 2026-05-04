@@ -52,13 +52,6 @@ const ChronosMap = (function () {
     return 0.3;
   }
 
-  function _tierFillOpacity(tier, broad) {
-    // Broad regions (>=1000km radius) get near-transparent fill —
-    // they cover large areas and shouldn't obscure smaller events.
-    var base = broad ? 0.05 : 0.15;
-    return _tierOpacity(tier) * base;
-  }
-
   // Per-era default view. Set on first loadBorders so resetView()
   // returns to the right starting frame for the current run's era.
   var defaultCenter = [42, 15];
@@ -143,6 +136,57 @@ const ChronosMap = (function () {
 
     var centerBtn = document.getElementById("map-center-player");
     if (centerBtn) centerBtn.addEventListener("click", centerOnPlayer);
+
+    // Legend toggle — flips a body class so CSS handles the visual
+    // state. Persisted across sessions so the player's preference
+    // survives reload (and run switches).
+    var legendToggle = document.getElementById("map-legend-toggle");
+    var legendLabel = document.getElementById("map-legend-toggle-label");
+    if (legendToggle) {
+      // Restore prior preference (default: visible).
+      if (localStorage.getItem("chronos_map_legend_hidden") === "1") {
+        document.body.classList.add("map-legend-hidden");
+        if (legendLabel) legendLabel.textContent = "Show legend";
+        legendToggle.setAttribute("aria-expanded", "false");
+      }
+      legendToggle.addEventListener("click", function () {
+        var hidden = document.body.classList.toggle("map-legend-hidden");
+        try {
+          localStorage.setItem(
+            "chronos_map_legend_hidden",
+            hidden ? "1" : "0",
+          );
+        } catch (e) {}
+        if (legendLabel) legendLabel.textContent = hidden ? "Show legend" : "Hide legend";
+        legendToggle.setAttribute("aria-expanded", hidden ? "false" : "true");
+      });
+    }
+
+    // Discoverability hint at the top of the map. Auto-fades after
+    // the first interaction (any zoom or click) and on a 6-second
+    // timer fallback so it doesn't linger forever for someone who
+    // just stares at the map.
+    var discoverHint = document.getElementById("map-discover-hint");
+    var _hintTimer = null;
+    var _hideHint = function () {
+      if (!discoverHint) return;
+      discoverHint.classList.add("is-hidden");
+      if (_hintTimer) { clearTimeout(_hintTimer); _hintTimer = null; }
+      // Remove from layout once the fade settles, so it doesn't
+      // capture pointer events even at opacity 0 (it's
+      // pointer-events:none anyway, but keep DOM clean).
+      setTimeout(function () {
+        if (discoverHint && discoverHint.classList.contains("is-hidden")) {
+          discoverHint.style.display = "none";
+        }
+      }, 800);
+    };
+    if (discoverHint) {
+      _hintTimer = setTimeout(_hideHint, 6000);
+      map.once("click", _hideHint);
+      map.once("zoomstart", _hideHint);
+      map.once("dragstart", _hideHint);
+    }
 
     // Esc resets the view while the map is the active overlay.
     document.addEventListener("keydown", function (e) {
@@ -689,18 +733,23 @@ const ChronosMap = (function () {
   // Rendered as a dedicated L.layerGroup so we can clearLayers()
   // between turns without touching player/NPC markers.
   //
-  // Design:
-  //   witnessed / known (not broad)  -> pin + filled circle, full opacity
-  //   witnessed                       -> pin has a small white dot overlay
-  //                                      (marker-event-witnessed class)
-  //                                      indicating "you were here"
-  //   known or rumor_* (broad region) -> NO pin; circle only. A pin
-  //                                      at the center of something
-  //                                      as big as "Mediterranean" is
-  //                                      meaningless; the circle
-  //                                      honestly signals diffuseness.
-  //   rumor_reliable                  -> plain circle, 70% opacity
-  //   rumor_unreliable                -> plain circle, 40% opacity, dashed
+  // Design (2026-05-04):
+  //   Always a pin at (ev.lat, ev.lon). No translucent area circles —
+  //   they ballooned across the map for broad/rumor events and
+  //   obscured everything underneath without telling you anything you
+  //   couldn't read in the panel by clicking.
+  //
+  //   Tier is conveyed by:
+  //     witnessed       -> full opacity pin + small white dot overlay
+  //                        ("you were here", marker-event-witnessed)
+  //     known           -> full opacity pin
+  //     rumor_reliable  -> 70% opacity pin
+  //     rumor_unreliable-> 40% opacity pin
+  //
+  //   For "broad" events (region-scale, no exact site), the backend
+  //   gives us a centroid in (lat, lon). The pin sits there. The
+  //   panel text is the place to communicate "this happened somewhere
+  //   in this region", not a multi-thousand-km translucent disc.
   //
   // Color by event type from EVENT_TYPE_COLORS.
 
@@ -718,66 +767,36 @@ const ChronosMap = (function () {
 
   function _addEventMarker(ev) {
     if (typeof ev.lat !== "number" || typeof ev.lon !== "number") return;
-    var color = EVENT_TYPE_COLORS[ev.type] || "#71717a";
-    var isKnownTier = ev.tier === "witnessed" || ev.tier === "known";
     var isWitnessed = ev.tier === "witnessed";
-    var opacity = _tierOpacity(ev.tier);
-    var fillOpacity = _tierFillOpacity(ev.tier, !!ev.broad);
 
-    var circleOpts = {
-      color: color,
-      weight: 1.2,
-      opacity: opacity,
-      fillColor: color,
-      fillOpacity: fillOpacity,
-    };
-    if (ev.tier === "rumor_unreliable") {
-      circleOpts.dashArray = "4,4";
-    }
+    var iconClass = "marker-event marker-event-" + (ev.type || "cultural");
+    if (isWitnessed) iconClass += " marker-event-witnessed";
 
-    var circle = L.circle([ev.lat, ev.lon], Object.assign(
-      { radius: (ev.radius_km || 200) * 1000 },
-      circleOpts,
-    )).addTo(eventLayer);
+    var pin = L.marker([ev.lat, ev.lon], {
+      icon: makeIcon(iconClass, 12),
+      zIndexOffset: 200,
+      opacity: _tierOpacity(ev.tier),
+    }).addTo(eventLayer);
 
-    // Pin at center only when: (a) known-tier AND (b) region is
-    // not broad. Broad regions render as circles only.
-    if (isKnownTier && !ev.broad) {
-      var iconClass = "marker-event marker-event-" + (ev.type || "cultural");
-      if (isWitnessed) iconClass += " marker-event-witnessed";
-      var pin = L.marker([ev.lat, ev.lon], {
-        icon: makeIcon(iconClass, 12),
-        zIndexOffset: 200,
-      }).addTo(eventLayer);
-      pin.bindTooltip(_eventTooltip(ev), {
-        direction: "top",
-        offset: [0, -8],
-        className: "npc-tooltip",
+    pin.bindTooltip(_eventTooltip(ev), {
+      direction: "top",
+      offset: [0, -8],
+      className: "npc-tooltip",
+    });
+
+    (function (evRef) {
+      pin.on("click", function (e) {
+        if (L.DomEvent && e && e.originalEvent) {
+          L.DomEvent.stopPropagation(e.originalEvent);
+        }
+        _showEventPanel(evRef);
+        if (_isUserNavigating()) return;
+        // Broad events have no precise site, so don't slam the camera
+        // all the way to DEEP_ZOOM — that's misleading.
+        var z = evRef.broad ? REGION_ZOOM : DEEP_ZOOM;
+        _flyTo(evRef.lat, evRef.lon, z);
       });
-      (function (evRef) {
-        pin.on("click", function (e) {
-          if (L.DomEvent && e && e.originalEvent) {
-            L.DomEvent.stopPropagation(e.originalEvent);
-          }
-          _showEventPanel(evRef);
-          if (_isUserNavigating()) return;
-          _flyTo(evRef.lat, evRef.lon, DEEP_ZOOM);
-        });
-      })(ev);
-    } else {
-      // Clickable circle for broad or rumor-tier events.
-      (function (evRef) {
-        circle.on("click", function (e) {
-          if (L.DomEvent && e && e.originalEvent) {
-            L.DomEvent.stopPropagation(e.originalEvent);
-          }
-          _showEventPanel(evRef);
-          if (_isUserNavigating()) return;
-          var z = evRef.broad ? 5 : REGION_ZOOM;
-          _flyTo(evRef.lat, evRef.lon, z);
-        });
-      })(ev);
-    }
+    })(ev);
   }
 
   function _eventTooltip(ev) {

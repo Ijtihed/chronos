@@ -616,6 +616,62 @@ body.season-autumn #ground-name { color: rgba(220, 165, 115, 0.045); }
   position: relative;
 }
 
+/* ── Reading-size override (2026-05-04) ────────────────────────────────
+ *
+ * The narrative is rendered with Tailwind utility classes baked into
+ * literal HTML strings inside app.js (text-sm, leading-loose, etc).
+ * Rather than chase those through every render path, override them
+ * scoped to the prose inside #manuscript-inner. We bump body prose to
+ * 16px, tighten leading from ~1.95 to ~1.65, and shorten the gap
+ * between turn-blocks so the run reads as one continuous page rather
+ * than a list. UI labels (year stamps, "Voices", NPC name strips —
+ * all already on text-[9..11px]) are untouched and stay small.
+ */
+#manuscript-inner p.text-sm {
+  font-size: 16px;
+  letter-spacing: 0.005em;
+}
+
+#manuscript-inner p.text-sm.leading-loose {
+  line-height: 1.65;
+}
+
+#manuscript-inner p.text-sm.leading-relaxed {
+  line-height: 1.6;
+}
+
+#manuscript-inner p.text-xs.leading-loose,
+#manuscript-inner p.text-xs.leading-relaxed {
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* Slightly lift body opacity so the larger text doesn't read gauzy. */
+#manuscript-inner p.text-sm.text-white\/60,
+#manuscript-inner p.text-sm.text-white\/65 {
+  color: rgba(255, 255, 255, 0.78);
+}
+
+#manuscript-inner p.text-sm.text-white\/70 {
+  color: rgba(255, 255, 255, 0.82);
+}
+
+/* Pull turn-blocks closer together — original mb-8 (32px) felt
+ * arm's-length once text grew. */
+#manuscript-inner .turn-block {
+  margin-bottom: 22px;
+}
+
+#manuscript-inner .turn-block + .turn-block {
+  padding-top: 4px;
+}
+
+/* The intro block is rendered with mb-10 (40px) which was sized for
+ * the smaller body text. Match the new rhythm. */
+#manuscript-inner > div.mb-10:first-child {
+  margin-bottom: 26px;
+}
+
 
 /* Chrome handle — collapsed top bar, sits at top edge of viewport.
  *
@@ -2120,6 +2176,191 @@ body {
   font-style: italic;
 }
 
+
+/* ── Map legend (2026-05-04) ────────────────────────────────────────────
+ *
+ * Sibling concept to #graph-legend. Lives bottom-left on the map
+ * overlay; explains every shape and color the player sees so the map
+ * is decodable at a glance instead of a guessing game. Toggleable
+ * with #map-legend-toggle (collapsed = .map-legend-hidden on body).
+ *
+ * Reuses the existing legend-* class names from #graph-legend purely
+ * for visual consistency (same fonts, paddings, spacing rhythm).
+ * The selectors here are independent so the two can drift if needed.
+ */
+#map-legend {
+  position: absolute;
+  bottom: 64px; /* sits above the toolbar strip at bottom-center */
+  left: 16px;
+  z-index: 998;
+  background: rgba(10, 10, 10, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 12px 14px;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(8px);
+  pointer-events: auto;
+  width: 268px;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 160px);
+  overflow-y: auto;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+body.map-legend-hidden #map-legend {
+  opacity: 0;
+  transform: translateY(8px);
+  pointer-events: none;
+}
+
+#map-legend .legend-section {
+  margin-bottom: 12px;
+}
+
+#map-legend .legend-section:last-of-type {
+  margin-bottom: 8px;
+}
+
+#map-legend .legend-label {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: rgba(255, 255, 255, 0.30);
+  margin-bottom: 7px;
+  font-weight: 500;
+}
+
+#map-legend .legend-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px 12px;
+}
+
+#map-legend .legend-list.legend-list-types {
+  /* Eight types fit comfortably as 2 columns × 4 rows. */
+  gap: 4px 12px;
+}
+
+#map-legend .legend-list li {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.62);
+}
+
+/* People marker swatches — match the actual #map markers. */
+#map-legend .legend-swatch {
+  display: inline-block;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  border: 1px solid rgba(0, 0, 0, 0.5);
+}
+
+#map-legend .legend-swatch.swatch-player {
+  background: #10b981;
+  border-color: #34d399;
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.55);
+}
+
+#map-legend .legend-swatch.swatch-met {
+  background: #71717a;
+  border: 1.5px solid #a1a1aa;
+}
+
+#map-legend .legend-swatch.swatch-known {
+  background: #52525b;
+  border: 1.5px solid #71717a;
+  width: 9px;
+  height: 9px;
+}
+
+#map-legend .legend-swatch.swatch-anon {
+  background: #27272a;
+  border: 1px solid #3f3f46;
+  width: 7px;
+  height: 7px;
+  opacity: 0.7;
+}
+
+/* Square swatch variant for event-type colors. */
+#map-legend .legend-swatch.swatch-square {
+  border-radius: 2px;
+  width: 11px;
+  height: 11px;
+  border: 1px solid rgba(0, 0, 0, 0.55);
+}
+
+/* Event-marker rows — pin (square + white-dot variant) and rings. */
+#map-legend .legend-edge-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.62);
+}
+
+#map-legend .legend-edge-row:last-child {
+  margin-bottom: 0;
+}
+
+#map-legend .legend-event-pin {
+  position: relative;
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  background: #2563eb; /* sample event color (political) */
+  border-radius: 3px;
+  border: 1.5px solid rgba(0, 0, 0, 0.6);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  flex-shrink: 0;
+}
+
+#map-legend .legend-event-pin.legend-event-witnessed::after {
+  content: "";
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 4px;
+  height: 4px;
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.4);
+  border-radius: 50%;
+  box-shadow: 0 0 4px rgba(255, 255, 255, 0.55);
+}
+
+#map-legend .legend-tip {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.42);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  padding-top: 8px;
+  margin-top: 6px;
+  font-style: italic;
+  line-height: 1.55;
+}
+
+/* Discoverability hint at the top of the map. Fades out after the
+ * player has had a moment to read it (handled in map.js). */
+#map-discover-hint {
+  opacity: 1;
+}
+
+#map-discover-hint.is-hidden {
+  opacity: 0;
+}
+
+/* The toggle label text ("Hide legend" / "Show legend") is swapped
+ * by map.js when the toggle is clicked. No CSS needed. */
+
+
 @media (max-width: 640px) {
   #graph-side-panel {
     width: 100%;
@@ -2147,5 +2388,32 @@ body {
   #graph-npc-list-panel {
     width: 180px;
     max-height: 45%;
+  }
+  /* On phone the map legend would cover most of the canvas if shown
+   * at full size; auto-collapse and let the toggle button reopen it. */
+  #map-legend {
+    width: 220px;
+    max-width: calc(100vw - 24px);
+    padding: 10px 12px;
+    font-size: 9px;
+    bottom: 72px;
+    left: 12px;
+  }
+  #map-legend .legend-list,
+  #map-legend .legend-list.legend-list-types {
+    grid-template-columns: 1fr 1fr;
+    gap: 3px 8px;
+  }
+  #map-legend-toggle {
+    bottom: 12px !important;
+    left: 12px !important;
+    height: 36px;
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+  #map-discover-hint {
+    top: 56px;
+    font-size: 9px;
+    padding: 4px 8px;
   }
 }

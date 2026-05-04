@@ -28,6 +28,18 @@ function showScreen(id) {
 
 // ── localStorage — session persistence, not game state ────────────────
 
+// A "live" narrative is one we generated ourselves: either a real
+// turn (id="turn-<timestamp>") or the rehaul intro block (the only
+// place the literal phrase "Your name is" gets emitted). Anything else
+// — empty string, design-review placeholder, error stub — is junk we
+// must never pickle into localStorage and must evict on restore.
+function _isLiveNarrative(html) {
+  if (!html || typeof html !== "string") return false;
+  if (html.indexOf('id="turn-') !== -1) return true;
+  if (html.indexOf("Your name is") !== -1) return true;
+  return false;
+}
+
 function saveRunToStorage() {
   if (runId && eraKey) {
     localStorage.setItem("chronos_run_id", runId);
@@ -35,6 +47,7 @@ function saveRunToStorage() {
   }
   const tc = document.getElementById("turns-container");
   if (tc && runId) {
+    if (!_isLiveNarrative(tc.innerHTML)) return;
     localStorage.setItem("chronos_narrative_" + runId, tc.innerHTML);
   }
 }
@@ -280,6 +293,12 @@ function enterGame() {
   showScreen("screen-game");
   const turnsContainer = $("#turns-container");
 
+  // Reset transient view state from previous sessions: don't leak the
+  // zoomed-out class (and the "Press Z to return" hint that hangs off
+  // it) into a fresh entry into the game screen.
+  const _ms = document.getElementById("manuscript");
+  if (_ms) _ms.classList.remove("zoomed-out");
+
   updateTopBar();
   setupInput();
 
@@ -287,8 +306,13 @@ function enterGame() {
     ? localStorage.getItem("chronos_narrative_" + runId)
     : null;
   const isOldFormat = savedNarrative && savedNarrative.includes("font-body");
+  // Pre-rehaul builds (and one accidental design-review path) pickled
+  // the static placeholder turn-blocks from index.html into localStorage.
+  // Those don't contain a real turn id or the rehaul intro signature, so
+  // _isLiveNarrative rejects them and we render fresh.
+  const isPoisoned = savedNarrative && !_isLiveNarrative(savedNarrative);
 
-  if (savedNarrative && !isOldFormat && turnsContainer) {
+  if (savedNarrative && !isOldFormat && !isPoisoned && turnsContainer) {
     turnsContainer.innerHTML = savedNarrative;
     const manuscript = $("#manuscript");
     if (manuscript) manuscript.scrollTop = manuscript.scrollHeight;
@@ -297,7 +321,9 @@ function enterGame() {
     _wireDecayHoverAll();
   } else {
     if (turnsContainer) turnsContainer.innerHTML = "";
-    if (isOldFormat) localStorage.removeItem("chronos_narrative_" + runId);
+    if (runId && (isOldFormat || isPoisoned)) {
+      localStorage.removeItem("chronos_narrative_" + runId);
+    }
 
     const loc = state.current_location;
     const year = state.current_year;

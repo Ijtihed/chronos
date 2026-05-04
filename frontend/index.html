@@ -261,74 +261,15 @@
     <main id="manuscript" class="custom-scroll overflow-y-auto mt-10 mb-14" style="height: calc(100vh - 96px);">
       <div class="manuscript-column mx-auto py-16 px-6" id="manuscript-inner">
 
-        <div id="turns-container" class="space-y-0">
-
-          <!-- Intro block -->
-          <div class="mb-10">
-            <div class="text-[10px] uppercase tracking-[0.15em] text-white/15 mb-4 font-medium">Late Roman Empire &mdash; 410 AD</div>
-            <p class="text-sm leading-loose text-white/60 mb-4">The Western Empire fractures. Provincial defenses crumble as Rome&rsquo;s authority dissolves into regional strongmen, barbarian federates, and the slow weight of administrative collapse.</p>
-            <p class="text-sm leading-loose text-white/60 mb-4">You are <span class="text-white/80 font-medium">Flavius Marcellus</span>, minor provincial administrator in the diocese of northern Italia. The local garrison has not been paid in three months. Refugees from the sack crowd the roads south.</p>
-            <p class="text-sm leading-loose text-white/60">Mediolanum sits at the crossroads of the Alpine passes. Once an imperial capital, now it is a city holding its breath. The walls are sound but the granaries are half-empty.</p>
-          </div>
-
-          <!-- Turn 1 (older — dimmed) -->
-          <div class="turn-block mb-8" style="--turn-opacity: 0.5;">
-            <div class="text-[10px] uppercase tracking-[0.15em] text-white/15 mb-4 font-medium">410 AD</div>
-
-            <div class="space-y-2 mb-4">
-              <p class="text-sm leading-relaxed text-white/40">
-                <span class="text-white/50 font-medium">Gaius</span> &mdash; tends to his forge on the eastern road, ignoring the commotion near the walls.
-              </p>
-            </div>
-
-            <p class="text-sm italic text-white/20 mb-4 pl-3 border-l border-white/5">Speak with the garrison commander about the supply lines</p>
-
-            <p class="text-sm leading-loose text-white/50 mb-3">The garrison is in poor spirits. The commander, a Briton who has served Rome for thirty years, greets you without looking up from his maps. The room smells of tallow and cold stone.</p>
-
-            <p class="text-sm leading-relaxed italic text-amber-300/30 mb-4">Traders from the south say the Visigoths are moving west. The roads may not be safe much longer.</p>
-
-            <div class="pl-4 border-l-2 border-white/8 my-4">
-              <div class="text-[9px] uppercase tracking-[0.15em] text-white/20 mb-1.5 font-medium">Commander Lucius</div>
-              <p class="text-sm leading-relaxed text-white/40">Supply wagons haven&rsquo;t come in eleven days. I&rsquo;ve sent riders, but&mdash;well. If you hear anything on the road, I&rsquo;d take it as a kindness.</p>
-            </div>
-
-            <div class="mt-6 mb-2"><div class="w-full h-px bg-white/[0.03]"></div></div>
-          </div>
-
-          <!-- Turn 2 (recent — full opacity) -->
-          <div class="turn-block mb-8" style="--turn-opacity: 1;">
-            <div class="text-[10px] uppercase tracking-[0.15em] text-white/15 mb-4 font-medium">411 AD</div>
-
-            <div class="space-y-2 mb-4">
-              <p class="text-sm leading-relaxed text-white/50">
-                <span class="text-white/60 font-medium">Helena</span> and <span class="text-white/60 font-medium">Marcus</span> &mdash; argue loudly near the market square about hoarded grain.
-              </p>
-              <p class="text-sm leading-relaxed text-white/50">
-                <span class="text-white/60 font-medium">Gaius</span> &mdash; boards up his forge and loads a cart heading east.
-              </p>
-            </div>
-
-            <p class="text-sm italic text-white/20 mb-4 pl-3 border-l border-white/5">Go to the forum. Try to buy passage south.</p>
-
-            <p class="text-sm leading-loose text-white/70 mb-3">The forum is half-empty. Most merchants have packed their carts and left in the night. A tax collector sits behind his table, pretending nothing has changed. A handful of citizens cluster near the notice boards, reading edicts no one believes anymore.</p>
-
-            <p class="text-sm leading-relaxed italic text-amber-300/40 mb-4">Someone claims the emperor in Ravenna has fled. Others say he&rsquo;s negotiating with the Goths. Nobody knows.</p>
-
-            <div class="space-y-4 my-4">
-              <div class="pl-4 border-l-2 border-white/10">
-                <div class="text-[9px] uppercase tracking-[0.15em] text-white/25 mb-1.5 font-medium">Tax Collector Decimus</div>
-                <p class="text-sm leading-relaxed text-white/55">Passage south? You and every other fool in this city. The boats are gone. I&rsquo;d suggest praying, but I don&rsquo;t think the gods are taking appointments.</p>
-              </div>
-              <div class="pl-4 border-l-2 border-white/10">
-                <div class="text-[9px] uppercase tracking-[0.15em] text-white/25 mb-1.5 font-medium">Helena</div>
-                <p class="text-sm leading-relaxed text-white/55">Don&rsquo;t listen to Decimus. My cousin sailed yesterday from the eastern harbor. It costs, though. More than it should.</p>
-              </div>
-            </div>
-
-            <div class="mt-6 mb-2"><div class="w-full h-px bg-white/[0.03]"></div></div>
-          </div>
-
-        </div>
+        <!--
+          Live narrative is rendered into #turns-container by enterGame()
+          and renderTurnStaggered() in app.js. We deliberately keep this
+          empty in markup: any static demo HTML here gets pickled into
+          localStorage["chronos_narrative_<runId>"] by saveRunToStorage()
+          and then bleeds into every future run on reload, masking the
+          real game state.
+        -->
+        <div id="turns-container" class="space-y-0"></div>
 
         <!-- Death Marker (observation mode) -->
         <div id="death-marker" class="hidden flex justify-center my-16">
@@ -509,6 +450,84 @@
          class="hidden fixed bottom-20 left-1/2 -translate-x-1/2 z-[998] text-[10px] uppercase tracking-[0.15em] text-white/70 bg-black/85 backdrop-blur-sm border border-white/15 rounded-md px-3 py-1.5 pointer-events-none">
       Press <span class="text-white">Esc</span> to reset view
     </div>
+
+    <!-- Discoverability hint, top-center: tells new players what's
+         actually clickable on the map. Auto-hides after a few seconds
+         and on first interaction. -->
+    <div id="map-discover-hint"
+         class="fixed top-14 left-1/2 -translate-x-1/2 z-[997] text-[10px] uppercase tracking-[0.15em] text-white/55 bg-black/80 backdrop-blur-sm border border-white/10 rounded-md px-3 py-1.5 pointer-events-none transition-opacity duration-700">
+      Click a region or marker to see what you know
+    </div>
+
+    <!-- Map legend, bottom-left. Mirrors #graph-legend in style and
+         intent: explain every shape/color on screen so new players
+         don't need a tutorial. Toggle visible/collapsed with the
+         compact button on the toolbar. -->
+    <aside id="map-legend">
+      <div class="legend-section">
+        <div class="legend-label">Markers &mdash; people</div>
+        <ul class="legend-list">
+          <li><span class="legend-swatch swatch-player"></span>You</li>
+          <li><span class="legend-swatch swatch-met"></span>Person you met</li>
+          <li><span class="legend-swatch swatch-known"></span>Met, now elsewhere</li>
+          <li><span class="legend-swatch swatch-anon"></span>Someone, somewhere</li>
+        </ul>
+      </div>
+
+      <div class="legend-section">
+        <div class="legend-label">Markers &mdash; events</div>
+        <div class="legend-edge-row">
+          <span class="legend-event-pin legend-event-witnessed" aria-hidden="true"></span>
+          <span>You witnessed it</span>
+        </div>
+        <div class="legend-edge-row">
+          <span class="legend-event-pin" aria-hidden="true"></span>
+          <span>You heard about it</span>
+        </div>
+        <div class="legend-edge-row">
+          <span class="legend-event-pin" aria-hidden="true" style="opacity:0.7"></span>
+          <span>Rumor</span>
+        </div>
+        <div class="legend-edge-row">
+          <span class="legend-event-pin" aria-hidden="true" style="opacity:0.4"></span>
+          <span>Unreliable rumor</span>
+        </div>
+      </div>
+
+      <div class="legend-section">
+        <div class="legend-label">Event color &mdash; what kind</div>
+        <ul class="legend-list legend-list-types">
+          <li><span class="legend-swatch swatch-square" style="background:#dc2626"></span>War</li>
+          <li><span class="legend-swatch swatch-square" style="background:#16a34a"></span>Epidemic</li>
+          <li><span class="legend-swatch swatch-square" style="background:#ea580c"></span>Famine</li>
+          <li><span class="legend-swatch swatch-square" style="background:#2563eb"></span>Political</li>
+          <li><span class="legend-swatch swatch-square" style="background:#9333ea"></span>Religious</li>
+          <li><span class="legend-swatch swatch-square" style="background:#ca8a04"></span>Economic</li>
+          <li><span class="legend-swatch swatch-square" style="background:#78350f"></span>Disaster</li>
+          <li><span class="legend-swatch swatch-square" style="background:#71717a"></span>Cultural</li>
+        </ul>
+      </div>
+
+      <div class="legend-tip">
+        Click a colored region to see what you've heard about that polity. Click a pin to read the event. Fainter pins = less reliable.
+      </div>
+    </aside>
+
+    <button id="map-legend-toggle"
+            type="button"
+            class="fixed bottom-6 left-6 z-[999] h-10 px-3 flex items-center gap-2 bg-black/90 backdrop-blur-md border border-white/15 rounded-md text-[11px] uppercase tracking-[0.12em] text-white/85 hover:text-white hover:bg-white/10 transition-colors cursor-pointer shadow-2xl"
+            aria-controls="map-legend"
+            aria-expanded="true">
+      <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="3" cy="3.5" r="1.2" fill="currentColor"/>
+        <line x1="6" y1="3.5" x2="12" y2="3.5"/>
+        <circle cx="3" cy="7" r="1.2" fill="currentColor"/>
+        <line x1="6" y1="7" x2="12" y2="7"/>
+        <circle cx="3" cy="10.5" r="1.2" fill="currentColor"/>
+        <line x1="6" y1="10.5" x2="12" y2="10.5"/>
+      </svg>
+      <span id="map-legend-toggle-label">Hide legend</span>
+    </button>
   </div>
 
   <!-- ════════════════════════════════════════════════════════════════ -->
