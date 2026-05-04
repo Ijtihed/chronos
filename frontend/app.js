@@ -10,14 +10,14 @@ const $$ = (sel) => document.querySelectorAll(sel);
 
 // ── Tutorial / how-it-works overlay ──────────────────────────────────
 //
-// Shown automatically on the first visit (gated by
-// localStorage["chronos_tutorial_seen"]). Re-openable from the
-// hamburger menu via #btn-tutorial. Esc closes.
+// Opt-in only. Two entry points:
+//   - "How it works" button on the start screen (#btn-tutorial-start)
+//   - "How it works" entry in the hamburger menu (#btn-tutorial)
+// No auto-show on first visit -- the previous auto-popup felt
+// jarring on the start screen.
 //
-// The wiring is here at the top of app.js so the auto-show fires
-// before any other JS gets a chance to do anything else with the
-// screen. The hamburger button binding lives in the menu wiring
-// further down.
+// Esc closes; clicking the dim backdrop closes; both close buttons
+// inside the card close.
 function showTutorial() {
   const overlay = document.getElementById("tutorial-overlay");
   if (!overlay) return;
@@ -27,32 +27,23 @@ function hideTutorial() {
   const overlay = document.getElementById("tutorial-overlay");
   if (!overlay) return;
   overlay.classList.add("hidden");
-  try { localStorage.setItem("chronos_tutorial_seen", "1"); } catch (_) {}
 }
 (function initTutorial() {
-  // Auto-show only on first visit -- don't re-show on every reload.
-  let seen = false;
-  try {
-    seen = localStorage.getItem("chronos_tutorial_seen") === "1";
-  } catch (_) {}
-  if (!seen) {
-    // Defer one frame so the start screen has a chance to paint
-    // first (otherwise the modal flashes against an empty page).
-    requestAnimationFrame(() => showTutorial());
-  }
   document.addEventListener("DOMContentLoaded", () => {
     const close = document.getElementById("btn-tutorial-close");
     const begin = document.getElementById("btn-tutorial-begin");
-    const trigger = document.getElementById("btn-tutorial");
+    const menuBtn = document.getElementById("btn-tutorial");
+    const startBtn = document.getElementById("btn-tutorial-start");
     if (close) close.addEventListener("click", hideTutorial);
     if (begin) begin.addEventListener("click", hideTutorial);
-    if (trigger) trigger.addEventListener("click", () => {
+    if (startBtn) startBtn.addEventListener("click", showTutorial);
+    if (menuBtn) menuBtn.addEventListener("click", () => {
       // From the menu: open the tutorial AND close the menu.
       showTutorial();
       const panel = document.getElementById("hamburger-panel");
-      const overlay = document.getElementById("hamburger-overlay");
+      const ovBg = document.getElementById("hamburger-overlay");
       if (panel) panel.classList.remove("open");
-      if (overlay) overlay.classList.add("hidden");
+      if (ovBg) ovBg.classList.add("hidden");
     });
     // Esc closes if open.
     document.addEventListener("keydown", (e) => {
