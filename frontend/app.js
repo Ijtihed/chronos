@@ -1604,33 +1604,84 @@ function applyDepthLayering() {
   blocks.forEach((block, index) => {
     const age = total - 1 - index;
     if (!enabled) {
-      // Clear in case we toggled the flag mid-session.
       block.style.removeProperty("--turn-z");
       block.style.removeProperty("--turn-blur");
       block.removeAttribute("data-deep");
       return;
     }
-    // Recession curve. Tuned so a 2-turn run already feels obviously
-    // dimensional. age=1 at z=-150 (10.7% smaller against perspective
-    // 1400) reads as one clear step back, not "is it 3D? hard to tell".
+    // Recession curve, dramatically bumped (2026-05-04 afternoon).
+    // Earlier curves (-90 then -150 px per age step) were visually
+    // ambiguous against perspective:1400px -- could read as flat with
+    // light dimming. New curve makes age=1 unmistakably "behind"
+    // (-300 px = ~21% smaller) and age=5 clearly distant.
     //
     //   age 0  -> z=0,     blur 0
-    //   age 1  -> z=-150,  blur 0.7
-    //   age 2  -> z=-260,  blur 1.2
-    //   age 5  -> z=-575,  blur 2.5
-    //   age 10 -> z=-1000, blur 3 (capped)
-    //   age 20+ floor -> z=-1300, blur 3
-    const z = Math.max(-1300, -150 * age - 5 * age * age);
-    const blur = Math.min(3, age * 0.7);
+    //   age 1  -> z=-300,  blur 1.0
+    //   age 2  -> z=-540,  blur 1.6
+    //   age 3  -> z=-780,  blur 2.2
+    //   age 5  -> z=-1250, blur 3 (capped)
+    //   age 10 -> floor:    z=-1800, blur 3
+    const z = Math.max(-1800, -300 * age - 20 * age * age);
+    const blur = Math.min(3, age * 0.9);
     block.style.setProperty("--turn-z", z + "px");
     block.style.setProperty("--turn-blur", blur.toFixed(2) + "px");
-    if (age > 20) {
+    if (age > 12) {
       block.setAttribute("data-deep", "1");
     } else {
       block.removeAttribute("data-deep");
     }
   });
 }
+
+// Phase 2.7 — diagnostic helper. Returns a structured snapshot of
+// every Phase-2.6/2.7-relevant runtime check so the user can paste
+// the result back when something looks broken.
+//
+// Run from DevTools console:  chronosDiag()
+//
+// The intent is "show me the state of each gate at a glance" rather
+// than "fix it for me" — keep this read-only and side-effect-free.
+window.chronosDiag = function chronosDiag() {
+  const has = (cls) => document.body.classList.contains(cls);
+  const tc = document.getElementById("turns-container");
+  const blocks = document.querySelectorAll(".turn-block");
+  const intro = document.querySelector(".manuscript-intro");
+  const introCS = intro ? getComputedStyle(intro) : null;
+  const blockCS = blocks.length ? getComputedStyle(blocks[0]) : null;
+  const innerCS = (() => {
+    const e = document.getElementById("manuscript-inner");
+    return e ? getComputedStyle(e) : null;
+  })();
+  const out = {
+    flags: {
+      stacked: has("chronos-stacked-manuscript"),
+      globeDefault: has("chronos-globe-default"),
+      no3d: has("chronos-no-3d"),
+    },
+    runtime: {
+      THREE_loaded: typeof THREE !== "undefined",
+      ChronosMap_kind: typeof ChronosMap === "undefined"
+        ? "undefined"
+        : (ChronosMap.show ? "object" : typeof ChronosMap),
+      ChronosWarTable_kind: typeof ChronosWarTable === "undefined"
+        ? "undefined"
+        : (ChronosWarTable.show ? "object" : typeof ChronosWarTable),
+      state_loaded: !!window.state,
+      runId_loaded: !!window.runId,
+      eraKey_loaded: !!window.eraKey,
+    },
+    manuscript_inner_perspective: innerCS ? innerCS.perspective : "(no element)",
+    manuscript_inner_transform_style: innerCS ? innerCS.transformStyle : "(no element)",
+    turns_container_has_data: tc ? tc.getAttribute("data-has-turn") : "(no element)",
+    turn_block_count: blocks.length,
+    first_block_z_var: blockCS ? blockCS.getPropertyValue("--turn-z").trim() : "(no blocks)",
+    first_block_transform: blockCS ? blockCS.transform : "(no blocks)",
+    intro_present: !!intro,
+    intro_transform: introCS ? introCS.transform : "(no intro)",
+  };
+  console.log("[chronosDiag]", out);
+  return out;
+};
 
 // ── Death / observation ───────────────────────────────────────────────
 

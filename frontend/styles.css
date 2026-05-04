@@ -628,22 +628,22 @@ body.season-autumn #ground-name { color: rgba(220, 165, 115, 0.045); }
  * all already on text-[9..11px]) are untouched and stay small.
  */
 #manuscript-inner p.text-sm {
-  font-size: 16px;
+  font-size: 19px;
   letter-spacing: 0.005em;
 }
 
 #manuscript-inner p.text-sm.leading-loose {
-  line-height: 1.65;
+  line-height: 1.7;
 }
 
 #manuscript-inner p.text-sm.leading-relaxed {
-  line-height: 1.6;
+  line-height: 1.65;
 }
 
 #manuscript-inner p.text-xs.leading-loose,
 #manuscript-inner p.text-xs.leading-relaxed {
-  font-size: 14px;
-  line-height: 1.6;
+  font-size: 16px;
+  line-height: 1.65;
 }
 
 /* Slightly lift body opacity so the larger text doesn't read gauzy. */
@@ -2684,10 +2684,10 @@ body.chronos-stacked-manuscript #turns-container[data-has-turn="1"] .manuscript-
 
 .inner-thought-text {
   font-family: 'Cormorant Garamond', 'EB Garamond', Georgia, serif;
-  font-size: 17px;
-  line-height: 1.45;
+  font-size: 21px;
+  line-height: 1.5;
   font-style: italic;
-  color: rgba(255, 255, 255, 0.62);
+  color: rgba(255, 255, 255, 0.7);
   margin: 0;
   letter-spacing: 0.01em;
 }
