@@ -71,9 +71,11 @@ Scene illustrations are reserved for moments of narrative weight. Standard trigg
 1. **Run start.** Who the character is and where they are, as the first image of the run.
 2. **Character death.** The moment the character dies, first-person from the viewer's own body.
 3. **Erasure.** The final memory-fade moment, the viewer fading from the world.
-4. **Two or three major narrative moments across the run body.** Candidates: a decisive player action, a first encounter with a major NPC (Addressed mode first contact with a significant character), witnessing a historical catastrophe the character is present for.
+4. **Two or three major narrative moments across the run body.** Candidates: a decisive player action (significance >= 0.8), a witnessed canonical historical event the character is present for, first arrival at a new location.
 
-The character-study framing (2026-04-27) reinforces the existing trigger set. First conversations with named NPCs in Addressed mode are candidate trigger moments -- the image shows the other person's face and context, from the player's POV. Introspective turns ("I sit with this a while," "I think about what happened") are also candidate moments if the narrative has sufficient weight. The honest-bodies rule still applies: character descriptions in image prompts are based on role, archetype, and era context, not hero-trope defaults.
+**Implementation status (2026-05-01).** The trigger detector in `backend/scene_triggers.py` implements run_start, character_death, erasure, and three signals for major_narrative_moment (high-significance player action, witnessed canonical event, first arrival at a new location). It does NOT implement a "first conversation in Addressed mode" trigger -- the file's docstring (lines 21-22) explicitly defers Signal 3 ("first encounter with a major NPC") because there is no first-class "major" flag on NPC today. A previous draft of this doc (2026-04-27) listed Addressed-mode first contact as a candidate trigger; that trigger does not exist in code. Deferred until **Phase 3 Step 3.3** ships actual image generation, at which point the trigger pipeline will be revisited end-to-end. The honest-bodies rule still applies: when image generation does ship, character descriptions in image prompts must be based on role, archetype, and era context, not hero-trope defaults.
+
+Introspective turns ("I sit with this a while," "I think about what happened") are an aspirational extension and are also not currently triggered. Same deferral.
 
 Typical run produces 5 to 6 images. Uneventful runs may produce as few as 3 (start, death, erasure). Exceptionally eventful runs rarely exceed 8. Triggers are gated on narrative weight, not turn count.
 
