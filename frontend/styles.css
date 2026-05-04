@@ -1014,6 +1014,11 @@ body {
  * further down for the override.
  */
 
+/* Pass 5 zoom-out base styling. transform-origin and transition apply
+ * in both flat (no Pass 6) and 3D modes; Pass 6 swaps the actual
+ * transform value via its body.chronos-stacked-manuscript override
+ * further down so the zoomed-out state pulls back through the depth
+ * stack instead of just scaling flat. */
 #manuscript-inner {
   transform-origin: top center;
   transition: transform 0.7s cubic-bezier(0.4, 0, 0.2, 1),
@@ -1025,7 +1030,9 @@ body {
   scrollbar-width: thin;
 }
 
-#manuscript.zoomed-out #manuscript-inner {
+/* Flat (no Pass 6) zoom-out behavior. When chronos-stacked-manuscript
+ * is on, the Pass 6 rule below re-targets this with translateZ. */
+body:not(.chronos-stacked-manuscript) #manuscript.zoomed-out #manuscript-inner {
   transform: scale(0.45);
   filter: contrast(1.1);
 }
@@ -2456,20 +2463,34 @@ body.map-legend-hidden #map-legend {
 
 /* Establish the 3D context.
  *
- * IMPORTANT: perspective MUST live on #manuscript-inner, not on
- * #manuscript. #manuscript is the scroll container (overflow-y:auto),
- * and per CSS spec a scroll container creates a stacking context that
- * effectively flattens descendant 3D transforms in Chromium and
- * Webkit — the visual depth disappears. Earlier this rule was on
- * #manuscript and the manuscript looked completely flat regardless of
- * applyDepthLayering() math; this is the fix.
+ * Round 1 fix (2026-05-04 morning): moved perspective off #manuscript
+ * (the scroll container, which flattens descendant 3D in Chromium)
+ * onto #manuscript-inner. Still flat in the browser.
  *
- * The scroller stays flat (good — scrollbars and viewport intersection
- * behave normally), and the inner element holds the 3D space.
+ * Round 2 fix (2026-05-04 noon): the actual problem. Perspective on
+ * #manuscript-inner applies to its DIRECT children only. The DOM is:
+ *
+ *   #manuscript-inner (perspective set here)
+ *     └─ #turns-container (NO transform-style)
+ *         └─ .turn-block (translateZ set here)
+ *
+ * The intermediate #turns-container, with no transform-style:preserve-3d,
+ * silently FLATTENS the 3D space before .turn-block's translateZ can
+ * be projected against the perspective. So every block was rendered
+ * at z=0 in 2D, no matter what value applyDepthLayering set.
+ *
+ * Fix: every element on the chain from the perspective owner down to
+ * the transformed children must preserve 3D. Add it to #turns-container
+ * too. Belt-and-suspenders: also explicit on .manuscript-intro since
+ * its own transform animation needs a 3D context to project against.
  */
 body.chronos-stacked-manuscript #manuscript-inner {
   perspective: 1400px;
   perspective-origin: 50% 30%;
+  transform-style: preserve-3d;
+}
+
+body.chronos-stacked-manuscript #turns-container {
   transform-style: preserve-3d;
 }
 
