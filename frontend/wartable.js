@@ -34,7 +34,25 @@
   // ── State ────────────────────────────────────────────────────────────
   let scene, camera, renderer, raycaster, mouse;
   let terrainMesh, sunLight;
-  let borderGroup, markerGroup, eventGroup;
+  let borderGroup, markerGroup, eventGroup, knowledgeGroup;
+  // Phase 2.7 info layers (all DOM-overlay):
+  // - place labels (city/town/region names) projected from the
+  //   /api/geo/places/labels endpoint, opacity ramps with zoom.
+  // - region glow as a separate THREE.Group of subtle disc meshes
+  //   sitting on the terrain at polity centroids when the player has
+  //   knowledge of that region.
+  // - inline event labels: small text fragments hovering above each
+  //   event marker showing the rumor or fact the character knows.
+  let labelOverlay = null;
+  // Each entry: { el, vec3, kind, payload }
+  let domLabels = [];
+  // Region knowledge for the currently-loaded run -- map from polity
+  // NAME (lowercase) to {tier, summary} where tier is one of
+  // 'witnessed' | 'known' | 'rumor_reliable' | 'rumor_unreliable'.
+  // Populated by _loadRegionKnowledge() at show() time.
+  let _regionKnowledge = {};
+  // Loaded place-labels payload from the backend (cached per session).
+  let _placesData = null;
   let initialized = false;
   let isVisible = false;
   let currentEraKey = null;
@@ -198,7 +216,23 @@
     borderGroup = new THREE.Group();
     markerGroup = new THREE.Group();
     eventGroup = new THREE.Group();
-    scene.add(borderGroup, markerGroup, eventGroup);
+    // Region knowledge glow layer: subtle disc meshes on the terrain
+    // at polity centroids. Colored by what the player knows about
+    // each region (warm amber for rumors, cool teal for confirmed
+    // knowledge, dark for unknown). Sits below markers and labels.
+    knowledgeGroup = new THREE.Group();
+    scene.add(borderGroup, knowledgeGroup, markerGroup, eventGroup);
+
+    // DOM label overlay for place names + inline event text + region
+    // knowledge labels. Sits above the canvas, transparent. Children
+    // re-enable pointer events as needed.
+    if (!labelOverlay) {
+      labelOverlay = document.createElement("div");
+      labelOverlay.id = "wartable-label-overlay";
+      labelOverlay.style.cssText =
+        "position:absolute;inset:0;pointer-events:none;z-index:5;";
+      container.appendChild(labelOverlay);
+    }
 
     _wireInteraction(canvas);
     _wireToolbar();
@@ -207,6 +241,95 @@
 
     initialized = true;
     _animate();
+  }
+
+  // ── DOM label projection (places + event captions + region tags) ───
+  function _addDomLabel(opts) {
+    if (!labelOverlay) return null;
+    const el = document.createElement("div");
+    el.className = opts.className;
+    el.style.cssText =
+      "position:absolute;left:0;top:0;transform:translate(-9999px,-9999px);" +
+      "pointer-events:" + (opts.interactive ? "auto" : "none") + ";" +
+      (opts.zIndex != null ? "z-index:" + opts.zIndex + ";" : "");
+    el.innerHTML = opts.html || "";
+    if (opts.title) el.title = opts.title;
+    labelOverlay.appendChild(el);
+    const entry = {
+      el: el,
+      lat: opts.lat,
+      lon: opts.lon,
+      // Y-offset above the terrain in scene units, for things that
+      // should hover (event captions etc).
+      yLift: opts.yLift || 0,
+      kind: opts.kind,
+      payload: opts.payload,
+      tier: opts.tier,
+    };
+    domLabels.push(entry);
+    return entry;
+  }
+
+  function _clearDomLabels(predicate) {
+    const keep = [];
+    domLabels.forEach((m) => {
+      if (predicate(m)) {
+        if (m.el && m.el.parentNode) m.el.parentNode.removeChild(m.el);
+      } else {
+        keep.push(m);
+      }
+    });
+    domLabels = keep;
+  }
+
+  function _projectDomLabels() {
+    if (!camera || !labelOverlay || !bbox) return;
+    const rect = renderer.domElement.getBoundingClientRect();
+    const w = rect.width;
+    const h = rect.height;
+    const tmp = new THREE.Vector3();
+    for (let i = 0; i < domLabels.length; i++) {
+      const m = domLabels[i];
+      const p = _latLonToPlane(m.lat, m.lon);
+      if (!p) {
+        m.el.style.opacity = "0";
+        continue;
+      }
+      const yBase = _heightAtLatLon(m.lat, m.lon) + m.yLift;
+      tmp.set(p.x, yBase, p.z).project(camera);
+      // Behind the camera: hide.
+      if (tmp.z > 1) {
+        m.el.style.opacity = "0";
+        continue;
+      }
+      const sx = (tmp.x * 0.5 + 0.5) * w;
+      const sy = (1 - (tmp.y * 0.5 + 0.5)) * h;
+      // Anchor: top-left at projected point + small offset right of
+      // marker so it doesn't overlap the disc directly.
+      m.el.style.transform = "translate(" + (sx + 6) + "px," + (sy - 8) + "px)";
+      // Distance-based opacity for places — far-away ones fade.
+      const opacity = m.kind === "place" ? _placeFade(m.tier, camOrbit.dist) : 1;
+      m.el.style.opacity = String(opacity);
+    }
+  }
+
+  // Place labels fade in as the player zooms in -- city earliest,
+  // town a bit later, region from default. Mirrors the behavior of
+  // the legacy 2D map for visual consistency.
+  function _placeFade(tier, dist) {
+    if (tier === "city") {
+      if (dist > 3.0) return 0;
+      if (dist < 1.5) return 1;
+      return 1 - (dist - 1.5) / 1.5;
+    }
+    if (tier === "town") {
+      if (dist > 2.4) return 0;
+      if (dist < 1.4) return 1;
+      return 1 - (dist - 1.4) / 1.0;
+    }
+    // region
+    if (dist > 5.0) return 0.4;
+    return 1;
   }
 
   // ── Interaction ──────────────────────────────────────────────────────
@@ -345,6 +468,9 @@
     requestAnimationFrame(_animate);
     if (!isVisible) return;
     renderer.render(scene, camera);
+    // Project DOM labels (places, event captions, region knowledge
+    // tags) after the render so we have the latest matrix world.
+    _projectDomLabels();
   }
 
   // ── Terrain ──────────────────────────────────────────────────────────
@@ -646,6 +772,8 @@
   function updateEventMarkers(events) {
     if (!initialized) return;
     _disposeGroup(eventGroup);
+    // Wipe any existing inline event labels before re-rendering.
+    _clearDomLabels((m) => m.kind === "event_label");
     if (!events || !events.length) return;
     events.forEach((ev) => {
       if (typeof ev.lat !== "number" || typeof ev.lon !== "number") return;
@@ -663,7 +791,151 @@
       pin.position.set(p.x, _heightAtLatLon(ev.lat, ev.lon) + MARKER_SHADOW_LIFT, p.z);
       pin.userData = { kind: "event", event: ev };
       eventGroup.add(pin);
+
+      // Inline label: small text fragment hovering above the pin.
+      // Witnessed/known events show full one-liner; rumors are
+      // italic and shorter to read as uncertain.
+      const isRumor = ev.tier === "rumor_reliable" || ev.tier === "rumor_unreliable";
+      const summary = (ev.summary || "").trim();
+      // Cap length so labels don't pile up over the table.
+      const maxLen = isRumor ? 56 : 80;
+      let text = summary.length > maxLen ? summary.slice(0, maxLen - 1) + "\u2026" : summary;
+      // Rumors get a "rumored:" prefix as a final readability cue.
+      if (isRumor) text = "rumored \u2014 " + text;
+      const cssClass = "wartable-event-label" +
+        (isRumor ? " rumor" : "") +
+        (isWitnessed ? " witnessed" : "");
+      _addDomLabel({
+        kind: "event_label",
+        lat: ev.lat,
+        lon: ev.lon,
+        yLift: 0.07, // hover above the pin's top
+        html: '<span class="wel-text">' + _escHtml(text) + "</span>",
+        className: cssClass,
+        zIndex: 5,
+        tier: ev.tier,
+      });
     });
+  }
+
+  function _escHtml(s) {
+    if (!s) return "";
+    const d = document.createElement("div");
+    d.textContent = s;
+    return d.innerHTML;
+  }
+
+  // ── Phase 2.7 region knowledge glow ──────────────────────────────────
+  //
+  // Subtle disc on the terrain at each polity's centroid, colored by
+  // what the player knows about that region. Currently sourced from
+  // the events_visible payload: aggregate the highest-tier event per
+  // polity to get a single color.
+  //
+  // Tier -> color:
+  //   witnessed/known  -> cool teal (information is grounded)
+  //   rumor_reliable   -> amber
+  //   rumor_unreliable -> faint amber, dimmer
+  //   (unknown regions stay un-glowed)
+  //
+  // Approach: each border feature already has a polygon. Compute a
+  // rough centroid + radius in lat/lon, project to plane coords, drop
+  // a flat disc on the terrain. Disc material is additive with low
+  // opacity so it tints the terrain rather than masking it.
+  function _updateKnowledgeGlow() {
+    // Wipe.
+    while (knowledgeGroup.children.length) {
+      const c = knowledgeGroup.children.pop();
+      if (c.geometry) c.geometry.dispose();
+      if (c.material) c.material.dispose();
+    }
+    if (!_bordersData || !bbox) return;
+    if (!_regionKnowledge || Object.keys(_regionKnowledge).length === 0) return;
+
+    const features = _bordersData.features || [];
+    features.forEach((f) => {
+      const name = f.properties && f.properties.NAME;
+      if (!name) return;
+      const tier = (_regionKnowledge[name.toLowerCase()] || {}).tier;
+      if (!tier) return;
+
+      // Compute polygon centroid + rough lat/lon radius.
+      const c = _featureCentroid(f);
+      if (!c) return;
+      // Skip if outside the era's regional bbox (no terrain to paint).
+      if (
+        c.lat < bbox.south || c.lat > bbox.north ||
+        c.lon < bbox.west || c.lon > bbox.east
+      ) return;
+      const planeC = _latLonToPlane(c.lat, c.lon);
+      if (!planeC) return;
+
+      // Color + opacity by tier.
+      let colorHex, opacity;
+      if (tier === "witnessed" || tier === "known") {
+        colorHex = 0x4dd0c4; opacity = 0.18;
+      } else if (tier === "rumor_reliable") {
+        colorHex = 0xfcd34d; opacity = 0.14;
+      } else if (tier === "rumor_unreliable") {
+        colorHex = 0xfcd34d; opacity = 0.08;
+      } else {
+        return;
+      }
+
+      // Disc radius scaled by region span. Aspect-correct same way
+      // _latLonToPlane is.
+      const spanLat = c.maxLat - c.minLat;
+      const spanLon = c.maxLon - c.minLon;
+      const aspect = (bbox.east - bbox.west) / (bbox.north - bbox.south);
+      let planeW = TERRAIN_PLANE_SIZE;
+      let planeH = TERRAIN_PLANE_SIZE;
+      if (aspect > 1) planeH = TERRAIN_PLANE_SIZE / aspect;
+      else planeW = TERRAIN_PLANE_SIZE * aspect;
+      const radiusUnits = Math.min(0.5, Math.max(0.04,
+        Math.max(spanLon / (bbox.east - bbox.west) * planeW,
+                 spanLat / (bbox.north - bbox.south) * planeH) / 2.4
+      ));
+
+      const geo = new THREE.CircleGeometry(radiusUnits, 36);
+      geo.rotateX(-Math.PI / 2);
+      const mat = new THREE.MeshBasicMaterial({
+        color: colorHex,
+        transparent: true,
+        opacity: opacity,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+      });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.position.set(planeC.x, _heightAtLatLon(c.lat, c.lon) + 0.001, planeC.z);
+      knowledgeGroup.add(mesh);
+    });
+  }
+
+  function _featureCentroid(feature) {
+    const geom = feature.geometry;
+    if (!geom) return null;
+    const polys = [];
+    if (geom.type === "Polygon") polys.push(...geom.coordinates);
+    else if (geom.type === "MultiPolygon") geom.coordinates.forEach((p) => polys.push(...p));
+    else return null;
+    if (polys.length === 0) return null;
+    // Use the first ring (outer) for centroid math.
+    const ring = polys[0];
+    let sumLat = 0, sumLon = 0;
+    let minLat = 90, maxLat = -90, minLon = 180, maxLon = -180;
+    for (let i = 0; i < ring.length; i++) {
+      const lon = ring[i][0], lat = ring[i][1];
+      sumLat += lat; sumLon += lon;
+      if (lat < minLat) minLat = lat;
+      if (lat > maxLat) maxLat = lat;
+      if (lon < minLon) minLon = lon;
+      if (lon > maxLon) maxLon = lon;
+    }
+    return {
+      lat: sumLat / ring.length,
+      lon: sumLon / ring.length,
+      minLat, maxLat, minLon, maxLon,
+    };
   }
 
   // ── Click handling ──────────────────────────────────────────────────
@@ -859,6 +1131,7 @@
 
     if (playerView) updateMarkers(playerView);
     _loadEventsForRun(currentRunId);
+    _loadPlaceLabels();
 
     if (renderer && camera) {
       const w = container.clientWidth || window.innerWidth;
@@ -874,6 +1147,45 @@
       const friendly = (currentEraKey || "").replace(/_/g, " ").toUpperCase();
       label.textContent = friendly;
     }
+  }
+
+  // Phase 2.7: place labels (city / town / region) projected from
+  // /api/geo/places/labels. Same data the legacy 2D map uses.
+  // Filtered to the era's bbox so we don't paint Mongolia onto a
+  // 410 AD Italia run.
+  async function _loadPlaceLabels() {
+    if (!bbox) return;
+    if (!_placesData) {
+      try {
+        const resp = await fetch("/api/geo/places/labels");
+        if (resp.ok) {
+          const data = await resp.json();
+          _placesData = data.places || [];
+        } else {
+          _placesData = [];
+        }
+      } catch (e) {
+        _placesData = [];
+      }
+    }
+    _clearDomLabels((m) => m.kind === "place");
+    _placesData.forEach((p) => {
+      // Skip places outside the era's regional bbox.
+      if (
+        p.lat < bbox.south || p.lat > bbox.north ||
+        p.lon < bbox.west || p.lon > bbox.east
+      ) return;
+      _addDomLabel({
+        kind: "place",
+        lat: p.lat,
+        lon: p.lon,
+        yLift: 0.005,
+        html: '<span class="wpl-text">' + _escHtml(p.name) + "</span>",
+        className: "wartable-place-label tier-" + p.tier,
+        zIndex: 4,
+        tier: p.tier,
+      });
+    });
   }
 
   function hide() {
@@ -894,8 +1206,27 @@
       const res = await fetch("/api/run/" + runId + "/events/visible");
       if (!res.ok) return;
       const data = await res.json();
-      updateEventMarkers(data.events || []);
+      const events = data.events || [];
+      updateEventMarkers(events);
+      _deriveRegionKnowledgeFromEvents(events);
+      _updateKnowledgeGlow();
     } catch (e) { /* swallow */ }
+  }
+
+  // Aggregate the highest-tier event per polity to a single knowledge
+  // tier. Witnessed > known > rumor_reliable > rumor_unreliable.
+  function _deriveRegionKnowledgeFromEvents(events) {
+    _regionKnowledge = {};
+    const order = { witnessed: 4, known: 3, rumor_reliable: 2, rumor_unreliable: 1 };
+    events.forEach((ev) => {
+      const region = (ev.region || "").trim().toLowerCase();
+      if (!region) return;
+      const t = ev.tier;
+      const cur = _regionKnowledge[region];
+      if (!cur || (order[t] || 0) > (order[cur.tier] || 0)) {
+        _regionKnowledge[region] = { tier: t, summary: ev.summary || "" };
+      }
+    });
   }
 
   // Public API. T-key wiring lives in app.js so it can pass current

@@ -2704,3 +2704,83 @@ body.chronos-stacked-manuscript #turns-container[data-has-turn="1"] .manuscript-
     filter: blur(0);
   }
 }
+
+
+/* ── Phase 2.7 war-table info layers ─────────────────────────────────
+ *
+ * Three layers project as DOM elements above the war-table canvas:
+ *  - place names (city / town / region) — white, opacity ramps with
+ *    camera distance via JS
+ *  - inline event captions hovering above each event pin — color-tinted
+ *    by event type via the parent .marker-event-* class on the
+ *    pin doesn't apply here (label is separate DOM); instead we use
+ *    rumor-vs-fact styling: facts in white, rumors in italic amber.
+ *  - region knowledge glow renders on the terrain itself as Three.js
+ *    geometry, NOT here — see _updateKnowledgeGlow in wartable.js.
+ */
+
+.wartable-place-label {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  text-shadow:
+    0 0 3px rgba(0, 0, 0, 0.95),
+    0 0 8px rgba(0, 0, 0, 0.7),
+    -1px 0 0 rgba(0, 0, 0, 0.85),
+    1px 0 0 rgba(0, 0, 0, 0.85),
+    0 -1px 0 rgba(0, 0, 0, 0.85),
+    0 1px 0 rgba(0, 0, 0, 0.85);
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+  user-select: none;
+  transition: opacity 0.18s ease;
+}
+
+.wartable-place-label.tier-city .wpl-text {
+  color: rgba(255, 255, 255, 0.9);
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.wartable-place-label.tier-town .wpl-text {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 11px;
+}
+
+.wartable-place-label.tier-region .wpl-text {
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  font-style: italic;
+}
+
+.wartable-event-label {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 10px;
+  line-height: 1.35;
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.78);
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-left-width: 2px;
+  padding: 3px 6px;
+  border-radius: 3px;
+  max-width: 240px;
+  backdrop-filter: blur(3px);
+  text-shadow: 0 0 2px rgba(0, 0, 0, 0.8);
+  white-space: normal;
+  user-select: none;
+  pointer-events: none;
+  transition: opacity 0.18s ease;
+}
+
+.wartable-event-label.witnessed {
+  border-left-color: rgba(255, 255, 255, 0.9);
+  background: rgba(0, 0, 0, 0.7);
+}
+
+.wartable-event-label.rumor {
+  font-style: italic;
+  color: rgba(252, 211, 77, 0.78);
+  border-left-color: rgba(252, 211, 77, 0.4);
+  background: rgba(35, 25, 0, 0.55);
+}
