@@ -367,3 +367,85 @@ class TestStorySummary:
         summary = build_story_summary(state)
         # Some events were dropped — the elision note must appear
         assert "smaller moments now in the past" in summary
+
+
+class TestPlayerInteractionsCap:
+    """The structured player-interaction log on each NPC must FIFO-evict
+    at MAX_PLAYER_INTERACTIONS=5 to prevent unbounded growth across long runs.
+    Independent per NPC -- targeting Gallus must not affect Paulus' log.
+    """
+
+    def _action(self, target: str, intent: str, action_type: str = "speak"):
+        """Build a parsed_action dict that targets a specific NPC by name."""
+        return {
+            "action_type": action_type,
+            "target": target,
+            "intent": intent,
+            "era_description": f"Player {action_type}s {target}.",
+            "npc_impacts": [
+                {"name": target, "sentiment": "neutral", "relevant": True},
+            ],
+        }
+
+    def test_player_interactions_capped_at_5(self, initial_state):
+        """After 7 targeted interactions the log holds at most 5 entries."""
+        state = initial_state
+        target_name = state.npcs[0].name  # Lucius Gallus
+        for i in range(7):
+            state = apply_action(
+                state,
+                self._action(target_name, f"intent number {i}"),
+            )
+        npc = next(n for n in state.npcs if n.name == target_name)
+        assert len(npc.player_interactions) == 5, (
+            f"Expected cap at 5, got {len(npc.player_interactions)}"
+        )
+
+    def test_player_interactions_fifo_eviction(self, initial_state):
+        """Oldest entries drop first; newest 5 remain."""
+        state = initial_state
+        target_name = state.npcs[0].name
+        for i in range(8):
+            state = apply_action(
+                state,
+                self._action(target_name, f"unique_intent_{i}"),
+            )
+        npc = next(n for n in state.npcs if n.name == target_name)
+        intents = [r["intent"] for r in npc.player_interactions]
+        # The 8 intents were 0..7. After cap at 5, only 3..7 should remain.
+        assert intents == [
+            "unique_intent_3",
+            "unique_intent_4",
+            "unique_intent_5",
+            "unique_intent_6",
+            "unique_intent_7",
+        ], f"FIFO eviction wrong: {intents}"
+
+    def test_player_interactions_independent_per_npc(self, initial_state):
+        """Targeting one NPC must not write to another NPC's log."""
+        state = initial_state
+        gallus = state.npcs[0].name  # Lucius Gallus
+        paulus = state.npcs[1].name  # Deacon Paulus
+
+        # Address Gallus 3 times
+        for i in range(3):
+            state = apply_action(
+                state,
+                self._action(gallus, f"to gallus {i}"),
+            )
+
+        # Address Paulus once
+        state = apply_action(
+            state,
+            self._action(paulus, "to paulus once"),
+        )
+
+        gallus_npc = next(n for n in state.npcs if n.name == gallus)
+        paulus_npc = next(n for n in state.npcs if n.name == paulus)
+
+        assert len(gallus_npc.player_interactions) == 3
+        assert len(paulus_npc.player_interactions) == 1
+        # Cross-contamination check: Gallus' intents must not appear on Paulus
+        paulus_intents = [r["intent"] for r in paulus_npc.player_interactions]
+        assert "to gallus 0" not in paulus_intents
+        assert paulus_intents == ["to paulus once"]

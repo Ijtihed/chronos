@@ -81,6 +81,49 @@ class TestFormatRumorsForPrompt:
         assert "unreliable" in text
 
 
+class TestGenerateGroundContextYearReference:
+    """Regression test: hce.py:88 used to read undefined `year_start` instead
+    of the local `current_year`.  When state.current_year was 0 the prompt
+    substitution raised NameError, which the broad `except Exception` then
+    swallowed, silently degrading every fresh-state run to fallback prose.
+    """
+
+    @pytest.mark.asyncio
+    async def test_generate_ground_context_with_zero_current_year(self, state_with_events):
+        """A state with current_year=0 must NOT raise NameError during prompt
+        substitution.  The function should fall back to era.year_start."""
+        state = state_with_events.model_copy(deep=True)
+        state.current_year = 0  # the trigger condition for the bug
+
+        captured_prompts: list[str] = []
+
+        async def mock_llm(prompt, **kw):
+            captured_prompts.append(prompt)
+            return (
+                '{"era_feel": "test", "what_character_knows": "x", '
+                '"local_rumors": [], "material_conditions": "y", '
+                '"recent_events_known": [], "recent_events_unknown": []}',
+                0.0,
+            )
+
+        with patch("backend.hce.call_llm", side_effect=mock_llm):
+            result = await generate_ground_context(state)
+
+        # If the bug was present, mock_llm would never have been reached
+        # because NameError raises before call_llm.  The fact that we see
+        # at least one captured prompt confirms substitution succeeded.
+        assert captured_prompts, (
+            "generate_ground_context did not reach call_llm -- "
+            "year_start NameError likely re-introduced"
+        )
+        # Era year_start (410 for Roman Late Empire) must appear in the prompt
+        assert "410" in captured_prompts[0], (
+            "Year substitution missing -- expected era.year_start fallback"
+        )
+        # The function returns the LLM output, not the fallback
+        assert result["era_feel"] == "test"
+
+
 class TestFallbackContext:
     def test_produces_valid_structure(self, state_with_events):
         ctx = _fallback_context(state_with_events, [], [])

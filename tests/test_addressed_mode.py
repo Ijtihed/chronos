@@ -306,3 +306,112 @@ class TestNpcAddressedPrompt:
             already_used_details="",
         )
         assert "$" not in result, f"Unfilled placeholders: {result}"
+
+
+# ---------------------------------------------------------------------------
+# JSON contract -- Addressed-mode response shapes Gemini returns in practice
+#
+# Gemini's JSON-mode output is mostly stable but the `internal` field
+# specifically has shown three observed patterns: present-with-value, present-
+# but-empty (""), and entirely absent. The schema and frontend BOTH have to
+# render these correctly. These tests pin the contract so a future schema
+# loosening or prompt rewrite can't break the addressed-mode flow silently.
+# ---------------------------------------------------------------------------
+
+class TestAddressedJSONContract:
+    """End-to-end contract tests for the four JSON shapes Gemini returns."""
+
+    def _state_and_npc(self):
+        state = create_initial_state()
+        return state, state.npcs[0]
+
+    def _mock_llm(self, raw_response: str):
+        async def _llm(prompt, **kw):
+            return (raw_response, 0.0)
+        return _llm
+
+    @pytest.mark.asyncio
+    async def test_addressed_response_with_internal_field(self):
+        """Standard case: reply + non-empty internal + emotional_state."""
+        from backend.npc_engine import generate_npc_addressed
+
+        state, npc = self._state_and_npc()
+        action = {"action_type": "speak", "intent": "asks about ships"}
+        raw = (
+            '{"reply": "No ships today.", '
+            '"internal": "He keeps coming back. Why?", '
+            '"emotional_state": "wary"}'
+        )
+
+        with patch("backend.npc_engine.call_llm", side_effect=self._mock_llm(raw)):
+            with patch("backend.npc_engine.retrieve_context", return_value=""):
+                result = await generate_npc_addressed(
+                    npc, action, state, player_input="Are there boats?"
+                )
+
+        assert result["reply"] == "No ships today."
+        assert result["internal"] == "He keeps coming back. Why?"
+        assert result["emotional_state"] == "wary"
+
+    @pytest.mark.asyncio
+    async def test_addressed_response_with_null_internal(self):
+        """JSON null for internal -- schema validator coerces to None."""
+        from backend.npc_engine import generate_npc_addressed
+
+        state, npc = self._state_and_npc()
+        action = {"action_type": "speak", "intent": "asks about debt"}
+        raw = '{"reply": "Pay me.", "internal": null, "emotional_state": "curt"}'
+
+        with patch("backend.npc_engine.call_llm", side_effect=self._mock_llm(raw)):
+            with patch("backend.npc_engine.retrieve_context", return_value=""):
+                result = await generate_npc_addressed(
+                    npc, action, state, player_input="When can I pay you?"
+                )
+
+        assert result["reply"] == "Pay me."
+        assert result["internal"] is None, (
+            "JSON null must render as Python None for frontend conditional"
+        )
+        assert result["emotional_state"] == "curt"
+
+    @pytest.mark.asyncio
+    async def test_addressed_response_with_empty_internal(self):
+        """Empty string for internal -- coerce_internal validator must
+        normalise this to None so the frontend's truthy check works."""
+        from backend.npc_engine import generate_npc_addressed
+
+        state, npc = self._state_and_npc()
+        action = {"action_type": "speak", "intent": "asks for help"}
+        raw = '{"reply": "Can\'t help.", "internal": "", "emotional_state": "tired"}'
+
+        with patch("backend.npc_engine.call_llm", side_effect=self._mock_llm(raw)):
+            with patch("backend.npc_engine.retrieve_context", return_value=""):
+                result = await generate_npc_addressed(
+                    npc, action, state, player_input="Help me?"
+                )
+
+        assert result["reply"] == "Can't help."
+        assert result["internal"] is None, (
+            "Empty string must coerce to None to avoid rendering an empty <p>"
+        )
+
+    @pytest.mark.asyncio
+    async def test_addressed_response_with_missing_internal_field(self):
+        """Field entirely absent -- Pydantic default takes over (None)."""
+        from backend.npc_engine import generate_npc_addressed
+
+        state, npc = self._state_and_npc()
+        action = {"action_type": "speak", "intent": "greets"}
+        raw = '{"reply": "Hello.", "emotional_state": "neutral"}'
+
+        with patch("backend.npc_engine.call_llm", side_effect=self._mock_llm(raw)):
+            with patch("backend.npc_engine.retrieve_context", return_value=""):
+                result = await generate_npc_addressed(
+                    npc, action, state, player_input="Hi."
+                )
+
+        assert result["reply"] == "Hello."
+        assert result["internal"] is None, (
+            "Missing field must default to None per NPCAddressedResponse schema"
+        )
+        assert result["emotional_state"] == "neutral"

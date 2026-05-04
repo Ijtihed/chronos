@@ -479,12 +479,13 @@ def _update_npc_memory(state: WorldState, action: dict) -> None:
 #   - the most recent N events (what's happening right now)
 #   - high-significance events from earlier (player actions, deaths, divergences)
 # and drop low-signal ambient activity older than the recent window.
+#
+# Priority types live in backend.event_vocab.PRIORITY_EVENT_TYPES so the
+# story-summary slice and the long-run state.events compaction
+# (world_engine.compact_events) cannot drift apart.
+from backend.event_vocab import PRIORITY_EVENT_TYPES as _STORY_SUMMARY_PRIORITY_TYPES
+
 _STORY_SUMMARY_RECENT_CAP = 12
-_STORY_SUMMARY_PRIORITY_TYPES = frozenset({
-    "speak", "trade", "petition", "threaten", "betray", "attack",
-    "steal", "negotiate", "defend", "fight", "siege", "alliance",
-    "hoard", "prevent", "save", "flee", "death", "travel",
-})
 
 
 def build_story_summary(state: WorldState) -> str:

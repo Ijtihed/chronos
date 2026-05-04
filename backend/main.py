@@ -1468,11 +1468,16 @@ def _split_addressed(relevant_npcs, parsed: dict, state):
     return addressed, ambient
 
 
-_MAX_STORED_POVS = 10
+# Cap reduced 2026-05-01: stored_povs is no longer injected into prompts
+# (Change 3 replaced it with player_actions_toward_you). The only remaining
+# read is player_knowledge.py:512 -> VisibleNPCHere.last_pov, which exposes
+# the most recent entry. Storing 10 served the deprecated prompt-injection
+# pipeline; one entry is sufficient for the surviving consumer.
+_MAX_STORED_POVS = 1
 
 
 def _store_povs(state, npcs, pov_results):
-    """Append generated POV text to each NPC's stored_povs. Cap at 10."""
+    """Append generated POV text to each NPC's stored_povs. Cap at 1."""
     for npc, pov in zip(npcs, pov_results):
         if not isinstance(pov, str) or pov.startswith("["):
             continue

@@ -176,6 +176,54 @@ def resolve_action_conflicts(
 # Core simulation tick — stages 1-4
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# state.events compaction
+# ---------------------------------------------------------------------------
+#
+# state.events grows unbounded across a run.  At ~5 ambient events per turn
+# the WorldState JSON blob in SQLite gets large enough by turn ~200 to slow
+# save_session.  Every N turns (defined by EVENTS_COMPACTION_INTERVAL) we
+# drop ambient events older than turn N - EVENTS_COMPACTION_KEEP_RECENT.
+# Priority types (player actions, deaths, travel) are NEVER dropped --
+# the source of truth for that set is event_vocab.PRIORITY_EVENT_TYPES.
+#
+# Note that build_story_summary already caps what reaches the prompt; this
+# is a separate concern -- preventing the WorldState blob itself from
+# bloating across long runs and slowing persistence.
+
+EVENTS_COMPACTION_INTERVAL = 25
+EVENTS_COMPACTION_KEEP_RECENT = 50
+
+
+def compact_events(state: WorldState) -> int:
+    """Drop ambient events older than KEEP_RECENT turns.  Returns count dropped.
+
+    Priority events (player actions, deaths, travel) are preserved regardless
+    of age.  Mutates state.events in place.  Pure code, no LLM.
+    """
+    from backend.event_vocab import PRIORITY_EVENT_TYPES
+
+    if not state.events:
+        return 0
+    cutoff_turn = state.turn - EVENTS_COMPACTION_KEEP_RECENT
+    if cutoff_turn <= 0:
+        return 0
+
+    before = len(state.events)
+    state.events = [
+        ev for ev in state.events
+        if ev.turn >= cutoff_turn or ev.action_type in PRIORITY_EVENT_TYPES
+    ]
+    dropped = before - len(state.events)
+    if dropped:
+        logger.info(
+            "compact_events: dropped %d ambient events older than turn %d "
+            "(run %s, turn %d)",
+            dropped, cutoff_turn, state.run_id, state.turn,
+        )
+    return dropped
+
+
 async def simulate_turn(state: WorldState) -> Tuple[WorldState, List[dict]]:
     """Run one simulation tick (stages 1-4). Returns (new_state, ambient_events).
 
@@ -195,7 +243,13 @@ async def simulate_turn(state: WorldState) -> Tuple[WorldState, List[dict]]:
     if new.player.location not in new.visited_locations:
         new.visited_locations.append(new.player.location)
 
-    # --- STAGE 0: Refresh ground context if stale ---
+    # --- STAGE 0a: Compact state.events on schedule (no LLM) ---
+    # Runs every EVENTS_COMPACTION_INTERVAL turns to keep the persisted
+    # WorldState blob bounded across long runs.  Priority types preserved.
+    if new.turn > 0 and new.turn % EVENTS_COMPACTION_INTERVAL == 0:
+        compact_events(new)
+
+    # --- STAGE 0b: Refresh ground context if stale ---
     if new.ground_context_stale:
         try:
             from backend.hce import generate_ground_context

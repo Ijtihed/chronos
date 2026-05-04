@@ -85,7 +85,7 @@ async def generate_ground_context(state: WorldState) -> Dict[str, Any]:
         character_role=state.player.role,
         character_archetype=state.player.archetype,
         location_name=player_loc.name,
-        year=state.current_year or year_start,
+        year=current_year,
         era_description=state.era.description,
         known_events=known_text,
         rumor_events=rumor_text,
