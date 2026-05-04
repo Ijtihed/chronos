@@ -2786,3 +2786,17 @@ body.chronos-stacked-manuscript #turns-container[data-has-turn="1"] .manuscript-
   border-left-color: rgba(252, 211, 77, 0.4);
   background: rgba(35, 25, 0, 0.55);
 }
+
+
+/* War-table loading overlay -- hides the empty/black canvas and the
+ * empty era label while terrain + borders + place labels load on
+ * first show. wartable.js show() adds .ready to #wartable-container
+ * once the terrain mesh exists, fading this out. */
+#wartable-container.ready #wartable-loading {
+  opacity: 0;
+}
+#wartable-container.ready #wartable-loading {
+  /* Once faded, take it out of the layer stack so clicks pass
+   * through to the canvas. */
+  pointer-events: none;
+}

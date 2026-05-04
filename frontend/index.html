@@ -544,6 +544,23 @@
   <!-- ════════════════════════════════════════════════════════════════ -->
   <div id="wartable-container" class="hidden fixed top-10 left-0 right-0 bottom-0 z-[210] bg-black">
     <!-- Canvas mounts inside here (created lazily by wartable.js).     -->
+    <!-- Loading overlay: covers the canvas while terrain + borders     -->
+    <!-- load on first show. wartable.js show() adds .ready to the      -->
+    <!-- container once terrain mesh exists so this fades out.          -->
+    <div id="wartable-loading"
+         class="absolute inset-0 z-[20] flex flex-col items-center justify-center bg-black pointer-events-none transition-opacity duration-500">
+      <div class="text-[10px] uppercase tracking-[0.25em] text-white/35 font-medium mb-5">
+        War-table
+      </div>
+      <div class="dots-pulse flex gap-1.5 mb-6">
+        <span class="w-1 h-1 rounded-full bg-white/40"></span>
+        <span class="w-1 h-1 rounded-full bg-white/40"></span>
+        <span class="w-1 h-1 rounded-full bg-white/40"></span>
+      </div>
+      <div class="text-[10px] uppercase tracking-[0.18em] text-white/25" id="wartable-loading-stage">
+        Loading terrain&hellip;
+      </div>
+    </div>
     <!-- Massive faint era label hanging behind the table.              -->
     <div id="wartable-era-label"
          class="pointer-events-none absolute inset-0 flex items-center justify-center select-none">

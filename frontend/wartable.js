@@ -1112,6 +1112,20 @@
     container.classList.remove("hidden");
     isVisible = true;
 
+    // Loading state: hide the canvas (and the empty era label) behind
+    // an overlay until terrain + borders are loaded. Without this the
+    // user sees a black screen for 5-15s on first show (procedural
+    // terrain generator is CPU-bound) and reasonably assumes T is
+    // broken. .ready class is applied at the end of the show() flow.
+    const stageEl = document.getElementById("wartable-loading-stage");
+    const setStage = (s) => { if (stageEl) stageEl.textContent = s; };
+    if (!terrainMesh || (eraKey && eraKey !== currentEraKey)) {
+      // Only show the overlay if we actually need to load. On a quick
+      // re-open with the same era and existing terrain, we skip it.
+      container.classList.remove("ready");
+      setStage("Loading terrain\u2026");
+    }
+
     // The container was display:none when init() ran, so the canvas
     // mounted at 0x0 and the renderer is sized at 0x0. Now that the
     // container is visible the canvas has real dimensions; size the
@@ -1138,9 +1152,14 @@
       const ok = await _loadTerrain(eraKey);
       if (ok) {
         currentEraKey = eraKey;
+        setStage("Loading borders\u2026");
         await _loadBorders(eraKey);
       } else {
         console.warn("[wartable] terrain load failed; will retry on next show");
+        setStage("Terrain load failed");
+        // Don't fade out -- leave the loading overlay so the user
+        // doesn't see a black war-table.
+        return;
       }
     }
     const saved = _loadViewState();
@@ -1173,6 +1192,17 @@
       const friendly = (currentEraKey || "").replace(/_/g, " ").toUpperCase();
       label.textContent = friendly;
     }
+
+    // Terrain + borders + initial markers are in. Fade out the
+    // loading overlay so the canvas becomes visible. Defer one frame
+    // so the renderer has a chance to paint at least one full frame
+    // before the overlay clears -- prevents the user catching a
+    // single empty-canvas frame between fade and first paint.
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        container.classList.add("ready");
+      });
+    });
   }
 
   // Phase 2.7: place labels (city / town / region) projected from
@@ -1216,7 +1246,14 @@
 
   function hide() {
     const container = document.getElementById("wartable-container");
-    if (container) container.classList.add("hidden");
+    if (container) {
+      container.classList.add("hidden");
+      // Don't clear .ready -- if the user reopens with the same era
+      // and the terrain mesh still exists (it does, Three.js scenes
+      // persist), show() will skip the loading overlay and reveal
+      // the table instantly. .ready stays set; the loading overlay
+      // is opacity:0 either way.
+    }
     isVisible = false;
   }
 

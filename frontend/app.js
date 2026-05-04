@@ -965,6 +965,13 @@ async function submitTurn(text) {
   block.scrollIntoView({ behavior: "smooth" });
   saveRunToStorage();
 
+  // Phase 2.6: depth-layer the in-flight block immediately so the
+  // intro recedes and the new block sits at z=0 from the moment of
+  // submission, not just after /turn returns. Otherwise users see a
+  // flat intro for 5-30s while the spinner runs and conclude the 3D
+  // isn't working at all.
+  applyDepthLayering();
+
   // Phase 2.7: race the inner thought against /turn. Kick off
   // immediately, render in the slot as soon as it arrives. Failure is
   // silent — the slot just collapses out of layout when empty.
@@ -1676,9 +1683,11 @@ window.chronosDiag = function chronosDiag() {
       ChronosWarTable_kind: typeof ChronosWarTable === "undefined"
         ? "undefined"
         : (ChronosWarTable.show ? "object" : typeof ChronosWarTable),
-      state_loaded: !!window.state,
-      runId_loaded: !!window.runId,
-      eraKey_loaded: !!window.eraKey,
+      // state, runId, eraKey are module-scope `let`s, not on window.
+      // We poke the closure references directly here.
+      state_loaded: !!state,
+      runId_loaded: !!runId,
+      eraKey_loaded: !!eraKey,
     },
     manuscript_inner_perspective: innerCS ? innerCS.perspective : "(no element)",
     manuscript_inner_transform_style: innerCS ? innerCS.transformStyle : "(no element)",
