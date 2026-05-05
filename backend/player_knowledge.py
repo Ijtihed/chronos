@@ -453,6 +453,12 @@ class PlayerView(BaseModel):
     cost_cap_soft_eur: float = 1.0
     cost_cap_hard_eur: float = 2.0
 
+    # Phase 2.8: per-page positions on the manuscript detective board.
+    # Empty by default. Frontend writes via POST /api/run/{id}/board
+    # when the player drags a page. Read on initial run load to
+    # restore the player's saved layout. See manuscript-as-artifact.md.
+    board_state: Dict[str, Dict[str, float]] = Field(default_factory=dict)
+
 
 # ---------------------------------------------------------------------------
 # Build function
@@ -613,4 +619,5 @@ def build_player_view(
         cost_cap_state=getattr(state, "cost_cap_state", "none") or "none",
         cost_cap_soft_eur=_config.COST_CAP_SOFT_EUR,
         cost_cap_hard_eur=_config.COST_CAP_HARD_EUR,
+        board_state=getattr(state, "board_state", {}) or {},
     )

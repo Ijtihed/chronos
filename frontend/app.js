@@ -397,11 +397,15 @@ function enterGame() {
     applyDepthLayering();
     _wireDecayHoverAll();
     // Phase 2.8: hand the restored .turn-block elements to the
-    // corridor so they get placed along the path. Connection edges
-    // for restored turns are sparse (no per-turn data); new turns
-    // submitted after restore will have full edges.
+    // corridor so they get placed along the board. New turns
+    // submitted after restore will have full edges. board_state
+    // (saved drag positions) is applied BEFORE the cards are added
+    // so each card lands at its saved override on first paint.
     if (typeof ChronosCorridor !== "undefined") {
-      ChronosCorridor.show();
+      if (state && state.board_state) {
+        ChronosCorridor.applyBoardOverrides(state.board_state);
+      }
+      ChronosCorridor.show(runId);
       ChronosCorridor.restoreFromContainer();
     }
   } else {
@@ -436,9 +440,14 @@ function enterGame() {
     // moment the player scrolls or hovers a turn-block.
     _maybeShowDepthHint();
     // Phase 2.8: register the freshly-built intro card with the
-    // corridor and bring it on-screen.
+    // corridor and bring it on-screen. apply board_state overrides
+    // first so the intro lands at its saved position if the player
+    // had dragged it on a prior visit.
     if (typeof ChronosCorridor !== "undefined") {
-      ChronosCorridor.show();
+      if (state && state.board_state) {
+        ChronosCorridor.applyBoardOverrides(state.board_state);
+      }
+      ChronosCorridor.show(runId);
       const intro = turnsContainer.querySelector(".manuscript-intro");
       if (intro) ChronosCorridor.addIntroCard(intro);
     }

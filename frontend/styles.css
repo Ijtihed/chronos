@@ -2959,18 +2959,43 @@ body:not(.chronos-corridor-manuscript) #corridor-container {
  * close range -- they're MEANT to be readable as discrete pages.
  */
 .corridor-card {
-  width: 540px;
-  max-width: min(60vw, 600px);
-  background: rgba(8, 8, 10, 0.78);
+  /* Phase 2.8 v3: pages, not cards. Wider + taller so each turn
+   * reads as a full readable page on a detective board. The 540px
+   * corridor card was a compromise between "card" and "page";
+   * commit to page. min/max-height let long turns expand within
+   * a sane band before clipping (rare in practice). */
+  width: 440px;
+  max-width: 460px;
+  min-height: 480px;
+  max-height: 720px;
+  overflow: hidden;
+  background: rgba(8, 8, 10, 0.82);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 6px;
-  padding: 22px 26px;
+  padding: 24px 28px;
   backdrop-filter: blur(6px);
   box-shadow: 0 18px 64px rgba(0, 0, 0, 0.55);
+  /* Player can pick up any page and drag it to a new spot on the
+   * board. corridor.js wires per-card pointerdown -> pointermove
+   * (document-level) -> pointerup which raycasts a horizontal plane
+   * at the card's y to compute the world position. */
+  cursor: grab;
   /* Don't transition transform -- corridor.js writes it inline every
    * frame. Transitioning would lag every redraw by 50ms. Filter and
    * opacity are fine to ease. */
   will-change: transform, opacity;
+}
+
+/* Active drag state -- emphasizes the page being dragged and pins
+ * it above all other DOM in the overlay so it never gets occluded
+ * mid-drag. */
+.corridor-card.is-dragging {
+  cursor: grabbing;
+  z-index: 99999 !important;
+  filter: brightness(1.12);
+  box-shadow:
+    0 0 0 2px rgba(110, 231, 183, 0.18),
+    0 22px 80px rgba(0, 0, 0, 0.7);
 }
 
 /* Tier-based emphasis. The tier is set as data-significance-tier by

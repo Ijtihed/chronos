@@ -174,6 +174,14 @@ class WorldState(BaseModel):
     # into npc_pov.md and npc_addressed.md as $already_used_details. Resets
     # per run (new WorldState = empty list).
     used_grounding_details: List[str] = Field(default_factory=list)
+    # Phase 2.8: per-page positions on the manuscript detective board.
+    # Keyed by turn-block id ("turn-<timestamp>") or "manuscript-intro".
+    # Each value is {x: float, y: float, z: float}. Empty by default;
+    # the frontend computes a deterministic INITIAL position for each
+    # new page and only writes here when the player drags a page.
+    # Cut threads (next commit) will live alongside this in the same
+    # field as a sibling list. See manuscript-as-artifact.md Phase 2.8.
+    board_state: Dict[str, Dict[str, float]] = Field(default_factory=dict)
 
 
 # ---------------------------------------------------------------------------

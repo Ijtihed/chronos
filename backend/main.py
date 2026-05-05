@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import math
 from collections import defaultdict
 from pathlib import Path
 from string import Template
@@ -406,6 +407,55 @@ async def reset_run(run_id: str):
 async def take_turn(run_id: str, req: TurnRequest):
     async with _session_locks[run_id]:
         return await _execute_turn(run_id, req)
+
+
+# Phase 2.8 — manuscript detective board persistence.
+#
+# The frontend computes deterministic INITIAL positions for every page
+# from (turn_idx, NPCs, location). When the player drags a page on the
+# board, the frontend sends a full snapshot of the current
+# board_state to this endpoint. We sanitize, replace state.board_state
+# wholesale, and save. No turn log entry (board edits are not
+# simulation events). Empty payload is valid (player resetting the
+# board to defaults).
+#
+# Why a full-snapshot replace instead of a partial update: simpler
+# protocol, the payload is tiny (~30 turns x 3 floats x JSON overhead
+# = ~2KB), and it eliminates any drift between client and server
+# views of the board. The client is authoritative for layout.
+class BoardUpdateRequest(BaseModel):
+    board_state: dict[str, dict[str, float]]
+
+
+@app.post("/api/run/{run_id}/board")
+async def update_board(run_id: str, req: BoardUpdateRequest):
+    async with _session_locks[run_id]:
+        state = await _load_or_404(run_id)
+        # Sanitize: drop any non-finite coord, cap dict size, clamp
+        # to a sane bounding box so a malicious or buggy client can't
+        # grief by writing absurd numbers.
+        cleaned: dict[str, dict[str, float]] = {}
+        for key, pos in (req.board_state or {}).items():
+            if not isinstance(key, str):
+                continue
+            if len(cleaned) >= 200:
+                break
+            if not isinstance(pos, dict):
+                continue
+            x, y, z = pos.get("x"), pos.get("y"), pos.get("z")
+            if not all(
+                isinstance(v, (int, float)) and math.isfinite(v)
+                for v in (x, y, z)
+            ):
+                continue
+            cleaned[key] = {
+                "x": max(-50.0, min(50.0, float(x))),
+                "y": max(-50.0, min(50.0, float(y))),
+                "z": max(-100.0, min(200.0, float(z))),
+            }
+        state.board_state = cleaned
+        await save_session(state)
+        return {"saved": True, "page_count": len(cleaned)}
 
 
 # Phase 2.7 — instant inline inner thought.

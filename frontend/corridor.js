@@ -1,38 +1,40 @@
 /**
- * CHRONOS Constellation Manuscript -- Phase 2.8 Phase A v2 (read-only).
+ * CHRONOS Manuscript Detective Board -- Phase 2.8 Phase A v3 (read-only).
  *
- * The manuscript is a 3D constellation of memories. Each past turn
- * is a node hanging in space. TIME is locked to the Z axis -- newer
- * turns near the camera at z=0, older turns recede into +z. The
- * X/Y position of each turn is determined by a force-directed
- * simulation: turns repel each other; causal connections (action ->
- * NPC reaction, action -> divergence, NPC <-> NPC) act as springs
- * pulling related turns together; high-significance DECISIONS are
- * pinned at deliberate angular anchors so they always stand out as
- * structural nodes around which the run organizes.
+ * The manuscript is a 3D detective board. Each turn is a full readable
+ * PAGE pinned at deterministic 3D coordinates derived from its turn
+ * index plus its NPC + location associations. Causal threads connect
+ * related pages. The player can DRAG any page to a new position; the
+ * threads stretch to follow. Drag positions persist in the run's
+ * session state via POST /api/run/{run_id}/board so reopening the run
+ * restores the layout.
  *
- * The result: clusters where causality concentrates, voids where it
- * doesn't. The shape of the constellation IS the shape of the run.
+ * Time is locked to the Z axis (newer turns close to camera at z=0,
+ * older turns recede). X/Y is determined by:
+ *   1. A deterministic column formula based on which NPC or location
+ *      a turn primarily involves -- same NPC = same column every time.
+ *   2. A row offset (rows wrap as the run grows).
+ *   3. Plus any override the player has saved by dragging.
  *
- * Camera: free orbit around the constellation centroid. Drag to
- * orbit, wheel to zoom, WASD to pan, Z toggles a wide overview.
+ * No force simulator. No wandering layout. Same run = same initial
+ * arrangement. The player's drags are the only thing that moves a
+ * page off its deterministic spot.
  *
- * Design source of truth: context/game logic context/manuscript-as-artifact.md
- * (Phase 2.8 section). Roadmap entry: roadmap.md "PHASE 2.8 -- The
- * corridor manuscript" -- this v2 keeps the same intent but swaps the
- * positioning algorithm from a fixed corridor path to a real spatial
- * graph. Docs will be updated to reflect the new naming after browser
- * verification.
+ * Cut-the-thread interaction is explicitly NOT in this commit -- it
+ * lands in the next commit once the page-board itself is verified.
  *
- * Module shape: same IIFE / window.ChronosCorridor public API as v1
+ * Module shape: same IIFE / window.ChronosCorridor public API as v2
  * so existing app.js hooks (submitTurn / renderTurnStaggered /
- * enterGame / Z-key) work unchanged.
+ * enterGame / Z-key / skip endpoint) work unchanged. The TWO new
+ * additions are applyBoardOverrides(boardState) and getBoardState();
+ * everything else (init / show / hide / isVisible / addTurn /
+ * notifyTurnComplete / addIntroCard / restoreFromContainer /
+ * toggleConstellation / getDiag) keeps the same signatures.
  *
- * Renderer: DOM-overlay strategy -- Three.js draws ONLY the connection
- * line geometry on a transparent canvas. Turn-block DOM elements live
- * in #corridor-cards and are projected to screen coords each frame.
- * Same proven pattern as globe.js DOM markers and wartable.js DOM
- * labels. No CSS3DRenderer, no ES module switch.
+ * Renderer: DOM-overlay strategy unchanged from v2 -- Three.js draws
+ * connection lines on a transparent canvas; turn-block DOM elements
+ * live in #corridor-cards and are projected to screen coords each
+ * frame. No CSS3DRenderer. No ES module switch.
  */
 
 (function () {
@@ -49,71 +51,63 @@
   }
 
   // ── State ────────────────────────────────────────────────────────────
-  let scene, camera, renderer;
-  let lineGroup;        // Three.js group for all connection-line geometry
-  let cardsLayer;       // DOM div that holds the moved .turn-block elements
+  let scene, camera, renderer, raycaster;
+  let lineGroup;
+  let cardsLayer;
   let initialized = false;
   let isVisible = false;
 
-  // Each card node:
-  //   { id, el, kind, tier,
-  //     pos: Vector3,         // CURRENT world position (mutated each frame)
-  //     vel: Vector3,         // velocity (force-sim integrates)
-  //     anchor: Vector3|null, // pinned target (decisions) or null
-  //     z: number,            // locked time-axis position
-  //     mass: number,         // larger for decisions, smaller for filler
-  //     idx: number           // age (0 = newest)
-  //   }
+  // Each card node: { id, el, kind, tier, pos: Vector3, idx: number }
   const cards = [];
   let nextTurnIndex = 0;
-  // Map from turn-block id ("turn-<timestamp>") to its card.
   const cardByTurnId = new Map();
   // NPC nodes -- one per unique NPC across the run, keyed by lowercased name.
   const npcNodes = new Map();
-  // Edges: { from: nodeRef, to: nodeRef, kind, restLength, strength, _key }
-  // 'from'/'to' are LIVE references; each frame we read .pos fresh.
+  // Edges: { from: nodeRef, to: nodeRef, kind, _key }
   const edges = [];
 
-  // Decision anchor allocation. Each new decision gets the next
-  // golden-angle slot around the time axis.
-  let decisionAnchorCount = 0;
-  // Time-axis stride. Each turn back is ~1.4 units further into +z.
-  const Z_STEP = 1.4;
+  // Layout constants. The board is a tall vertical "wall" of pages
+  // arranged in columns. Z = age. X = column (deterministic by NPC
+  // or location). Y = row (wraps every COLUMNS_PER_ROW turns).
+  const Z_STEP = 1.55;
+  const COLUMN_SPACING = 2.6;     // horizontal gap between columns
+  const ROW_HEIGHT = 1.4;
+  const COLUMNS_PER_ROW = 6;      // turns per row before y-wrap
+  const COLUMN_HASH_RADIUS = 5;   // max column index either side of center
 
-  // Force-sim coefficients (tunable via ChronosCorridor.tune).
-  const tuning = {
-    k_repel: 0.9,   // pairwise repulsion strength
-    k_spring: 0.18, // edge spring strength
-    k_anchor: 0.55, // pull toward pinned anchor
-    k_center: 0.04, // weak pull toward (0, 0, node.z)
-    damping: 0.84,  // velocity damping per tick
-    max_vel: 0.45,  // velocity cap to prevent jitter
-    rest_length: 1.2,
-    repel_radius: 3.0, // ignore repulsion past this distance (cheap O(n^2))
-  };
-
-  // Simulation control. Runs while there's still energy in the
-  // system; stops when settled to save battery + cleanly snap into
-  // place. Bumped back into running on every addTurn / new edge.
-  let simRunning = true;
-  let simIdleFrames = 0;
-  const SIM_IDLE_THRESHOLD = 90; // frames of low energy before sleep
-  const SIM_KE_EPSILON = 0.0008;
+  // Board overrides: dict keyed by page id ("turn-<ts>" / "manuscript-intro")
+  // mapping to {x, y, z}. Populated by applyBoardOverrides() at run load.
+  // When set, addTurn uses these instead of deterministic positions.
+  // When the player drags, we mutate this map and persist (debounced).
+  const overrides = new Map();
+  // Debounced persist. Mutating drag fires _schedulePersist on every
+  // pointermove; the timer fires 500ms after the last move.
+  let _persistTimer = null;
+  // The current run id, set by show(); used as the POST target.
+  let currentRunId = null;
 
   // Free-orbit camera.
   const camOrbit = {
-    theta: 0,            // azimuth (rotation around Y axis)
-    phi: Math.PI * 0.45, // polar angle from +Y
-    dist: 7.5,           // distance from target
-    target: new THREE.Vector3(0, 0, 4), // looking at this point
+    theta: 0,
+    phi: Math.PI * 0.45,
+    dist: 9.5,
+    target: new THREE.Vector3(0, 0, 4),
   };
   const _defaultOrbit = {
     theta: 0,
     phi: Math.PI * 0.45,
-    dist: 7.5,
+    dist: 9.5,
     targetZ: 4,
   };
-  let _constellation = false; // overview mode (Z key)
+  let _constellation = false;
+
+  // Column allocation. Each unique NPC name or location id gets a
+  // deterministic column index. We use a hash-of-name lookup so the
+  // same NPC always lands in the same column across reloads. New
+  // names get the next free slot via a small linear-probe to avoid
+  // collisions.
+  const columnByKey = new Map(); // columnKey -> column index (integer, signed)
+  const usedColumns = new Set(); // set of column indices currently in use
 
   function _significanceTier(score) {
     if (typeof score !== "number" || isNaN(score)) return "notable";
@@ -124,11 +118,11 @@
 
   // Connection-line styling per type.
   const EDGE_STYLE = {
-    action_npc_positive:  { color: 0x10b981, opacity: 0.55, dashed: false, restLength: 1.6, strength: 0.22 },
-    action_npc_negative:  { color: 0xef4444, opacity: 0.55, dashed: false, restLength: 1.6, strength: 0.22 },
-    action_npc_neutral:   { color: 0x71717a, opacity: 0.45, dashed: false, restLength: 1.8, strength: 0.18 },
-    action_divergence:    { color: 0xfcd34d, opacity: 0.7,  dashed: true,  restLength: 1.4, strength: 0.30 },
-    npc_npc:              { color: 0x94a3b8, opacity: 0.35, dashed: true,  restLength: 1.3, strength: 0.14 },
+    action_npc_positive:  { color: 0x10b981, opacity: 0.55, dashed: false },
+    action_npc_negative:  { color: 0xef4444, opacity: 0.55, dashed: false },
+    action_npc_neutral:   { color: 0x71717a, opacity: 0.45, dashed: false },
+    action_divergence:    { color: 0xfcd34d, opacity: 0.7,  dashed: true  },
+    npc_npc:              { color: 0x94a3b8, opacity: 0.35, dashed: true  },
   };
 
   // ── Init ─────────────────────────────────────────────────────────────
@@ -156,7 +150,7 @@
     }
 
     scene = new THREE.Scene();
-    scene.fog = new THREE.Fog(0x000000, 16, 60);
+    scene.fog = new THREE.Fog(0x000000, 18, 70);
     scene.background = null;
 
     const w = container.clientWidth || window.innerWidth;
@@ -173,6 +167,8 @@
     renderer.setSize(w, h, false);
     renderer.setClearColor(0x000000, 0);
 
+    raycaster = new THREE.Raycaster();
+
     lineGroup = new THREE.Group();
     scene.add(lineGroup);
 
@@ -186,10 +182,13 @@
   // ── Camera orbit ─────────────────────────────────────────────────────
   function _applyCameraOrbit() {
     if (!camera) return;
+    // Defense-in-depth phi clamp. Same lesson as the war-table fix.
+    const phi = Math.max(0.05, Math.min(Math.PI - 0.05, camOrbit.phi));
+    camOrbit.phi = phi;
     const t = camOrbit.target;
-    const x = t.x + camOrbit.dist * Math.sin(camOrbit.phi) * Math.sin(camOrbit.theta);
-    const y = t.y + camOrbit.dist * Math.cos(camOrbit.phi);
-    const z = t.z + camOrbit.dist * Math.sin(camOrbit.phi) * Math.cos(camOrbit.theta);
+    const x = t.x + camOrbit.dist * Math.sin(phi) * Math.sin(camOrbit.theta);
+    const y = t.y + camOrbit.dist * Math.cos(phi);
+    const z = t.z + camOrbit.dist * Math.sin(phi) * Math.cos(camOrbit.theta);
     camera.position.set(x, y, z);
     camera.lookAt(t);
   }
@@ -204,34 +203,39 @@
   }
 
   // ── Interaction ──────────────────────────────────────────────────────
-  let _dragging = false;
+  let _camDragging = false;
   let _dragLast = { x: 0, y: 0 };
   const _keys = new Set();
 
+  // Page drag state. When the user pointerdowns on a card, we capture
+  // the card and drag it across a horizontal plane in world space.
+  let _pageDrag = null; // { card, plane, offset: Vector3 }
+
   function _wireInteraction(canvas) {
+    // Camera orbit drag. Only fires when the click STARTS on the
+    // canvas itself, not on a card -- card drag has its own listener
+    // via _wirePageDrag added per card in addTurn.
     canvas.addEventListener("pointerdown", (e) => {
-      _dragging = true;
+      _camDragging = true;
       _dragLast.x = e.clientX;
       _dragLast.y = e.clientY;
       canvas.style.cursor = "grabbing";
       try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
     });
     canvas.addEventListener("pointermove", (e) => {
-      if (!_dragging) return;
+      if (!_camDragging) return;
       const dx = e.clientX - _dragLast.x;
       const dy = e.clientY - _dragLast.y;
       _dragLast.x = e.clientX;
       _dragLast.y = e.clientY;
-      // Drag east -> orbit east. Sensitivity scales with dist so
-      // close-in is precise.
       const k = 0.0035 * Math.min(1.4, camOrbit.dist / 4);
       camOrbit.theta -= dx * k;
       camOrbit.phi = Math.max(0.05, Math.min(Math.PI - 0.05, camOrbit.phi - dy * k));
       _applyCameraOrbit();
     });
     const _release = (e) => {
-      if (!_dragging) return;
-      _dragging = false;
+      if (!_camDragging) return;
+      _camDragging = false;
       canvas.style.cursor = "grab";
       try { canvas.releasePointerCapture(e.pointerId); } catch (_) {}
     };
@@ -239,8 +243,6 @@
     canvas.addEventListener("pointercancel", _release);
     canvas.addEventListener("pointerleave", _release);
 
-    // Wheel zooms in/out on the constellation. Altitude-proportional
-    // step, same idea as the globe.
     canvas.addEventListener("wheel", (e) => {
       e.preventDefault();
       const step = 0.12 * Math.max(0.4, camOrbit.dist - 1.5);
@@ -249,8 +251,6 @@
       _applyCameraOrbit();
     }, { passive: false });
 
-    // WASD pans the camera target. W/S walk along the time axis
-    // (target.z) -- W = forward in space = back in time. A/D pans X.
     document.addEventListener("keydown", (e) => {
       if (!isVisible) return;
       const a = document.activeElement;
@@ -269,6 +269,90 @@
       if (k === "a" || k === "arrowleft")  _keys.delete("left");
       if (k === "d" || k === "arrowright") _keys.delete("right");
     });
+
+    // Global pointermove + up for ACTIVE page drag. We want to keep
+    // tracking the drag even if the cursor leaves the original card.
+    document.addEventListener("pointermove", _onPageDragMove, true);
+    document.addEventListener("pointerup", _onPageDragEnd, true);
+  }
+
+  // Per-card drag wiring. Called from addTurn for each new card.
+  // The card needs pointer-events:auto from CSS for this to fire.
+  function _wirePageDrag(card) {
+    if (!card.el) return;
+    card.el.addEventListener("pointerdown", (e) => {
+      // Don't hijack clicks on interactive children (act-name buttons,
+      // act-rumor, etc.) -- those are click affordances, not drag handles.
+      if (e.target && e.target.closest && e.target.closest("[data-act], button")) {
+        return;
+      }
+      // Compute the world position the cursor is currently over on
+      // the card's plane (we use a horizontal X-Z plane at the
+      // card's current y). Compute the offset from the cursor to the
+      // card center so dragging doesn't snap the card to the cursor.
+      const planeY = card.pos.y;
+      const world = _screenToPlane(e.clientX, e.clientY, planeY);
+      if (!world) return;
+      _pageDrag = {
+        card: card,
+        planeY: planeY,
+        offset: new THREE.Vector3(
+          card.pos.x - world.x,
+          0,
+          card.pos.z - world.z,
+        ),
+      };
+      card.el.classList.add("is-dragging");
+      e.preventDefault();
+      e.stopPropagation();
+    });
+  }
+
+  function _onPageDragMove(e) {
+    if (!_pageDrag) return;
+    const world = _screenToPlane(e.clientX, e.clientY, _pageDrag.planeY);
+    if (!world) return;
+    const card = _pageDrag.card;
+    // Apply offset so the card-to-cursor relationship stays constant
+    // throughout the drag.
+    card.pos.x = Math.max(-50, Math.min(50, world.x + _pageDrag.offset.x));
+    // We DELIBERATELY allow Y to be tweaked by dragging by a small
+    // amount: when the camera is angled, the user's intent is "move
+    // this page across the wall," so we let the X-Z plane intersection
+    // drive the position. But we LOCK z (time) -- a page can move
+    // horizontally and vertically on the wall, but never travel through
+    // time. To approximate this with a single horizontal plane, we
+    // keep z fixed and only update x. Y stays at the deterministic
+    // row position. This matches "slide a sheet of paper sideways."
+    // (Future: support free vertical placement by intersecting a
+    // tilted plane that follows the card's vertical row index.)
+  }
+
+  function _onPageDragEnd(e) {
+    if (!_pageDrag) return;
+    const card = _pageDrag.card;
+    if (card.el) card.el.classList.remove("is-dragging");
+    // Persist the new position.
+    overrides.set(card.id, { x: card.pos.x, y: card.pos.y, z: card.pos.z });
+    _schedulePersist();
+    _pageDrag = null;
+  }
+
+  // Project a screen (x, y) to a world (x, _, z) by ray-casting
+  // against a horizontal plane at the given Y. Returns null if the
+  // ray is parallel to the plane.
+  function _screenToPlane(clientX, clientY, planeY) {
+    if (!camera || !renderer) return null;
+    const rect = renderer.domElement.getBoundingClientRect();
+    const ndc = new THREE.Vector2(
+      ((clientX - rect.left) / rect.width) * 2 - 1,
+      -(((clientY - rect.top) / rect.height) * 2 - 1),
+    );
+    raycaster.setFromCamera(ndc, camera);
+    const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -planeY);
+    const target = new THREE.Vector3();
+    const hit = raycaster.ray.intersectPlane(plane, target);
+    return hit ? target : null;
   }
 
   function _updateCameraFromInput() {
@@ -304,166 +388,89 @@
     requestAnimationFrame(_animate);
     if (!isVisible) return;
     _updateCameraFromInput();
-    if (simRunning) {
-      const ke = _tickSimulation();
-      if (ke < SIM_KE_EPSILON) {
-        simIdleFrames++;
-        if (simIdleFrames > SIM_IDLE_THRESHOLD) simRunning = false;
-      } else {
-        simIdleFrames = 0;
-      }
-    }
     _drawConnections();
     renderer.render(scene, camera);
     _projectCards();
   }
 
-  // ── Force simulation ────────────────────────────────────────────────
-  // Runs each frame while energy is in the system. Updates X/Y of each
-  // node's velocity + position; Z (time) is locked.
+  // ── Deterministic position formula ───────────────────────────────────
   //
-  // Forces:
-  //   1. Repulsion between every pair of cards within REPEL_RADIUS
-  //      (charge-like, F = k_repel / dist^2).
-  //   2. Springs along edges (Hooke, F = k * (dist - restLength)).
-  //   3. Anchor pull on pinned nodes (decisions): F = k * (anchor - pos).
-  //   4. Center pull (weak): F = k_center * (-pos.x, -pos.y) -- keeps
-  //      isolated nodes from drifting to infinity.
-  //   5. Damping: vel *= damping.
-  //   6. Velocity cap.
+  // A turn's 3D position is determined by:
+  //   z = turnIdx * Z_STEP                       (locked, age = depth)
+  //   y = (turnIdx % COLUMNS_PER_ROW == 0)       (rows wrap every N turns)
+  //       step + slight oscillation
+  //   x = column owned by an attractor (NPC or location)
   //
-  // Returns total kinetic energy (sum of |vel|^2) so the loop can
-  // detect "settled" and stop ticking.
-  function _tickSimulation() {
-    const allNodes = _allMovableNodes();
-    const n = allNodes.length;
-    if (n === 0) return 0;
-
-    // Force accumulators per node (reset each tick). Allocating fresh
-    // is cheaper than mutating shared Vector3s in tight loop.
-    const fx = new Float32Array(n);
-    const fy = new Float32Array(n);
-
-    // 1) Pairwise repulsion + 2-D plane only (Z is locked).
-    const repelR2 = tuning.repel_radius * tuning.repel_radius;
-    for (let i = 0; i < n; i++) {
-      const a = allNodes[i];
-      for (let j = i + 1; j < n; j++) {
-        const b = allNodes[j];
-        // Skip pairs across very different Z bands -- they don't
-        // visually overlap so the cost isn't worth it.
-        if (Math.abs(a.pos.z - b.pos.z) > 4) continue;
-        const dx = a.pos.x - b.pos.x;
-        const dy = a.pos.y - b.pos.y;
-        const d2 = dx * dx + dy * dy;
-        if (d2 > repelR2) continue;
-        const d = Math.sqrt(d2) + 0.05; // avoid div0
-        const f = tuning.k_repel / (d2 + 0.1);
-        const ux = dx / d;
-        const uy = dy / d;
-        // Mass-weighted: heavier nodes (decisions) push back harder.
-        const ma = a.mass || 1;
-        const mb = b.mass || 1;
-        fx[i] += ux * f * mb;
-        fy[i] += uy * f * mb;
-        fx[j] -= ux * f * ma;
-        fy[j] -= uy * f * ma;
-      }
-    }
-
-    // 2) Spring forces along edges.
-    for (let e = 0; e < edges.length; e++) {
-      const ed = edges[e];
-      if (!ed.from || !ed.to) continue;
-      const ai = ed.from._simIndex;
-      const bi = ed.to._simIndex;
-      if (ai == null || bi == null) continue;
-      const a = allNodes[ai];
-      const b = allNodes[bi];
-      if (!a || !b) continue;
-      const dx = b.pos.x - a.pos.x;
-      const dy = b.pos.y - a.pos.y;
-      const d = Math.sqrt(dx * dx + dy * dy) + 0.001;
-      const stretch = d - (ed.restLength || tuning.rest_length);
-      const f = (ed.strength || tuning.k_spring) * stretch;
-      const ux = dx / d;
-      const uy = dy / d;
-      fx[ai] += ux * f;
-      fy[ai] += uy * f;
-      fx[bi] -= ux * f;
-      fy[bi] -= uy * f;
-    }
-
-    // 3) Anchor pull (decisions, intro, NPC nodes).
-    for (let i = 0; i < n; i++) {
-      const node = allNodes[i];
-      if (!node.anchor) continue;
-      const dx = node.anchor.x - node.pos.x;
-      const dy = node.anchor.y - node.pos.y;
-      fx[i] += dx * tuning.k_anchor;
-      fy[i] += dy * tuning.k_anchor;
-    }
-
-    // 4) Center pull (weak) -- keeps unconnected nodes from drifting away.
-    for (let i = 0; i < n; i++) {
-      const node = allNodes[i];
-      if (node.anchor) continue; // anchored nodes don't need it
-      fx[i] += -node.pos.x * tuning.k_center;
-      fy[i] += -node.pos.y * tuning.k_center;
-    }
-
-    // Integrate.
-    let totalKE = 0;
-    for (let i = 0; i < n; i++) {
-      const node = allNodes[i];
-      const m = node.mass || 1;
-      // Apply to velocity, damp, cap, integrate position.
-      node.vel.x = (node.vel.x + fx[i] / m) * tuning.damping;
-      node.vel.y = (node.vel.y + fy[i] / m) * tuning.damping;
-      const speed = Math.sqrt(node.vel.x * node.vel.x + node.vel.y * node.vel.y);
-      if (speed > tuning.max_vel) {
-        const s = tuning.max_vel / speed;
-        node.vel.x *= s;
-        node.vel.y *= s;
-      }
-      node.pos.x += node.vel.x;
-      node.pos.y += node.vel.y;
-      // Z is locked -- always at node.z (set on creation).
-      node.pos.z = node.z;
-      totalKE += speed * speed;
-    }
-    return totalKE;
+  // The COLUMN is allocated like this:
+  //   1. If the turn names a target NPC -> that NPC's column.
+  //   2. Else, the first NPC in npc_responses -> that NPC's column.
+  //   3. Else, the location id -> that location's column.
+  //   4. Else, "filler" column at index 0.
+  //
+  // Each unique column key gets a stable integer column index via
+  // _allocateColumn (deterministic-hash with linear-probe fallback so
+  // the same key always picks the same column for a given run order).
+  // This gives the visual property: pages cluster into vertical
+  // columns by NPC/location, time runs down/back.
+  function _deterministicPosition(turnIdx, columnKey) {
+    const colIdx = _allocateColumn(columnKey || "_filler");
+    const x = colIdx * COLUMN_SPACING;
+    // Y: each turn nudges its row down by a bit so columns don't pile
+    // up infinitely deep without break. Plus a small oscillation so
+    // adjacent same-column turns visibly stack rather than overlapping.
+    const rowSeed = turnIdx % COLUMNS_PER_ROW;
+    const y = -rowSeed * 0.18; // gentle vertical stagger within a column
+    const z = turnIdx * Z_STEP;
+    return { x, y, z };
   }
 
-  function _allMovableNodes() {
-    // Collect cards + npcNodes in one array. Index each so edges can
-    // reference them in the force loop without a Map lookup per edge
-    // per frame.
-    const out = [];
-    for (let i = 0; i < cards.length; i++) {
-      cards[i]._simIndex = out.length;
-      out.push(cards[i]);
+  // Allocate a stable column index for a given key. Uses a hash to
+  // pick a target column, then linear-probes outward if that column
+  // is taken. The probe is deterministic given the same insertion
+  // order, so reload-from-saved produces the identical layout.
+  function _allocateColumn(key) {
+    const existing = columnByKey.get(key);
+    if (existing != null) return existing;
+    let h = 0;
+    for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) | 0;
+    let target = ((Math.abs(h) % (COLUMN_HASH_RADIUS * 2 + 1)) - COLUMN_HASH_RADIUS);
+    // Linear-probe in alternating directions if the column is taken.
+    let step = 0;
+    while (usedColumns.has(target)) {
+      step++;
+      target = (step % 2 === 0)
+        ? target + Math.ceil(step / 2)
+        : target - Math.ceil(step / 2);
+      if (Math.abs(target) > COLUMN_HASH_RADIUS * 4) break; // safety
     }
-    npcNodes.forEach((n) => {
-      n._simIndex = out.length;
-      out.push(n);
-    });
-    return out;
+    columnByKey.set(key, target);
+    usedColumns.add(target);
+    return target;
   }
 
-  function _kickSim() {
-    simRunning = true;
-    simIdleFrames = 0;
+  // Pick the column key for a turn from its data, in priority order.
+  function _columnKeyForTurn(data) {
+    if (!data) return "_filler";
+    const pa = data.parsed_action || data.parsed || {};
+    if (pa.target && typeof pa.target === "string" && pa.target.trim()) {
+      return "npc:" + pa.target.trim().toLowerCase();
+    }
+    const responses = data.npc_responses || [];
+    if (responses.length > 0 && responses[0].npc_name) {
+      return "npc:" + responses[0].npc_name.toLowerCase();
+    }
+    const pv = data.player_view || {};
+    if (pv.current_location && pv.current_location.id) {
+      return "loc:" + pv.current_location.id.toLowerCase();
+    }
+    return "_filler";
   }
 
-  // ── Pre-settle helper ────────────────────────────────────────────────
-  // Run a handful of force ticks immediately after a node is added so
-  // the new node "swims into place" quickly rather than visibly popping
-  // from (0,0) for a second.
-  function _preSettle(iterations) {
-    for (let i = 0; i < iterations; i++) {
-      _tickSimulation();
-    }
+  function _extractSignificance(data) {
+    if (!data) return 0.5;
+    const pa = data.parsed_action || data.parsed || {};
+    const s = pa.significance_score;
+    return typeof s === "number" ? s : 0.5;
   }
 
   // ── Card lifecycle ───────────────────────────────────────────────────
@@ -472,13 +479,18 @@
     if (!blockEl || !blockEl.classList || !blockEl.classList.contains("turn-block")) return;
     const tid = blockEl.id || "";
     if (tid && cardByTurnId.has(tid)) {
-      if (turnData) _registerEdgesForTurn(tid, turnData);
+      if (turnData) {
+        // notifyTurnComplete path: column might re-evaluate based on
+        // full data. But changing a card's column after placement is
+        // visually jarring -- keep it pinned. Just register edges.
+        _registerEdgesForTurn(tid, turnData);
+      }
       return;
     }
     const idx = nextTurnIndex++;
     const score = _extractSignificance(turnData);
     const tier = _significanceTier(score);
-    const z = idx * Z_STEP;
+    const columnKey = _columnKeyForTurn(turnData);
 
     blockEl.classList.add("corridor-card");
     blockEl.dataset.significanceTier = tier;
@@ -496,38 +508,30 @@
     });
     blockEl.classList.add("is-current");
 
-    // Initial position: small random offset around (0, 0, z) so the
-    // simulator has something to push apart.
-    const rx = (Math.random() - 0.5) * 0.6;
-    const ry = (Math.random() - 0.5) * 0.6;
+    // Compute deterministic position. If the player has a saved
+    // override for this card id, use that instead.
+    const det = _deterministicPosition(idx, columnKey);
+    const ov = tid ? overrides.get(tid) : null;
+    const pos = ov
+      ? new THREE.Vector3(ov.x, ov.y, ov.z)
+      : new THREE.Vector3(det.x, det.y, det.z);
 
     const card = {
       id: tid,
       el: blockEl,
-      pos: new THREE.Vector3(rx, ry, z),
-      vel: new THREE.Vector3(0, 0, 0),
-      anchor: null,
-      z: z,
+      pos: pos,
       idx: idx,
       tier: tier,
       kind: "turn",
-      mass: tier === "decision" ? 1.6 : tier === "filler" ? 0.7 : 1.0,
+      columnKey: columnKey,
     };
-
-    // Decisions get a deterministic anchor on the golden-angle wheel.
-    if (tier === "decision") {
-      card.anchor = _allocateDecisionAnchor(z);
-      card.pos.x = card.anchor.x;
-      card.pos.y = card.anchor.y;
-    }
 
     cards.push(card);
     if (tid) cardByTurnId.set(tid, card);
     if (turnData) _registerEdgesForTurn(tid, turnData);
 
-    // Pre-settle so the new card swims into place quickly.
-    _kickSim();
-    _preSettle(20);
+    // Wire drag handler now that the card is in the DOM.
+    _wirePageDrag(card);
 
     // Camera target slides to the present so the player's eye is on
     // the new turn.
@@ -548,26 +552,10 @@
     if (newTier !== card.tier) {
       card.tier = newTier;
       blockEl.dataset.significanceTier = newTier;
-      card.mass = newTier === "decision" ? 1.6 : newTier === "filler" ? 0.7 : 1.0;
-      // Promoting to decision? Allocate an anchor.
-      if (newTier === "decision" && !card.anchor) {
-        card.anchor = _allocateDecisionAnchor(card.z);
-      }
     }
     _registerEdgesForTurn(tid, data);
-    _kickSim();
   }
 
-  function _extractSignificance(data) {
-    if (!data) return 0.5;
-    const pa = data.parsed_action || data.parsed || {};
-    const s = pa.significance_score;
-    return typeof s === "number" ? s : 0.5;
-  }
-
-  // Restored runs (from saved HTML in localStorage). Per-turn data
-  // isn't available; cards just get default mass and no edges except
-  // those inferable from the markup.
   function restoreFromContainer() {
     if (!cardsLayer) init();
     const tc = document.getElementById("turns-container");
@@ -576,9 +564,6 @@
     blocks.forEach((b) => addTurn(b, null));
     const intro = tc.querySelector(".manuscript-intro");
     if (intro) addIntroCard(intro);
-    // After restoring, run a longer pre-settle so the constellation
-    // is in a coherent position before the user sees the canvas.
-    _preSettle(60);
   }
 
   function addIntroCard(introEl) {
@@ -596,104 +581,98 @@
     if (introEl.parentNode !== cardsLayer) {
       cardsLayer.appendChild(introEl);
     }
-    // Intro sits at the deepest position in the constellation, anchored
-    // at the time-axis origin (X=0, Y=0) -- it's the run's beginning.
-    const introZ = (nextTurnIndex + 4) * Z_STEP; // always behind the deepest turn
+    // Intro sits at the deepest position at column 0, anchoring the
+    // run's beginning at the time-axis origin.
+    const introZ = (nextTurnIndex + 4) * Z_STEP;
+    const ov = overrides.get("manuscript-intro");
+    const pos = ov
+      ? new THREE.Vector3(ov.x, ov.y, ov.z)
+      : new THREE.Vector3(0, 0.4, introZ);
     const introCard = {
       id: "manuscript-intro",
       el: introEl,
-      pos: new THREE.Vector3(0, 0, introZ),
-      vel: new THREE.Vector3(0, 0, 0),
-      anchor: new THREE.Vector3(0, 0, introZ),
-      z: introZ,
+      pos: pos,
       idx: -1,
       tier: "intro",
       kind: "intro",
-      mass: 1.4,
     };
     cards.push(introCard);
-    _kickSim();
+    cardByTurnId.set("manuscript-intro", introCard);
+    _wirePageDrag(introCard);
   }
 
-  // ── Decision anchors ────────────────────────────────────────────────
-  // Golden-angle allocation gives even angular spacing without
-  // collisions for any number of decisions. Each anchor sits at radius
-  // 1.8 from the time axis at the decision's Z.
-  const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5)); // ~2.39996 rad
-  function _allocateDecisionAnchor(z) {
-    const theta = decisionAnchorCount * GOLDEN_ANGLE;
-    decisionAnchorCount++;
-    const r = 1.8;
-    return new THREE.Vector3(Math.cos(theta) * r, Math.sin(theta) * r, z);
+  // ── Persistence ──────────────────────────────────────────────────────
+  // Public method: applyBoardOverrides({turnId: {x, y, z}, ...}).
+  // Called from app.js enterGame on initial run load. Stores the
+  // saved layout so subsequent addTurn calls see overrides via
+  // overrides.get(turnId). Existing cards (if any) get repositioned
+  // immediately.
+  function applyBoardOverrides(boardState) {
+    if (!boardState || typeof boardState !== "object") return;
+    overrides.clear();
+    Object.keys(boardState).forEach((key) => {
+      const v = boardState[key];
+      if (!v || typeof v !== "object") return;
+      const x = Number(v.x);
+      const y = Number(v.y);
+      const z = Number(v.z);
+      if (!isFinite(x) || !isFinite(y) || !isFinite(z)) return;
+      overrides.set(key, { x: x, y: y, z: z });
+    });
+    // Apply to any cards already in the scene.
+    cards.forEach((c) => {
+      const ov = overrides.get(c.id);
+      if (ov) {
+        c.pos.x = ov.x;
+        c.pos.y = ov.y;
+        c.pos.z = ov.z;
+      }
+    });
   }
 
-  // ── NPC nodes ────────────────────────────────────────────────────────
-  function _ensureNpcNode(name, role) {
-    if (!name) return null;
-    const key = name.toLowerCase();
-    let node = npcNodes.get(key);
-    if (node) return node;
-    if (!cardsLayer) return null;
-
-    const el = document.createElement("div");
-    el.className = "corridor-npc-node";
-    el.innerHTML =
-      '<div class="cnn-name">' + _escHtml(name) + "</div>" +
-      (role ? '<div class="cnn-role">' + _escHtml(role) + "</div>" : "");
-    el.style.cssText =
-      "position:absolute;left:0;top:0;transform:translate(-9999px,-9999px);" +
-      "pointer-events:auto;cursor:default;transform-origin:50% 50%;";
-    cardsLayer.appendChild(el);
-
-    // NPC anchor: deterministic-hash position around the time axis at
-    // a wider radius than decisions. Z starts at the present and
-    // smoothly drifts back as more turns reference this NPC.
-    const h = _hash(key);
-    const theta = (h % 360) * Math.PI / 180;
-    const r = 2.6;
-    const z = nextTurnIndex > 0 ? (nextTurnIndex - 1) * Z_STEP : 0;
-    const anchor = new THREE.Vector3(Math.cos(theta) * r, Math.sin(theta) * r - 0.4, z);
-    node = {
-      name: name,
-      role: role,
-      el: el,
-      pos: new THREE.Vector3(anchor.x, anchor.y, z),
-      vel: new THREE.Vector3(0, 0, 0),
-      anchor: anchor,
-      z: z,
-      idx: -2,
-      tier: "notable",
-      kind: "npc",
-      mass: 1.1,
-      _refTurnZs: [], // running list of Z's this NPC has been referenced at
-    };
-    npcNodes.set(key, node);
-    return node;
+  // Set the run id (called from show()). Used as the POST target.
+  function _setRunId(rid) {
+    if (rid) currentRunId = rid;
   }
 
-  function _updateNpcNodeZ(node, refZ) {
-    node._refTurnZs.push(refZ);
-    if (node._refTurnZs.length > 8) node._refTurnZs.shift();
-    let sum = 0;
-    for (let i = 0; i < node._refTurnZs.length; i++) sum += node._refTurnZs[i];
-    const meanZ = sum / node._refTurnZs.length;
-    node.z = meanZ;
-    node.anchor.z = meanZ;
+  // Debounced persist: schedule a POST 500ms after the last drag-move.
+  function _schedulePersist() {
+    if (_persistTimer) clearTimeout(_persistTimer);
+    _persistTimer = setTimeout(_persist, 500);
   }
 
-  function _hash(s) {
-    let h = 0;
-    for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
-    return Math.abs(h);
+  function _persist() {
+    _persistTimer = null;
+    if (!currentRunId) return;
+    const payload = { board_state: {} };
+    overrides.forEach((pos, key) => {
+      payload.board_state[key] = { x: pos.x, y: pos.y, z: pos.z };
+    });
+    fetch("/api/run/" + currentRunId + "/board", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }).catch((e) => {
+      // Silent on failure -- the layout is still correct in-memory;
+      // a future drag will try again. Don't block the UI.
+      console.warn("[corridor] board persist failed:", e);
+    });
   }
 
-  // ── Connection edges ─────────────────────────────────────────────────
+  function getBoardState() {
+    const out = {};
+    overrides.forEach((pos, key) => {
+      out[key] = { x: pos.x, y: pos.y, z: pos.z };
+    });
+    return out;
+  }
+
+  // ── Connection edges (unchanged from v2) ────────────────────────────
   function _registerEdgesForTurn(tid, data) {
     if (!data || !tid) return;
     const card = cardByTurnId.get(tid);
     if (!card) return;
 
-    // 1) action -> NPC reaction edges, one per NPC POV.
     const npcResponses = data.npc_responses || [];
     const impacts = (data.parsed_action || data.parsed || {}).npc_impacts || [];
     npcResponses.forEach((r) => {
@@ -701,35 +680,31 @@
       const sentiment = _sentimentForNpc(r.npc_name, impacts);
       const npcNode = _ensureNpcNode(r.npc_name, r.npc_role || "");
       if (!npcNode) return;
-      _updateNpcNodeZ(npcNode, card.z);
       const kind = sentiment === "positive" ? "action_npc_positive"
                  : sentiment === "negative" ? "action_npc_negative"
                  : "action_npc_neutral";
       _pushEdge(card, npcNode, kind, tid + "->npc:" + r.npc_name);
     });
 
-    // 2) action -> divergence edges.
     const divergences = data.divergences || [];
     divergences.forEach((d, i) => {
+      const offset = (i % 2 === 0 ? 1.4 : -1.4);
       const anchorPos = new THREE.Vector3(
-        card.pos.x + (i % 2 === 0 ? 1.4 : -1.4),
+        card.pos.x + offset,
         card.pos.y + 0.6,
-        card.z,
+        card.pos.z,
       );
       const divNode = _ensureDivergenceNode(tid + ":div:" + i, d, anchorPos);
       if (!divNode) return;
       _pushEdge(card, divNode, "action_divergence", tid + "->div:" + i);
     });
 
-    // 3) NPC <-> NPC edges from ambient_activity.
     const ambient = data.ambient_activity || [];
     ambient.forEach((a) => {
       if (!a || !a.npc_name || !a.interacts_with) return;
       const aNode = _ensureNpcNode(a.npc_name, "");
       const bNode = _ensureNpcNode(a.interacts_with, "");
       if (!aNode || !bNode) return;
-      _updateNpcNodeZ(aNode, card.z);
-      _updateNpcNodeZ(bNode, card.z);
       _pushEdge(aNode, bNode, "npc_npc", tid + ":" + a.npc_name + "<->" + a.interacts_with);
     });
   }
@@ -752,21 +727,54 @@
         if (edges[i]._key === key) return;
       }
     }
-    const style = EDGE_STYLE[kind] || EDGE_STYLE.npc_npc;
-    edges.push({
-      from: fromNode,
-      to: toNode,
-      kind: kind,
-      restLength: style.restLength,
-      strength: style.strength,
-      _key: key,
-    });
-    _kickSim();
+    edges.push({ from: fromNode, to: toNode, kind: kind, _key: key });
   }
 
-  // ── Divergence anchor markers ────────────────────────────────────────
+  function _ensureNpcNode(name, role) {
+    if (!name) return null;
+    const key = name.toLowerCase();
+    let node = npcNodes.get(key);
+    if (node) return node;
+    if (!cardsLayer) return null;
+
+    const el = document.createElement("div");
+    el.className = "corridor-npc-node";
+    el.innerHTML =
+      '<div class="cnn-name">' + _escHtml(name) + "</div>" +
+      (role ? '<div class="cnn-role">' + _escHtml(role) + "</div>" : "");
+    el.style.cssText =
+      "position:absolute;left:0;top:0;transform:translate(-9999px,-9999px);" +
+      "pointer-events:auto;cursor:default;transform-origin:50% 50%;";
+    cardsLayer.appendChild(el);
+
+    // NPC nodes get the same column as their NPC (so threads from
+    // turns to NPCs stay vertical and the "this NPC owns this column"
+    // metaphor reads). Z is a running average of the turns referencing
+    // this NPC -- updated here on creation, then by addTurn calls.
+    const colIdx = _allocateColumn("npc:" + key);
+    const x = colIdx * COLUMN_SPACING;
+    const y = 0.8; // sits slightly above the row of turn cards
+    const z = nextTurnIndex > 0 ? (nextTurnIndex - 1) * Z_STEP : 0;
+    const ov = overrides.get("npc:" + key);
+    const pos = ov
+      ? new THREE.Vector3(ov.x, ov.y, ov.z)
+      : new THREE.Vector3(x, y, z);
+    node = {
+      id: "npc:" + key,
+      name: name,
+      role: role,
+      el: el,
+      pos: pos,
+      idx: -2,
+      tier: "notable",
+      kind: "npc",
+    };
+    npcNodes.set(key, node);
+    return node;
+  }
+
   function _ensureDivergenceNode(key, divergence, anchorPos) {
-    if (cardByTurnId.has("div:" + key)) return null;
+    if (cardByTurnId.has("div:" + key)) return cardByTurnId.get("div:" + key);
     if (!cardsLayer) return null;
     const el = document.createElement("div");
     el.className = "corridor-divergence-marker";
@@ -780,26 +788,25 @@
       "position:absolute;left:0;top:0;transform:translate(-9999px,-9999px);" +
       "pointer-events:none;transform-origin:50% 50%;";
     cardsLayer.appendChild(el);
+    const id = "div:" + key;
+    const ov = overrides.get(id);
+    const pos = ov
+      ? new THREE.Vector3(ov.x, ov.y, ov.z)
+      : anchorPos.clone();
     const node = {
-      id: "div:" + key,
+      id: id,
       el: el,
-      pos: anchorPos.clone(),
-      vel: new THREE.Vector3(0, 0, 0),
-      anchor: anchorPos.clone(),
-      z: anchorPos.z,
+      pos: pos,
       idx: -3,
       tier: "notable",
       kind: "divergence",
-      mass: 0.9,
     };
     cards.push(node);
-    cardByTurnId.set("div:" + key, node);
+    cardByTurnId.set(id, node);
     return node;
   }
 
-  // ── Connection lines (Three.js) ──────────────────────────────────────
-  // Read each edge's live from/to positions every frame. Cheap for our
-  // edge counts (<300).
+  // ── Connection lines ─────────────────────────────────────────────────
   function _drawConnections() {
     while (lineGroup.children.length) {
       const c = lineGroup.children.pop();
@@ -862,19 +869,19 @@
                     : c.kind === "divergence" ? 0.75
                     : 1.0;
     const tier = c.tier || "notable";
-    const tierScale = tier === "decision" ? 1.15 : tier === "filler" ? 0.78 : 1.0;
+    const tierScale = tier === "decision" ? 1.1 : tier === "filler" ? 0.85 : 1.0;
     const distScale = Math.max(0.45, 1 - Math.min(0.55, dist * 0.04));
     const scale = baseScale * tierScale * distScale;
-    const cw = c.el.offsetWidth || 320;
-    const ch = c.el.offsetHeight || 100;
+    const cw = c.el.offsetWidth || 440;
+    const ch = c.el.offsetHeight || 480;
     const tx = sx - (cw * scale) / 2;
     const ty = sy - (ch * scale) / 2;
     let opacity = 1;
     if (dist > 6) opacity = Math.max(0.25, 1 - (dist - 6) * 0.04);
-    if (tier === "filler") opacity *= 0.78;
+    if (tier === "filler") opacity *= 0.85;
     c.el.style.transform = "translate3d(" + tx + "px," + ty + "px,0) scale(" + scale.toFixed(3) + ")";
     c.el.style.opacity = opacity.toFixed(3);
-    c.el.style.pointerEvents = opacity > 0.5 ? "auto" : "none";
+    c.el.style.pointerEvents = opacity > 0.4 ? "auto" : "none";
     c.el.style.zIndex = String(10000 - Math.round(dist * 10));
   }
 
@@ -886,8 +893,9 @@
   }
 
   // ── Lifecycle ────────────────────────────────────────────────────────
-  function show() {
+  function show(runId) {
     init();
+    if (runId) _setRunId(runId);
     const container = document.getElementById("corridor-container");
     if (!container) return;
     container.classList.remove("hidden");
@@ -901,7 +909,6 @@
         renderer.setSize(w, h, false);
       }
     }
-    _kickSim();
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         container.classList.add("ready");
@@ -917,25 +924,15 @@
   function toggleConstellation() {
     _constellation = !_constellation;
     if (_constellation) {
-      // Pull way back to see the whole shape from above.
       camOrbit.theta = 0;
       camOrbit.phi = 0.55;
-      camOrbit.dist = Math.max(14, 4 + nextTurnIndex * Z_STEP * 0.7);
+      camOrbit.dist = Math.max(16, 4 + nextTurnIndex * Z_STEP * 0.7);
       camOrbit.target.set(0, 0, (nextTurnIndex * Z_STEP) / 2);
     } else {
       _resetView();
     }
     _applyCameraOrbit();
     return _constellation;
-  }
-
-  function tune(opts) {
-    if (!opts) return Object.assign({}, tuning);
-    Object.keys(opts).forEach((k) => {
-      if (k in tuning) tuning[k] = opts[k];
-    });
-    _kickSim();
-    return Object.assign({}, tuning);
   }
 
   function getDiag() {
@@ -946,9 +943,8 @@
       card_kinds: cardCounts,
       npc_node_count: npcNodes.size,
       edge_count: edges.length,
-      decision_anchor_count: decisionAnchorCount,
-      sim_running: simRunning,
-      sim_idle_frames: simIdleFrames,
+      column_count: columnByKey.size,
+      override_count: overrides.size,
       camera: {
         theta: camOrbit.theta,
         phi: camOrbit.phi,
@@ -956,8 +952,15 @@
         target_z: camOrbit.target.z,
       },
       constellation_overview: _constellation,
-      tuning: Object.assign({}, tuning),
+      run_id: currentRunId,
     };
+  }
+
+  // tune() kept as no-op for backward compat with chronosDiag callers.
+  // The force simulator is gone in v3; there's nothing to tune. Returns
+  // the (empty) settings object so existing chronosDiag display works.
+  function tune(_opts) {
+    return { note: "force simulator retired in Phase 2.8 v3 (detective board)" };
   }
 
   window.ChronosCorridor = {
@@ -970,6 +973,8 @@
     addIntroCard: addIntroCard,
     restoreFromContainer: restoreFromContainer,
     toggleConstellation: toggleConstellation,
+    applyBoardOverrides: applyBoardOverrides,
+    getBoardState: getBoardState,
     tune: tune,
     getDiag: getDiag,
   };
