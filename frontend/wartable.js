@@ -110,11 +110,25 @@
       const raw = localStorage.getItem(key);
       if (!raw) return null;
       const v = JSON.parse(raw);
+      // Hard-validate phi bounds so a saved view from a buggy
+      // earlier build (or dev-console tinkering) can't put the
+      // camera below the terrain. The drag handler clamps to
+      // [0.18, PI*0.49] -- enforce the same bounds here. If the
+      // saved value is outside, evict it and return null so the
+      // caller falls back to resetView() defaults.
       if (
-        v && typeof v.theta === "number" && typeof v.phi === "number" &&
+        v &&
+        typeof v.theta === "number" && isFinite(v.theta) &&
+        typeof v.phi === "number" && isFinite(v.phi) &&
+        v.phi >= 0.05 && v.phi <= Math.PI * 0.49 &&
         typeof v.dist === "number" && v.dist >= 0.18 && v.dist <= 8.0
       ) return v;
-    } catch (e) {}
+      // Validation failed -- nuke the bad save so it can't poison
+      // every subsequent reopen.
+      try { localStorage.removeItem(key); } catch (_) {}
+    } catch (e) {
+      try { localStorage.removeItem(key); } catch (_) {}
+    }
     return null;
   }
 
@@ -445,7 +459,15 @@
 
   function _applyOrbit() {
     if (!camera) return;
-    const { theta, phi, dist } = camOrbit;
+    // Clamp phi as a defense-in-depth: even if some path mutated
+    // camOrbit.phi outside the drag-handler bounds (saved-view race,
+    // dev console, future code), the camera y stays POSITIVE so we
+    // never end up below the terrain looking up at it. phi=PI*0.49
+    // gives a near-horizontal view (just shy of looking from inside
+    // the table). phi=0.05 is straight-down.
+    const phi = Math.max(0.05, Math.min(Math.PI * 0.49, camOrbit.phi));
+    camOrbit.phi = phi;
+    const { theta, dist } = camOrbit;
     camera.position.x = camPan.x + dist * Math.sin(phi) * Math.sin(theta);
     camera.position.y = dist * Math.cos(phi);
     camera.position.z = camPan.y + dist * Math.sin(phi) * Math.cos(theta);
