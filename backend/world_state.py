@@ -179,9 +179,14 @@ class WorldState(BaseModel):
     # Each value is {x: float, y: float, z: float}. Empty by default;
     # the frontend computes a deterministic INITIAL position for each
     # new page and only writes here when the player drags a page.
-    # Cut threads (next commit) will live alongside this in the same
-    # field as a sibling list. See manuscript-as-artifact.md Phase 2.8.
     board_state: Dict[str, Dict[str, float]] = Field(default_factory=dict)
+    # Phase 2.8: edge keys the player has CUT on the manuscript board.
+    # The frontend persists these alongside drag positions via the
+    # /board endpoint. Cuts are visual + explanatory only in this
+    # commit; the simulation does NOT rewind. Phase B (simulation
+    # response to a cut) is blocked by 3 open questions; see
+    # open-questions.md "Phase 2.8 Phase B blockers".
+    cut_threads: List[str] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------

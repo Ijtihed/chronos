@@ -3128,3 +3128,77 @@ body.is-dead #corridor-container {
   filter: contrast(0.85) brightness(0.7) saturate(0.7);
 }
 
+/* ── Phase 2.8 strong-threads: hover tooltip + cut preview ─────────── *
+ *
+ * Threads on the manuscript board are now picked-able TubeGeometry
+ * meshes. Hovering one shows a small floating tooltip near the
+ * cursor with a templated explanation of what the connection is.
+ * Clicking severs the thread and shows a longer "what would have
+ * changed" preview note that auto-dismisses after 8s or on outside-
+ * click.
+ *
+ * Both elements are appended to document.body (not the corridor
+ * container) so they layer ABOVE all overlays and stay glued to
+ * cursor coordinates without contending with the WebGL canvas's
+ * stacking context.
+ */
+#corridor-thread-tooltip {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 9999;
+  background: rgba(10, 10, 10, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  padding: 10px 14px;
+  max-width: 320px;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #d4d4d8;
+  pointer-events: none;
+  display: none;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+  /* The tooltip is moved each frame via inline transform; the
+   * transform is what positions it relative to the cursor. */
+  will-change: transform;
+}
+
+.corridor-cut-preview {
+  position: fixed;
+  z-index: 9998;
+  background: rgba(35, 25, 0, 0.88);
+  border: 1px dashed rgba(252, 211, 77, 0.55);
+  border-radius: 4px;
+  padding: 10px 14px;
+  max-width: 280px;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 11px;
+  line-height: 1.55;
+  color: rgba(252, 211, 77, 0.92);
+  font-style: italic;
+  letter-spacing: 0.01em;
+  pointer-events: auto;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.7);
+  animation: corridorCutPreviewIn 0.32s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+.corridor-cut-preview:hover {
+  background: rgba(45, 35, 5, 0.95);
+}
+
+@keyframes corridorCutPreviewIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+    filter: blur(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+

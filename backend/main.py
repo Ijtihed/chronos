@@ -424,38 +424,67 @@ async def take_turn(run_id: str, req: TurnRequest):
 # = ~2KB), and it eliminates any drift between client and server
 # views of the board. The client is authoritative for layout.
 class BoardUpdateRequest(BaseModel):
-    board_state: dict[str, dict[str, float]]
+    # Phase 2.8: both fields are optional so a partial update can change
+    # one without clobbering the other. The frontend may want to persist
+    # a fresh cut without re-sending all positions, or vice versa. When
+    # a field is None (or absent), the server leaves the existing
+    # state.<field> untouched.
+    board_state: dict[str, dict[str, float]] | None = None
+    cut_threads: list[str] | None = None
 
 
 @app.post("/api/run/{run_id}/board")
 async def update_board(run_id: str, req: BoardUpdateRequest):
     async with _session_locks[run_id]:
         state = await _load_or_404(run_id)
-        # Sanitize: drop any non-finite coord, cap dict size, clamp
-        # to a sane bounding box so a malicious or buggy client can't
-        # grief by writing absurd numbers.
-        cleaned: dict[str, dict[str, float]] = {}
-        for key, pos in (req.board_state or {}).items():
-            if not isinstance(key, str):
-                continue
-            if len(cleaned) >= 200:
-                break
-            if not isinstance(pos, dict):
-                continue
-            x, y, z = pos.get("x"), pos.get("y"), pos.get("z")
-            if not all(
-                isinstance(v, (int, float)) and math.isfinite(v)
-                for v in (x, y, z)
-            ):
-                continue
-            cleaned[key] = {
-                "x": max(-50.0, min(50.0, float(x))),
-                "y": max(-50.0, min(50.0, float(y))),
-                "z": max(-100.0, min(200.0, float(z))),
-            }
-        state.board_state = cleaned
+
+        # board_state replace (when sent). Sanitize: drop non-finite
+        # coords, cap dict size, clamp to a sane bbox.
+        if req.board_state is not None:
+            cleaned: dict[str, dict[str, float]] = {}
+            for key, pos in req.board_state.items():
+                if not isinstance(key, str):
+                    continue
+                if len(cleaned) >= 200:
+                    break
+                if not isinstance(pos, dict):
+                    continue
+                x, y, z = pos.get("x"), pos.get("y"), pos.get("z")
+                if not all(
+                    isinstance(v, (int, float)) and math.isfinite(v)
+                    for v in (x, y, z)
+                ):
+                    continue
+                cleaned[key] = {
+                    "x": max(-50.0, min(50.0, float(x))),
+                    "y": max(-50.0, min(50.0, float(y))),
+                    "z": max(-100.0, min(200.0, float(z))),
+                }
+            state.board_state = cleaned
+
+        # cut_threads replace (when sent). Sanitize: strings only, dedup,
+        # cap key length at 200 chars, cap list at 500 entries.
+        if req.cut_threads is not None:
+            seen: set[str] = set()
+            cleaned_cuts: list[str] = []
+            for k in req.cut_threads:
+                if not isinstance(k, str):
+                    continue
+                k = k[:200]
+                if k in seen:
+                    continue
+                if len(cleaned_cuts) >= 500:
+                    break
+                seen.add(k)
+                cleaned_cuts.append(k)
+            state.cut_threads = cleaned_cuts
+
         await save_session(state)
-        return {"saved": True, "page_count": len(cleaned)}
+        return {
+            "saved": True,
+            "page_count": len(state.board_state or {}),
+            "cut_count": len(state.cut_threads or []),
+        }
 
 
 # Phase 2.7 — instant inline inner thought.

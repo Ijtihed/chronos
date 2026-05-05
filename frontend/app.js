@@ -399,11 +399,16 @@ function enterGame() {
     // Phase 2.8: hand the restored .turn-block elements to the
     // corridor so they get placed along the board. New turns
     // submitted after restore will have full edges. board_state
-    // (saved drag positions) is applied BEFORE the cards are added
-    // so each card lands at its saved override on first paint.
+    // (saved drag positions) and cut_threads (saved severed edges)
+    // are applied BEFORE the cards are added so each card lands at
+    // its saved override and severed threads render severed on
+    // first paint.
     if (typeof ChronosCorridor !== "undefined") {
-      if (state && state.board_state) {
-        ChronosCorridor.applyBoardOverrides(state.board_state);
+      if (state && (state.board_state || state.cut_threads)) {
+        ChronosCorridor.applyBoardOverrides(
+          state.board_state,
+          state.cut_threads,
+        );
       }
       ChronosCorridor.show(runId);
       ChronosCorridor.restoreFromContainer();
@@ -441,11 +446,15 @@ function enterGame() {
     _maybeShowDepthHint();
     // Phase 2.8: register the freshly-built intro card with the
     // corridor and bring it on-screen. apply board_state overrides
-    // first so the intro lands at its saved position if the player
-    // had dragged it on a prior visit.
+    // and cut_threads first so the intro lands at its saved position
+    // and any prior-cut edges render severed if the player had
+    // dragged or cut on a previous visit.
     if (typeof ChronosCorridor !== "undefined") {
-      if (state && state.board_state) {
-        ChronosCorridor.applyBoardOverrides(state.board_state);
+      if (state && (state.board_state || state.cut_threads)) {
+        ChronosCorridor.applyBoardOverrides(
+          state.board_state,
+          state.cut_threads,
+        );
       }
       ChronosCorridor.show(runId);
       const intro = turnsContainer.querySelector(".manuscript-intro");

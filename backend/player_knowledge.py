@@ -458,6 +458,13 @@ class PlayerView(BaseModel):
     # when the player drags a page. Read on initial run load to
     # restore the player's saved layout. See manuscript-as-artifact.md.
     board_state: Dict[str, Dict[str, float]] = Field(default_factory=dict)
+    # Phase 2.8: edge keys the player has CUT on the manuscript board.
+    # Saved alongside board_state via the same /board endpoint. The
+    # frontend re-applies cuts on initial load so severed threads
+    # render as severed. Phase B (simulation rewinding when a thread
+    # is cut) is still blocked by 3 open questions; cuts are
+    # visual + explanatory in this commit.
+    cut_threads: List[str] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -620,4 +627,5 @@ def build_player_view(
         cost_cap_soft_eur=_config.COST_CAP_SOFT_EUR,
         cost_cap_hard_eur=_config.COST_CAP_HARD_EUR,
         board_state=getattr(state, "board_state", {}) or {},
+        cut_threads=getattr(state, "cut_threads", []) or [],
     )

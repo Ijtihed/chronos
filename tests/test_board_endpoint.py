@@ -131,3 +131,129 @@ async def test_board_state_empty_payload_clears(client: AsyncClient) -> None:
     assert res.json()["page_count"] == 0
     pv = (await client.get(f"/api/run/{rid}")).json()
     assert pv["board_state"] == {}
+
+
+# ── Phase 2.8 cut_threads ──────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_cut_threads_roundtrip(client: AsyncClient) -> None:
+    """POST board_state + cut_threads together -> GET round-trips both."""
+    state = create_initial_state()
+    await persistence.save_session(state)
+    rid = state.run_id
+
+    payload = {
+        "board_state": {
+            "turn-1": {"x": 1.0, "y": 2.0, "z": 3.0},
+        },
+        "cut_threads": [
+            "turn-1->npc:cassia",
+            "turn-1->div:0",
+        ],
+    }
+    res = await client.post(f"/api/run/{rid}/board", json=payload)
+    assert res.status_code == 200
+    body = res.json()
+    assert body["saved"] is True
+    assert body["page_count"] == 1
+    assert body["cut_count"] == 2
+
+    pv = (await client.get(f"/api/run/{rid}")).json()
+    assert "cut_threads" in pv
+    assert sorted(pv["cut_threads"]) == [
+        "turn-1->div:0",
+        "turn-1->npc:cassia",
+    ]
+    assert "turn-1" in pv["board_state"]
+
+
+@pytest.mark.asyncio
+async def test_cut_threads_partial_update_preserves_other_field(
+    client: AsyncClient,
+) -> None:
+    """POSTing only cut_threads must NOT clobber a previously-saved
+    board_state (and vice versa). This is the partial-update semantics
+    promised by both fields being Optional."""
+    state = create_initial_state()
+    await persistence.save_session(state)
+    rid = state.run_id
+
+    # Seed board_state.
+    await client.post(
+        f"/api/run/{rid}/board",
+        json={"board_state": {"turn-1": {"x": 5.0, "y": 6.0, "z": 7.0}}},
+    )
+    # Then send ONLY cut_threads -- board_state should stay.
+    res = await client.post(
+        f"/api/run/{rid}/board",
+        json={"cut_threads": ["edge-a", "edge-b"]},
+    )
+    assert res.status_code == 200
+    body = res.json()
+    assert body["page_count"] == 1  # board_state survived
+    assert body["cut_count"] == 2
+
+    pv = (await client.get(f"/api/run/{rid}")).json()
+    assert pv["board_state"] == {"turn-1": {"x": 5.0, "y": 6.0, "z": 7.0}}
+    assert sorted(pv["cut_threads"]) == ["edge-a", "edge-b"]
+
+    # And the inverse: POST only board_state, cut_threads survives.
+    res2 = await client.post(
+        f"/api/run/{rid}/board",
+        json={"board_state": {"turn-2": {"x": 0, "y": 0, "z": 0}}},
+    )
+    assert res2.json()["cut_count"] == 2
+    pv2 = (await client.get(f"/api/run/{rid}")).json()
+    assert sorted(pv2["cut_threads"]) == ["edge-a", "edge-b"]
+
+
+@pytest.mark.asyncio
+async def test_cut_threads_sanitization(client: AsyncClient) -> None:
+    """Non-strings dropped, dedup, length cap (200 char per key),
+    count cap (500 entries)."""
+    state = create_initial_state()
+    await persistence.save_session(state)
+    rid = state.run_id
+
+    # Mix of valid + invalid + duplicate + over-long.
+    long_key = "x" * 300  # will be truncated to 200
+    payload = {
+        "cut_threads": [
+            "edge-1",
+            "edge-1",  # duplicate -> dropped
+            42,        # non-string -> dropped (would fail Pydantic; see below)
+            "edge-2",
+            long_key,
+        ],
+    }
+    # Pydantic v2's strict typing on list[str] will reject the int
+    # entry up-front, so we need to either pre-strip or accept that
+    # the request fails. Build a server-acceptable list and verify
+    # the OTHER sanitizations still apply.
+    safe_payload = {
+        "cut_threads": [
+            "edge-1",
+            "edge-1",  # duplicate
+            "edge-2",
+            long_key,
+        ],
+    }
+    res = await client.post(f"/api/run/{rid}/board", json=safe_payload)
+    assert res.status_code == 200
+    body = res.json()
+    # 3 unique keys after dedup: edge-1, edge-2, truncated long_key.
+    assert body["cut_count"] == 3
+
+    pv = (await client.get(f"/api/run/{rid}")).json()
+    cuts = pv["cut_threads"]
+    assert "edge-1" in cuts
+    assert "edge-2" in cuts
+    # long_key is truncated to 200 chars.
+    assert any(len(k) == 200 and k.startswith("x") for k in cuts)
+
+    # The count cap (500): build a list of 600 unique strings, expect 500.
+    big = {"cut_threads": [f"e-{i}" for i in range(600)]}
+    res2 = await client.post(f"/api/run/{rid}/board", json=big)
+    assert res2.status_code == 200
+    assert res2.json()["cut_count"] == 500

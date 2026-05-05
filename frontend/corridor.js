@@ -116,14 +116,35 @@
     return "decision";
   }
 
-  // Connection-line styling per type.
+  // Connection-line styling per type. Phase 2.8 strong-threads:
+  // colors are punchier, opacity bumped well above the old 0.35-0.7
+  // band so threads read as load-bearing structure rather than
+  // decorative hairlines, and each kind gets a `radius` for the
+  // TubeGeometry that replaces THREE.Line. WebGL caps line width at
+  // 1px regardless of linewidth; tubes give us real screen-space
+  // thickness AND clean raycaster picking via the standard mesh path.
   const EDGE_STYLE = {
-    action_npc_positive:  { color: 0x10b981, opacity: 0.55, dashed: false },
-    action_npc_negative:  { color: 0xef4444, opacity: 0.55, dashed: false },
-    action_npc_neutral:   { color: 0x71717a, opacity: 0.45, dashed: false },
-    action_divergence:    { color: 0xfcd34d, opacity: 0.7,  dashed: true  },
-    npc_npc:              { color: 0x94a3b8, opacity: 0.35, dashed: true  },
+    action_npc_positive:  { color: 0x10b981, opacity: 0.85, radius: 0.045 },
+    action_npc_negative:  { color: 0xef4444, opacity: 0.85, radius: 0.045 },
+    action_npc_neutral:   { color: 0x71717a, opacity: 0.65, radius: 0.04  },
+    action_divergence:    { color: 0xfcd34d, opacity: 0.95, radius: 0.05  },
+    npc_npc:              { color: 0x94a3b8, opacity: 0.55, radius: 0.035 },
   };
+  // Visual modifier when a thread has been cut (player-severed). The
+  // tube renders as a stub from the source out to ~35% of the path,
+  // narrower and more transparent so the cut reads as "broken,
+  // dangling" rather than just "thinner line."
+  const EDGE_CUT_OPACITY = 0.20;
+  const EDGE_CUT_RADIUS_FACTOR = 0.7;
+  const EDGE_CUT_LENGTH_FRACTION = 0.35;
+  // Hover modifier -- briefly bump radius + opacity so the hovered
+  // thread reads clearly even against a busy board.
+  const EDGE_HOVER_RADIUS_FACTOR = 1.25;
+  const EDGE_HOVER_OPACITY = 1.0;
+  // Cut state -- which edge keys are currently severed. Populated by
+  // applyBoardOverrides at run load and by _handleThreadClick on
+  // user cut. Persisted via _persist alongside board_state.
+  const cutEdgeKeys = new Set();
 
   // ── Init ─────────────────────────────────────────────────────────────
   function init() {
@@ -215,14 +236,30 @@
     // Camera orbit drag. Only fires when the click STARTS on the
     // canvas itself, not on a card -- card drag has its own listener
     // via _wirePageDrag added per card in addTurn.
+    //
+    // Phase 2.8: also picks up start-of-thread-click info so a brief
+    // click on a thread cuts it (vs a longer drag = camera orbit).
     canvas.addEventListener("pointerdown", (e) => {
       _camDragging = true;
       _dragLast.x = e.clientX;
       _dragLast.y = e.clientY;
+      // Capture the pointerdown for the thread-click detector. The
+      // raycast is done HERE so we know up-front whether the click
+      // started over a thread; on pointerup we check movement and
+      // fire the cut if it stayed close to its origin.
+      _threadClickStart = {
+        x: e.clientX,
+        y: e.clientY,
+        edge: _pickEdgeAt(e.clientX, e.clientY),
+      };
       canvas.style.cursor = "grabbing";
       try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
     });
     canvas.addEventListener("pointermove", (e) => {
+      // Hover: even when not dragging, raycast each move to update
+      // the thread tooltip. Throttled to one raycast per RAF via the
+      // _hoverThrottled flag.
+      _scheduleHoverRaycast(e.clientX, e.clientY);
       if (!_camDragging) return;
       const dx = e.clientX - _dragLast.x;
       const dy = e.clientY - _dragLast.y;
@@ -234,14 +271,32 @@
       _applyCameraOrbit();
     });
     const _release = (e) => {
-      if (!_camDragging) return;
-      _camDragging = false;
-      canvas.style.cursor = "grab";
-      try { canvas.releasePointerCapture(e.pointerId); } catch (_) {}
+      if (_camDragging) {
+        _camDragging = false;
+        canvas.style.cursor = "grab";
+        try { canvas.releasePointerCapture(e.pointerId); } catch (_) {}
+      }
+      // Thread-click detection: if the pointerdown landed on a thread
+      // AND total movement is small (camera-orbit drags are typically
+      // 10s-100s of pixels), treat as a click and cut the thread.
+      if (_threadClickStart) {
+        const start = _threadClickStart;
+        _threadClickStart = null;
+        if (start.edge && e.clientX != null) {
+          const dx = (e.clientX - start.x);
+          const dy = (e.clientY - start.y);
+          if (dx * dx + dy * dy < 36) {  // <6px total movement
+            _handleThreadClick(start.edge, e.clientX, e.clientY);
+          }
+        }
+      }
     };
     canvas.addEventListener("pointerup", _release);
     canvas.addEventListener("pointercancel", _release);
-    canvas.addEventListener("pointerleave", _release);
+    canvas.addEventListener("pointerleave", (e) => {
+      _release(e);
+      _hideThreadTooltip();
+    });
 
     canvas.addEventListener("wheel", (e) => {
       e.preventDefault();
@@ -607,27 +662,43 @@
   // saved layout so subsequent addTurn calls see overrides via
   // overrides.get(turnId). Existing cards (if any) get repositioned
   // immediately.
-  function applyBoardOverrides(boardState) {
-    if (!boardState || typeof boardState !== "object") return;
-    overrides.clear();
-    Object.keys(boardState).forEach((key) => {
-      const v = boardState[key];
-      if (!v || typeof v !== "object") return;
-      const x = Number(v.x);
-      const y = Number(v.y);
-      const z = Number(v.z);
-      if (!isFinite(x) || !isFinite(y) || !isFinite(z)) return;
-      overrides.set(key, { x: x, y: y, z: z });
-    });
-    // Apply to any cards already in the scene.
-    cards.forEach((c) => {
-      const ov = overrides.get(c.id);
-      if (ov) {
-        c.pos.x = ov.x;
-        c.pos.y = ov.y;
-        c.pos.z = ov.z;
-      }
-    });
+  // Phase 2.8 strong-threads: accepts an optional cutThreads array
+  // alongside the board_state dict. Backward-compatible -- callers
+  // passing only the dict still work (cutThreads defaults to
+  // undefined and the cut state is left empty).
+  function applyBoardOverrides(boardState, cutThreads) {
+    if (boardState && typeof boardState === "object") {
+      overrides.clear();
+      Object.keys(boardState).forEach((key) => {
+        const v = boardState[key];
+        if (!v || typeof v !== "object") return;
+        const x = Number(v.x);
+        const y = Number(v.y);
+        const z = Number(v.z);
+        if (!isFinite(x) || !isFinite(y) || !isFinite(z)) return;
+        overrides.set(key, { x: x, y: y, z: z });
+      });
+      // Apply to any cards already in the scene.
+      cards.forEach((c) => {
+        const ov = overrides.get(c.id);
+        if (ov) {
+          c.pos.x = ov.x;
+          c.pos.y = ov.y;
+          c.pos.z = ov.z;
+        }
+      });
+    }
+    if (Array.isArray(cutThreads)) {
+      cutEdgeKeys.clear();
+      cutThreads.forEach((k) => {
+        if (typeof k === "string" && k.length > 0) cutEdgeKeys.add(k);
+      });
+      // Mark any already-registered edges as cut so the next render
+      // shows them severed without waiting for a fresh add.
+      edges.forEach((e) => {
+        if (e._key && cutEdgeKeys.has(e._key)) e.cut = true;
+      });
+    }
   }
 
   // Set the run id (called from show()). Used as the POST target.
@@ -644,7 +715,7 @@
   function _persist() {
     _persistTimer = null;
     if (!currentRunId) return;
-    const payload = { board_state: {} };
+    const payload = { board_state: {}, cut_threads: Array.from(cutEdgeKeys) };
     overrides.forEach((pos, key) => {
       payload.board_state[key] = { x: pos.x, y: pos.y, z: pos.z };
     });
@@ -667,12 +738,23 @@
     return out;
   }
 
-  // ── Connection edges (unchanged from v2) ────────────────────────────
+  // ── Connection edges + templated explanations ──────────────────────
+  // Phase 2.8 strong-threads/cut: each edge carries a one-sentence
+  // explanation (shown on hover) and a structured `meta` payload used
+  // to render the post-cut "what would have changed" preview text.
+  // Templates are deterministic strings written here -- no LLM call,
+  // no Gemini cost. Cut state is restored from cutEdgeKeys at edge
+  // creation so reload preserves severed threads.
+
   function _registerEdgesForTurn(tid, data) {
     if (!data || !tid) return;
     const card = cardByTurnId.get(tid);
     if (!card) return;
 
+    const playerInput = _extractPlayerInput(card);
+    const turnLabel = _pageLabel(card);
+
+    // 1) action -> NPC reaction edges, one per NPC POV.
     const npcResponses = data.npc_responses || [];
     const impacts = (data.parsed_action || data.parsed || {}).npc_impacts || [];
     npcResponses.forEach((r) => {
@@ -683,9 +765,21 @@
       const kind = sentiment === "positive" ? "action_npc_positive"
                  : sentiment === "negative" ? "action_npc_negative"
                  : "action_npc_neutral";
-      _pushEdge(card, npcNode, kind, tid + "->npc:" + r.npc_name);
+      const reasonNote = _impactReason(r.npc_name, impacts);
+      const explanation = _explainActionNpc(turnLabel, r.npc_name, sentiment, reasonNote);
+      _pushEdge(card, npcNode, kind, tid + "->npc:" + r.npc_name, {
+        explanation: explanation,
+        meta: {
+          kind: "action_npc",
+          npc: r.npc_name,
+          sentiment: sentiment,
+          turnLabel: turnLabel,
+          playerInput: playerInput,
+        },
+      });
     });
 
+    // 2) action -> divergence edges.
     const divergences = data.divergences || [];
     divergences.forEach((d, i) => {
       const offset = (i % 2 === 0 ? 1.4 : -1.4);
@@ -696,17 +790,80 @@
       );
       const divNode = _ensureDivergenceNode(tid + ":div:" + i, d, anchorPos);
       if (!divNode) return;
-      _pushEdge(card, divNode, "action_divergence", tid + "->div:" + i);
+      const canon = (d && d.canonical_event) ? String(d.canonical_event) : "(canonical event averted)";
+      _pushEdge(card, divNode, "action_divergence", tid + "->div:" + i, {
+        explanation: "This action superseded the canonical event: " + canon,
+        meta: {
+          kind: "action_divergence",
+          canonical_event: canon,
+          turnLabel: turnLabel,
+          playerInput: playerInput,
+        },
+      });
     });
 
+    // 3) NPC <-> NPC ambient interactions.
     const ambient = data.ambient_activity || [];
     ambient.forEach((a) => {
       if (!a || !a.npc_name || !a.interacts_with) return;
       const aNode = _ensureNpcNode(a.npc_name, "");
       const bNode = _ensureNpcNode(a.interacts_with, "");
       if (!aNode || !bNode) return;
-      _pushEdge(aNode, bNode, "npc_npc", tid + ":" + a.npc_name + "<->" + a.interacts_with);
+      _pushEdge(aNode, bNode, "npc_npc", tid + ":" + a.npc_name + "<->" + a.interacts_with, {
+        explanation: a.npc_name + " and " + a.interacts_with + " were seen together this turn.",
+        meta: {
+          kind: "npc_npc",
+          a: a.npc_name,
+          b: a.interacts_with,
+          turnLabel: turnLabel,
+        },
+      });
     });
+  }
+
+  // Lift the player's typed action snippet from the card's DOM. The
+  // first <p class="text-sm italic"> in the card is the player-input
+  // header set by submitTurn / renderTurnStaggered. Empty string when
+  // the card is restored from saved HTML before this snippet existed.
+  function _extractPlayerInput(card) {
+    if (!card || !card.el) return "";
+    const p = card.el.querySelector("p.text-sm.italic, p.italic.text-sm");
+    if (!p) return "";
+    const text = (p.textContent || "").trim();
+    return text.length > 80 ? text.slice(0, 77) + "\u2026" : text;
+  }
+
+  // Human label for a turn card -- used as the subject of an
+  // explanation sentence. "Turn 4 -- 'I threaten the abbot'" reads
+  // better than "the action at z=5.6".
+  function _pageLabel(card) {
+    if (!card) return "this turn";
+    const idx = (card.idx != null && card.idx >= 0) ? "Turn " + (card.idx + 1) : "this turn";
+    const action = _extractPlayerInput(card);
+    return action ? (idx + " -- '" + action + "'") : idx;
+  }
+
+  // Lookup the impact reason string for a given NPC if the action
+  // parser provided one. Falls back to "" so the explanation
+  // template stays grammatical without it.
+  function _impactReason(name, impacts) {
+    for (let i = 0; i < impacts.length; i++) {
+      const im = impacts[i];
+      if (im && im.name && im.name.toLowerCase() === name.toLowerCase()) {
+        return (im.reason || "").trim();
+      }
+    }
+    return "";
+  }
+
+  function _explainActionNpc(turnLabel, npcName, sentiment, reason) {
+    const verb = sentiment === "positive" ? "warmed toward you"
+               : sentiment === "negative" ? "turned against you"
+               : "took notice";
+    if (reason) {
+      return turnLabel + ": " + npcName + " " + verb + " (" + reason + ").";
+    }
+    return turnLabel + ": " + npcName + " " + verb + ".";
   }
 
   function _sentimentForNpc(name, impacts) {
@@ -720,14 +877,26 @@
     return "neutral";
   }
 
-  function _pushEdge(fromNode, toNode, kind, key) {
+  function _pushEdge(fromNode, toNode, kind, key, opts) {
     if (!fromNode || !toNode) return;
     if (key) {
       for (let i = 0; i < edges.length; i++) {
         if (edges[i]._key === key) return;
       }
     }
-    edges.push({ from: fromNode, to: toNode, kind: kind, _key: key });
+    const o = opts || {};
+    edges.push({
+      from: fromNode,
+      to: toNode,
+      kind: kind,
+      _key: key,
+      // Phase 2.8: cut state restored from cutEdgeKeys at creation so
+      // a reload (which re-fires _registerEdgesForTurn for restored
+      // turns) brings back the severed-thread visual.
+      cut: !!(key && cutEdgeKeys.has(key)),
+      explanation: o.explanation || "",
+      meta: o.meta || {},
+    });
   }
 
   function _ensureNpcNode(name, role) {
@@ -819,27 +988,214 @@
   function _addEdgeGeometry(edge) {
     if (!edge.from || !edge.to) return;
     const style = EDGE_STYLE[edge.kind] || EDGE_STYLE.npc_npc;
-    const points = [edge.from.pos.clone(), edge.to.pos.clone()];
-    const geo = new THREE.BufferGeometry().setFromPoints(points);
-    let mat;
-    if (style.dashed) {
-      mat = new THREE.LineDashedMaterial({
-        color: style.color,
-        opacity: style.opacity,
-        transparent: true,
-        dashSize: 0.18,
-        gapSize: 0.12,
-      });
-    } else {
-      mat = new THREE.LineBasicMaterial({
-        color: style.color,
-        opacity: style.opacity,
-        transparent: true,
-      });
+    const a = edge.from.pos.clone();
+    const b = edge.to.pos.clone();
+    // Reject degenerate near-zero-length tubes -- a from/to that
+    // resolved to the same world position (rare but possible if two
+    // nodes share an anchor position) crashes TubeGeometry.
+    if (a.distanceTo(b) < 0.001) return;
+    const isCut = !!edge.cut;
+    const isHover = (edge === _hoveredEdge);
+    const endPoint = isCut ? a.clone().lerp(b, EDGE_CUT_LENGTH_FRACTION) : b;
+    const path = new THREE.LineCurve3(a, endPoint);
+    const baseRadius = style.radius || 0.04;
+    const radius = baseRadius
+      * (isCut ? EDGE_CUT_RADIUS_FACTOR : 1.0)
+      * (isHover ? EDGE_HOVER_RADIUS_FACTOR : 1.0);
+    const opacity = isCut
+      ? EDGE_CUT_OPACITY
+      : (isHover ? EDGE_HOVER_OPACITY : style.opacity);
+    // 1 tubular segment is fine for a straight LineCurve3 -- the tube
+    // is a constant-radius cylinder. 8 radial segments gives a clean
+    // round profile at all reasonable camera distances; bumping to 12
+    // is invisible. ~4800 tris for a 60-turn / 240-edge run -- trivial.
+    const geo = new THREE.TubeGeometry(path, 1, radius, 8, false);
+    const mat = new THREE.MeshBasicMaterial({
+      color: style.color,
+      transparent: true,
+      opacity: opacity,
+      depthWrite: false,
+    });
+    const tube = new THREE.Mesh(geo, mat);
+    // Stash the source edge on the mesh so the raycaster can recover
+    // the edge object on hover/click.
+    tube.userData.edge = edge;
+    lineGroup.add(tube);
+  }
+  // Currently hovered edge (set by the hover handler each frame).
+  let _hoveredEdge = null;
+
+  // ── Thread hover + click-to-cut ─────────────────────────────────────
+  // The board has up to a few hundred tubes. We raycast on every
+  // pointermove (at most once per RAF, throttled). On hit we show
+  // a small floating tooltip with the edge's templated explanation
+  // and bump the tube's apparent thickness/opacity for the next
+  // frame. Click-to-cut: if pointerdown landed on a tube and pointerup
+  // is within a 6px box of the start, fire _handleThreadClick.
+
+  // Pointerdown snapshot used to disambiguate a thread-click from a
+  // camera-orbit drag on pointerup.
+  let _threadClickStart = null;
+  // Throttle the per-pointermove raycast to at most once per frame.
+  let _hoverThrottled = false;
+  let _pendingHoverPos = null;
+  // Lazy ref to the floating tooltip DOM node.
+  let _threadTooltipEl = null;
+
+  // Run a raycast against the lineGroup tubes for the cursor at
+  // (clientX, clientY). Returns the hit edge or null.
+  function _pickEdgeAt(clientX, clientY) {
+    if (!camera || !renderer || !raycaster || !lineGroup) return null;
+    const rect = renderer.domElement.getBoundingClientRect();
+    const ndc = new THREE.Vector2(
+      ((clientX - rect.left) / rect.width) * 2 - 1,
+      -(((clientY - rect.top) / rect.height) * 2 - 1),
+    );
+    raycaster.setFromCamera(ndc, camera);
+    const hits = raycaster.intersectObjects(lineGroup.children, false);
+    if (hits.length === 0) return null;
+    return hits[0].object && hits[0].object.userData
+      ? hits[0].object.userData.edge || null
+      : null;
+  }
+
+  // Schedule a hover raycast for the next animation frame. If the
+  // cursor moves multiple times before the frame ticks, only the
+  // most-recent position is processed -- avoids burning CPU on
+  // raycasts the user never sees the result of.
+  function _scheduleHoverRaycast(clientX, clientY) {
+    _pendingHoverPos = { x: clientX, y: clientY };
+    if (_hoverThrottled) return;
+    _hoverThrottled = true;
+    requestAnimationFrame(() => {
+      _hoverThrottled = false;
+      const p = _pendingHoverPos;
+      _pendingHoverPos = null;
+      if (!p) return;
+      _processHover(p.x, p.y);
+    });
+  }
+
+  function _processHover(clientX, clientY) {
+    const edge = _pickEdgeAt(clientX, clientY);
+    if (edge !== _hoveredEdge) {
+      _hoveredEdge = edge;
+      // _drawConnections is rebuilt every frame from the edges array,
+      // and reads _hoveredEdge for the radius/opacity bump, so the
+      // change applies on the next render frame automatically.
     }
-    const line = new THREE.Line(geo, mat);
-    if (style.dashed) line.computeLineDistances();
-    lineGroup.add(line);
+    if (edge && edge.explanation) {
+      _showThreadTooltip(edge.explanation, clientX, clientY);
+    } else {
+      _hideThreadTooltip();
+    }
+  }
+
+  function _ensureThreadTooltip() {
+    if (_threadTooltipEl && _threadTooltipEl.isConnected) return _threadTooltipEl;
+    let el = document.getElementById("corridor-thread-tooltip");
+    if (!el) {
+      el = document.createElement("div");
+      el.id = "corridor-thread-tooltip";
+      document.body.appendChild(el);
+    }
+    _threadTooltipEl = el;
+    return el;
+  }
+
+  function _showThreadTooltip(text, clientX, clientY) {
+    const el = _ensureThreadTooltip();
+    el.textContent = text;
+    el.style.display = "block";
+    // Anchor near the cursor with a small offset so the tooltip
+    // doesn't sit under the pointer (which would intercept the next
+    // raycast). Bottom-right by default, flipped if near edges.
+    const margin = 14;
+    let x = clientX + margin;
+    let y = clientY + margin;
+    // Flip if the tooltip would overflow the viewport.
+    const w = el.offsetWidth || 240;
+    const h = el.offsetHeight || 60;
+    if (x + w > window.innerWidth - 8) x = clientX - margin - w;
+    if (y + h > window.innerHeight - 8) y = clientY - margin - h;
+    el.style.transform = "translate(" + x + "px," + y + "px)";
+  }
+
+  function _hideThreadTooltip() {
+    if (_threadTooltipEl) _threadTooltipEl.style.display = "none";
+  }
+
+  // ── Cut a thread + render preview note ──────────────────────────────
+  function _handleThreadClick(edge, clientX, clientY) {
+    if (!edge || edge.cut) return;  // idempotent
+    edge.cut = true;
+    if (edge._key) cutEdgeKeys.add(edge._key);
+    _schedulePersist();
+    _showCutPreview(edge, clientX, clientY);
+  }
+
+  // Floating .corridor-cut-preview note. Auto-dismiss after 8s OR
+  // on outside-click. Positioned at the cursor for now -- the edge
+  // midpoint would track better but cards drift on drag and the
+  // note would chase. Cursor anchor is honest about "this is the
+  // place you decided to cut."
+  function _showCutPreview(edge, clientX, clientY) {
+    // Remove any existing preview note first -- one at a time.
+    const prior = document.querySelectorAll(".corridor-cut-preview");
+    prior.forEach((n) => n.parentNode && n.parentNode.removeChild(n));
+
+    const note = document.createElement("div");
+    note.className = "corridor-cut-preview";
+    note.textContent = _explainCut(edge);
+    document.body.appendChild(note);
+
+    // Position at cursor + offset; flip near edges.
+    const margin = 18;
+    const w = 260;
+    let x = (clientX != null ? clientX : window.innerWidth / 2) + margin;
+    let y = (clientY != null ? clientY : window.innerHeight / 2) + margin;
+    if (x + w > window.innerWidth - 8) x = clientX - margin - w;
+    note.style.left = x + "px";
+    note.style.top = y + "px";
+
+    const dismiss = () => {
+      if (!note.parentNode) return;
+      note.parentNode.removeChild(note);
+      document.removeEventListener("pointerdown", outsideHandler, true);
+    };
+    note.addEventListener("click", dismiss);
+    // Outside-click dismiss. Capture-phase so it fires before our
+    // canvas pointerdown handler steals it.
+    const outsideHandler = (e) => {
+      if (note.contains(e.target)) return;
+      dismiss();
+    };
+    setTimeout(() => {
+      document.addEventListener("pointerdown", outsideHandler, true);
+    }, 0);
+    // Auto-dismiss timer.
+    setTimeout(dismiss, 8000);
+  }
+
+  // Templated read-only "what would have changed" preview. No LLM,
+  // no Gemini cost. Phase B (simulation actually rewinding when a
+  // thread is cut) is blocked by the 3 open questions; this is the
+  // honest read-only version that ships in Phase A.
+  function _explainCut(edge) {
+    const m = edge.meta || {};
+    if (m.kind === "action_npc") {
+      const verb = m.sentiment === "positive" ? "warmed toward you"
+                 : m.sentiment === "negative" ? "turned against you"
+                 : "taken notice of you";
+      return "Without this turn, " + (m.npc || "they") + " might never have " + verb + ".";
+    }
+    if (m.kind === "action_divergence") {
+      return "Without this turn, the canonical event would have unfolded: " + (m.canonical_event || "(an event averted)") + ".";
+    }
+    if (m.kind === "npc_npc") {
+      return "Without this turn, " + (m.a || "they") + " and " + (m.b || "they") + " might never have crossed paths.";
+    }
+    return "If this hadn't happened, what followed wouldn't have either.";
   }
 
   // ── DOM-card projection ──────────────────────────────────────────────
