@@ -22,6 +22,7 @@ from pydantic import BaseModel, Field
 
 from backend.utils import graph_distance as _graph_distance_shared
 from backend.world_state import (
+    Diorama,
     Pin,
     PinConnection,
     WorldState,
@@ -466,6 +467,11 @@ class PlayerView(BaseModel):
     # message pointing at /pinboard.
     pins: List[Pin] = Field(default_factory=list)
     pin_connections: List[PinConnection] = Field(default_factory=list)
+    # Phase 3b: stylized 3D dioramas the player has earned through
+    # high-significance moments. Surfaced so the frontend can rebuild
+    # the WebGL scenes on initial run load (after a refresh, the
+    # manuscript scrolls past the same insets in the same places).
+    dioramas: List[Diorama] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -629,4 +635,5 @@ def build_player_view(
         cost_cap_hard_eur=_config.COST_CAP_HARD_EUR,
         pins=getattr(state, "pins", []) or [],
         pin_connections=getattr(state, "pin_connections", []) or [],
+        dioramas=getattr(state, "dioramas", []) or [],
     )

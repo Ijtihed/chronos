@@ -296,6 +296,58 @@ class ConnectionProposalResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# SceneDirectorResponse — scene_director.py (Phase 3b)
+# ---------------------------------------------------------------------------
+
+class _SceneCharacter(BaseModel):
+    kind: str = "standing"
+    x: int = 0
+    z: int = 0
+    facing: int = 0
+    is_player: bool = False
+
+
+class _SceneCamera(BaseModel):
+    type: str = "low_orbit_slow"
+    initial_phi: int = 70
+    distance: float = 5.0
+
+
+class _SceneMood(BaseModel):
+    mood: str = "amber_low_light"
+    intensity: float = 0.7
+
+
+class SceneDirectorResponse(BaseModel):
+    """Structured spec for a Phase 3b diorama. Mirrors the shape that
+    backend.world_state.Diorama persists. The two are deliberately
+    NOT the same model -- this one is permissive (validates LLM output
+    with safe defaults), while Diorama is the canonical persisted
+    form. The endpoint converts response -> Diorama, applying the
+    DIORAMA_*_KINDS allow-lists to drop unknown values.
+
+    See prompts/scene_director.md.
+    """
+    location_kind: str = "chamber"
+    characters: List[_SceneCharacter] = Field(default_factory=list)
+    camera: _SceneCamera = Field(default_factory=_SceneCamera)
+    mood: _SceneMood = Field(default_factory=_SceneMood)
+    summary: str = ""
+
+    @field_validator("summary", mode="before")
+    @classmethod
+    def coerce_summary(cls, v):
+        if v is None:
+            return ""
+        if not isinstance(v, str):
+            return ""
+        s = v.strip()
+        if s.startswith('"') and s.endswith('"') and len(s) >= 2:
+            s = s[1:-1].strip()
+        return s[:140]
+
+
+# ---------------------------------------------------------------------------
 # leaks_raw_numbers — narrative output safety check
 # ---------------------------------------------------------------------------
 

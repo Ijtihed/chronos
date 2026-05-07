@@ -44,6 +44,7 @@ from backend.persistence import (
     build_narrative_output,
     compute_state_diff,
     delete_session,
+    get_turn_logs,
     init_db,
     list_sessions,
     load_session,
@@ -69,9 +70,17 @@ from backend.world_engine import (
     simulate_turn,
 )
 from backend.world_state import (
+    DIORAMA_CAMERA_TYPES,
+    DIORAMA_CHARACTER_KINDS,
+    DIORAMA_LOCATION_KINDS,
+    DIORAMA_MOODS,
     PIN_CONNECTION_KINDS,
     PIN_SOURCE_CONFIDENCES,
+    CameraSpec,
+    CharacterFigure,
+    Diorama,
     Event,
+    MoodSpec,
     Pin,
     PinConnection,
     PinSourceOffset,
@@ -85,6 +94,7 @@ from backend.world_state import (
 )
 from backend.connection_proposal import generate_connection_proposal
 from backend.pin_classifier import classify_pin_source
+from backend.scene_director import generate_scene_spec
 
 logger = logging.getLogger("chronos")
 
@@ -850,6 +860,228 @@ async def propose_connections(run_id: str, req: ProposeConnectionsRequest):
             "proposed": [c.model_dump() for c in proposed],
             "calls_made": calls_made,
             "connection_count": len(connections),
+            "cost_delta_usd": cost_delta,
+            "cost_cap_state": state.cost_cap_state,
+        }
+
+
+# Phase 3b — diorama generator.
+#
+# When a turn fires with `parsed_action.significance_score >= 0.85`,
+# the frontend hits this endpoint to mint a stylized 3D diorama for
+# the moment. The endpoint reads the saved turn-log row (the same
+# snapshot of player perception used for pin classification), calls
+# `generate_scene_spec` (Gemini Flash Lite via the new scene_director
+# call site), converts the response into a canonical `Diorama`, and
+# saves it on `state.dioramas`.
+#
+# Idempotent per turn: hitting POST /diorama/{turn_id} a second time
+# for the same turn returns the existing diorama without spending
+# another LLM call. Hard cap at 30 dioramas per run; the threshold
+# rule (>= 0.85) means a typical 10-turn run has 1-3.
+
+DIORAMA_SIGNIFICANCE_THRESHOLD = 0.85
+DIORAMA_HARD_CAP_PER_RUN = 30
+
+
+def _coerce_character(c) -> CharacterFigure:
+    """Apply the allow-list to an LLM-emitted CharacterFigure-shaped
+    dict / Pydantic object. Unknown `kind` values fall back to
+    standing; coords are clamped to [-3, 3]."""
+    kind_raw = getattr(c, "kind", None) or (c.get("kind") if isinstance(c, dict) else "standing")
+    kind = kind_raw if kind_raw in DIORAMA_CHARACTER_KINDS else "standing"
+    x_raw = getattr(c, "x", None) or (c.get("x") if isinstance(c, dict) else 0)
+    z_raw = getattr(c, "z", None) or (c.get("z") if isinstance(c, dict) else 0)
+    facing_raw = getattr(c, "facing", None) or (c.get("facing") if isinstance(c, dict) else 0)
+    is_player = bool(getattr(c, "is_player", False) or (c.get("is_player") if isinstance(c, dict) else False))
+    try:
+        x = max(-3, min(3, int(x_raw)))
+    except Exception:
+        x = 0
+    try:
+        z = max(-3, min(3, int(z_raw)))
+    except Exception:
+        z = 0
+    try:
+        facing = int(facing_raw) % 360
+    except Exception:
+        facing = 0
+    return CharacterFigure(kind=kind, x=x, z=z, facing=facing, is_player=is_player)
+
+
+def _coerce_camera(cam) -> CameraSpec:
+    """Apply the allow-list to a CameraSpec-shaped dict / object."""
+    type_raw = getattr(cam, "type", None) or (cam.get("type") if isinstance(cam, dict) else "low_orbit_slow")
+    cam_type = type_raw if type_raw in DIORAMA_CAMERA_TYPES else "low_orbit_slow"
+    phi_raw = getattr(cam, "initial_phi", None) or (cam.get("initial_phi") if isinstance(cam, dict) else 70)
+    dist_raw = getattr(cam, "distance", None) or (cam.get("distance") if isinstance(cam, dict) else 5.0)
+    try:
+        phi = max(20, min(85, int(phi_raw)))
+    except Exception:
+        phi = 70
+    try:
+        distance = max(2.5, min(9.0, float(dist_raw)))
+    except Exception:
+        distance = 5.0
+    return CameraSpec(type=cam_type, initial_phi=phi, distance=distance)
+
+
+def _coerce_mood(mood) -> MoodSpec:
+    """Apply the allow-list to a MoodSpec-shaped dict / object."""
+    mood_raw = getattr(mood, "mood", None) or (mood.get("mood") if isinstance(mood, dict) else "amber_low_light")
+    mood_value = mood_raw if mood_raw in DIORAMA_MOODS else "amber_low_light"
+    intensity_raw = getattr(mood, "intensity", None) or (mood.get("intensity") if isinstance(mood, dict) else 0.7)
+    try:
+        intensity = max(0.0, min(1.0, float(intensity_raw)))
+    except Exception:
+        intensity = 0.7
+    return MoodSpec(mood=mood_value, intensity=intensity)
+
+
+def _build_minimal_diorama(source_turn_id: str) -> Diorama:
+    """Fallback diorama when the LLM call returns nothing usable.
+    A single standing player figure in a generic chamber. This is
+    NEVER NICE but never broken either -- we always show *something*
+    when the trigger fires."""
+    return Diorama(
+        source_turn_id=source_turn_id,
+        location_kind="chamber",
+        characters=[CharacterFigure(kind="standing", x=0, z=0, is_player=True)],
+        camera=CameraSpec(type="low_orbit_slow", initial_phi=70, distance=5.0),
+        mood=MoodSpec(mood="amber_low_light", intensity=0.7),
+        summary="A moment in the run; the diorama was generated without context.",
+        created_at=time.time(),
+    )
+
+
+@app.post("/api/run/{run_id}/diorama/{turn_id}")
+async def create_diorama(run_id: str, turn_id: str):
+    async with _session_locks[run_id]:
+        state = await _load_or_404(run_id)
+
+        # Hard cost cap refusal.
+        if (state.cost_cap_state or "none") == "hard":
+            raise HTTPException(
+                status_code=402,
+                detail={
+                    "code": "cost_cap_hard",
+                    "message": (
+                        "This run has reached the hard cost cap. "
+                        "Diorama generation is disabled."
+                    ),
+                },
+            )
+
+        # Idempotent per turn: if a diorama already exists for this
+        # turn_id, return it without calling the LLM.
+        existing = next(
+            (d for d in (state.dioramas or []) if d.source_turn_id == turn_id),
+            None,
+        )
+        if existing is not None:
+            return {"saved": False, "diorama": existing.model_dump(), "reason": "already_exists"}
+
+        # Run-cap refusal.
+        if len(state.dioramas or []) >= DIORAMA_HARD_CAP_PER_RUN:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "This run has reached the diorama cap "
+                    f"({DIORAMA_HARD_CAP_PER_RUN}); no more will be generated."
+                ),
+            )
+
+        # Find the saved turn-log row for this turn. The frontend
+        # stamps source_turn_id like "turn-<turn_number>" or
+        # "turn-<created_at_ms>". The pin classifier uses the same
+        # convention; we copy its match logic.
+        rows = await get_turn_logs(run_id)
+        target = None
+        for row in rows:
+            cand_ids = {
+                f"turn-{row.get('id') or ''}",
+                f"turn-{row.get('turn_number') or ''}",
+            }
+            if turn_id in cand_ids:
+                target = row
+                break
+        if target is None and rows:
+            target = rows[-1]
+        if target is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No turn log found for {turn_id}",
+            )
+
+        # Threshold gate. The frontend SHOULD only call this for
+        # significance >= 0.85, but we double-check server-side so a
+        # bad client can't abuse the diorama generator. If significance
+        # is below the threshold, return a 422 (the data is valid but
+        # the request shouldn't fire).
+        parsed = target.get("parsed_action") or {}
+        significance = float(parsed.get("significance_score") or 0.0)
+        if significance < DIORAMA_SIGNIFICANCE_THRESHOLD:
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "code": "below_threshold",
+                    "message": (
+                        f"Turn significance {significance:.2f} is below "
+                        f"{DIORAMA_SIGNIFICANCE_THRESHOLD}; no diorama."
+                    ),
+                },
+            )
+
+        # Pull location + player context from current state. The
+        # diorama is a memory of the moment, so the location at the
+        # TIME of the turn is the right one. We use the turn-log
+        # row's location if recorded, falling back to current.
+        try:
+            player_loc = get_player_location(state)
+            location_name = player_loc.name or ""
+        except Exception:
+            location_name = ""
+
+        with track_turn_cost() as bucket:
+            spec = await generate_scene_spec(
+                turn_year=getattr(state, "current_year", None) or 0,
+                location_name=location_name,
+                player_name=getattr(state.player, "name", "") or "",
+                player_role=getattr(state.player, "role", "") or "",
+                player_action=str(target.get("player_input") or "")[:300],
+                action_type=str(parsed.get("action_type") or ""),
+                significance=significance,
+                npc_responses=target.get("npc_responses") or [],
+                ambient_activity=target.get("ambient_activity") or [],
+            )
+            cost_delta = _finalize_turn_cost(state, bucket)
+
+        # Convert the LLM response to a canonical Diorama. If the
+        # response is empty / unusable, fall back to a minimal default.
+        characters = [_coerce_character(c) for c in (spec.characters or [])]
+        if not characters:
+            diorama = _build_minimal_diorama(turn_id)
+        else:
+            location_kind = (
+                spec.location_kind
+                if spec.location_kind in DIORAMA_LOCATION_KINDS
+                else "chamber"
+            )
+            diorama = Diorama(
+                source_turn_id=turn_id,
+                location_kind=location_kind,
+                characters=characters[:6],
+                camera=_coerce_camera(spec.camera),
+                mood=_coerce_mood(spec.mood),
+                summary=(spec.summary or "")[:140],
+                created_at=time.time(),
+            )
+
+        state.dioramas = list(state.dioramas or []) + [diorama]
+        await save_session(state)
+        return {
+            "saved": True,
+            "diorama": diorama.model_dump(),
             "cost_delta_usd": cost_delta,
             "cost_cap_state": state.cost_cap_state,
         }

@@ -4,7 +4,23 @@
 
 This document is the source of truth for CHRONOS imagery. It covers POV, body treatment, prompt construction, style, and provider choice. Phase 3 integration work references these rules.
 
-**3D in CHRONOS (Phase 2.6 addendum, updated 2026-05-07).** 3D geometry is part of CHRONOS's visual language for the **map** — the globe and the war-table — only. The manuscript ran a 3D corridor experiment in Phase 2.8 (2026-05-04 → 2026-05-07) and **rolled back** in Phase 2.9: the manuscript is a flat scrollable column with z-recession on past turn-blocks (Phase 2.6 depth-stack), and a separate 2D **pinboard** panel sits to its right for the player's spatial curation interactions. The map remains 3D (globe + war-table); the manuscript does not. This still does **not** change Phase 3's rules: scene illustrations remain photoreal first-person stills (FLUX via mflux, see Provider section). 3D substrate and FLUX stills are different visual languages serving different purposes. A future "3D scenes generated for events" idea remains explicitly **deferred** — not in any phase, requires its own design conversation, would replace rather than augment Phase 3's image stack. See [manuscript-as-artifact.md](manuscript-as-artifact.md) and [simulation-and-world.md](simulation-and-world.md) for the manuscript/pinboard and map sides.
+**3D in CHRONOS (Phase 2.6 addendum, updated 2026-05-07 again for Phase 3b).** 3D geometry is part of CHRONOS's visual language for **two distinct surfaces**:
+
+1. **The map** — globe (default world view) and war-table (regional terrain). 3D because *space* is what the map describes; flat 2D would be a chart, not a place. Phase 2.6.
+2. **The diorama** — stylized 3D vignettes inset in the manuscript when a major event fires. Silhouette characters, low-poly setting, slow camera orbit, amber-on-black palette. Reads like a memory. Phase 3b.
+
+The manuscript itself is **not** 3D. The Phase 2.8 corridor experiment (3D manuscript) shipped, lived three commits, and rolled back. The manuscript is a flat scrollable column with z-recession on past turn-blocks (Phase 2.6 depth-stack), and a 2D **pinboard** sits beside it (Phase 2.9 + 2.10).
+
+**Two visual languages for "what the player sees in a moment":**
+
+| Visual language | Phase | Asserts | When it fires |
+|---|---|---|---|
+| Photoreal 1st-person FLUX still | 3a (deferred) | "this is what your character is seeing right now" | Major events (start, heavy actions, death, fade) |
+| Stylized silhouette 3D diorama | 3b (in scope) | "this is how your character remembers what happened" | High-significance decisions (≥0.85) |
+
+The two are **not redundant.** A finished CHRONOS would have both — the photoreal still is the witnessing frame; the diorama is the recollection frame. Phase 3b ships first because diorama composes more cleanly with the manuscript's existing rhythm and earns its weight at lower technical risk (no GPU image gen, no asset pipeline, all geometry procedural in Three.js). Phase 3a stays deferred but designed.
+
+See [manuscript-as-artifact.md](manuscript-as-artifact.md) and [simulation-and-world.md](simulation-and-world.md) for the manuscript/pinboard and map sides.
 
 ## First-person POV is mandatory
 

@@ -403,6 +403,11 @@ function enterGame() {
       ChronosPinboard.show(runId);
       ChronosPinboard.restore(state.pins || [], state.pin_connections || []);
     }
+    // Phase 3b: restore any dioramas this run has earned. They were
+    // persisted on state.dioramas; the renderer mounts them inline
+    // between turn-blocks at the same source_turn_id where they
+    // originally fired.
+    _restoreDioramasFromState(state);
   } else {
     if (turnsContainer) turnsContainer.innerHTML = "";
     if (runId && (isOldFormat || isPoisoned)) {
@@ -441,6 +446,9 @@ function enterGame() {
       ChronosPinboard.show(runId);
       ChronosPinboard.restore(state.pins || [], state.pin_connections || []);
     }
+    // Phase 3b: fresh runs start with no dioramas. The first major
+    // turn (significance >= 0.85) will mint one via the trigger in
+    // submitTurn / renderTurnStaggered. No restore needed here.
   }
 
   if (state.run_status === "dead_observing") {
@@ -1102,6 +1110,28 @@ async function submitTurn(text) {
       }
     }
 
+    // Phase 3b: when a turn fires with significance >= 0.85, mint a
+    // diorama and inset it inline in the manuscript. The threshold
+    // gate is double-checked server-side; the frontend just doesn't
+    // bother POSTing for clearly-low-significance turns. Best-effort
+    // -- never blocks the turn, never throws.
+    try {
+      const sig = parseFloat(
+        (data && data.parsed_action && data.parsed_action.significance_score) || 0
+      );
+      if (sig >= 0.85 && block && block.id) {
+        // Fire-and-forget; the inset appears whenever the LLM
+        // returns. We don't want to await the LLM call here because
+        // it can take several seconds and we're already past the
+        // "turn just rendered" moment.
+        _maybeMountDioramaForTurn(block.id).catch((err) => {
+          console.warn("[app] diorama mount failed:", err);
+        });
+      }
+    } catch (e) {
+      console.warn("[app] diorama trigger failed:", e);
+    }
+
     if (data.death) {
       showDeathMarker(data.death.cause);
       enterObservationMode();
@@ -1680,6 +1710,87 @@ function _maybeShowDepthHint() {
   const ms = document.getElementById("manuscript");
   if (ms) ms.addEventListener("scroll", dismiss, { once: true, passive: true });
   document.addEventListener("pointerdown", dismiss, { once: true });
+}
+
+// ── Phase 3b: diorama orchestration ────────────────────────────────────
+//
+// These helpers POST to /api/run/{id}/diorama/{turn_id}, mount the
+// returned spec via ChronosDiorama.mount(), and persist the result
+// inline in #turns-container as a <div class="diorama-inset"> right
+// after the turn-block. On reload, the manuscript regenerates the
+// dioramas from state.dioramas (no LLM cost; idempotent at the
+// backend).
+
+async function _maybeMountDioramaForTurn(turnId) {
+  if (!turnId || !runId) return;
+  if (typeof ChronosDiorama === "undefined") return;
+  // Skip if there's already an inset for this turn.
+  if (document.querySelector(
+    '.diorama-inset[data-source-turn="' + turnId.replace(/"/g, "") + '"]',
+  )) return;
+  try {
+    const res = await fetch("/api/run/" + runId + "/diorama/" + encodeURIComponent(turnId), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    });
+    if (res.status === 422) {
+      // Below threshold according to the server. Silent.
+      return;
+    }
+    if (res.status === 402) {
+      // Hard cost cap. Silent here; the cost banner already covers
+      // the user-facing message.
+      return;
+    }
+    if (!res.ok) {
+      console.warn("[app] /diorama/" + turnId + " returned", res.status);
+      return;
+    }
+    const body = await res.json();
+    if (!body || !body.diorama) return;
+    _mountDioramaInline(body.diorama);
+  } catch (err) {
+    console.warn("[app] /diorama POST error:", err);
+  }
+}
+
+function _mountDioramaInline(diorama) {
+  if (!diorama || !diorama.source_turn_id) return;
+  if (typeof ChronosDiorama === "undefined") return;
+  const turnEl = document.getElementById(diorama.source_turn_id);
+  if (!turnEl) return;
+  // Idempotent: skip if an inset already exists for this turn.
+  const existing = turnEl.parentNode &&
+    turnEl.parentNode.querySelector(
+      '.diorama-inset[data-source-turn="' + diorama.source_turn_id.replace(/"/g, "") + '"]',
+    );
+  if (existing) return;
+  const inset = document.createElement("div");
+  inset.className = "diorama-inset";
+  inset.dataset.sourceTurn = diorama.source_turn_id;
+  // Optional summary (alt-text) -- shown as a small caption below the
+  // canvas. Hidden if empty.
+  if (diorama.summary) {
+    const cap = document.createElement("div");
+    cap.className = "diorama-caption";
+    cap.textContent = diorama.summary;
+    inset.appendChild(cap);
+  }
+  // Insert AFTER the turn-block so the diorama follows the turn it
+  // belongs to in scroll order.
+  turnEl.parentNode.insertBefore(inset, turnEl.nextSibling);
+  // Mount the WebGL scene. ChronosDiorama appends a <canvas> as the
+  // first child of `inset`.
+  ChronosDiorama.mount(inset, diorama);
+}
+
+function _restoreDioramasFromState(state) {
+  if (!state || !Array.isArray(state.dioramas)) return;
+  state.dioramas.forEach((d) => {
+    try { _mountDioramaInline(d); } catch (e) {
+      console.warn("[app] restore diorama failed:", e);
+    }
+  });
 }
 
 function applyDepthLayering() {

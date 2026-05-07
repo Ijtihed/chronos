@@ -3263,3 +3263,92 @@ body.is-dead #pinboard-panel {
   color: rgba(255, 255, 255, 0.20);
   text-align: right;
 }
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+ * PHASE 3b -- Diorama insets
+ * ═══════════════════════════════════════════════════════════════════════
+ *
+ * Stylized 3D vignettes inset in the manuscript when a major turn fires
+ * (significance >= 0.85). The inset is a fixed-height block inside the
+ * manuscript scroll, with a Three.js canvas filling it. Cursor is grab
+ * by default (drag to orbit); the renderer flips it to grabbing during
+ * a drag.
+ *
+ * The metaphor is "memory glued in" -- a printed engraving in a book.
+ * The chrome is therefore minimal: a thin amber line above and below,
+ * a faint amber glow, and a small italic caption.
+ *
+ * Lives between turn-blocks in the manuscript scroll. See app.js
+ * _mountDioramaInline.
+ * ─────────────────────────────────────────────────────────────────── */
+
+.diorama-inset {
+  /* Block-level, full reading column width. The manuscript-inner
+   * container constrains width via the manuscript-column class.
+   * Default 250px tall: tall enough to read silhouettes, short
+   * enough not to dominate the manuscript. */
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 250px;
+  margin: 28px 0 36px 0;
+  border-top: 1px solid rgba(255, 179, 122, 0.22);
+  border-bottom: 1px solid rgba(255, 179, 122, 0.22);
+  background: rgba(8, 6, 4, 0.85);
+  overflow: hidden;
+  box-shadow:
+    0 0 0 1px rgba(255, 179, 122, 0.08) inset,
+    0 6px 24px rgba(0, 0, 0, 0.45);
+  /* Smooth fade-in when first mounted. The renderer's first frame
+   * arrives ~50ms after mount; the keyframe matches that beat. */
+  animation: dioramaFadeIn 0.65s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+  user-select: none;
+}
+
+@keyframes dioramaFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+    filter: blur(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+/* The canvas inside the inset is appended by ChronosDiorama.mount.
+ * Force display:block so the inset doesn't get phantom inline-block
+ * spacing under it. */
+.diorama-inset canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Caption: small italic alt-text below the canvas. Positioned absolute
+ * so it overlays the bottom of the canvas without changing layout. */
+.diorama-inset .diorama-caption {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 8px;
+  z-index: 2;
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: 13px;
+  font-style: italic;
+  color: rgba(255, 179, 122, 0.65);
+  text-align: center;
+  letter-spacing: 0.02em;
+  pointer-events: none;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.85);
+}
+
+/* Observation mode mutes the diorama with the same filter as the
+ * manuscript and pinboard. */
+body.is-dead .diorama-inset {
+  filter: contrast(0.85) brightness(0.7) saturate(0.7);
+}
+
