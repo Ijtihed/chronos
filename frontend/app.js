@@ -76,11 +76,11 @@ function hideTutorial() {
   if (!flat) {
     document.body.classList.add("chronos-stacked-manuscript");
     document.body.classList.add("chronos-globe-default");
-    // Phase 2.8: corridor manuscript replaces the depth-stack as the
-    // primary view. The depth-stack class above stays set for the
-    // ?flat=1 fallback path; with chronos-corridor-manuscript on,
-    // CSS hides #manuscript so the depth-stack is never seen.
-    document.body.classList.add("chronos-corridor-manuscript");
+    // Phase 2.9 (2026-05-07): the 3D corridor manuscript was deleted.
+    // chronos-stacked-manuscript above remains (it's the depth-stack
+    // recession metaphor on the legacy 2D manuscript -- past turns
+    // recede into z-space as new turns land). Pinboard runs as a
+    // separate panel rendered by pinboard.js.
   }
 })();
 
@@ -396,22 +396,12 @@ function enterGame() {
     applyMemoryDecay();
     applyDepthLayering();
     _wireDecayHoverAll();
-    // Phase 2.8: hand the restored .turn-block elements to the
-    // corridor so they get placed along the board. New turns
-    // submitted after restore will have full edges. board_state
-    // (saved drag positions) and cut_threads (saved severed edges)
-    // are applied BEFORE the cards are added so each card lands at
-    // its saved override and severed threads render severed on
-    // first paint.
-    if (typeof ChronosCorridor !== "undefined") {
-      if (state && (state.board_state || state.cut_threads)) {
-        ChronosCorridor.applyBoardOverrides(
-          state.board_state,
-          state.cut_threads,
-        );
-      }
-      ChronosCorridor.show(runId);
-      ChronosCorridor.restoreFromContainer();
+    // Phase 2.9: restore the player's pinboard state. Pins and their
+    // connections are persisted server-side; the frontend renders
+    // them into the right-hand panel.
+    if (typeof ChronosPinboard !== "undefined" && state) {
+      ChronosPinboard.show(runId);
+      ChronosPinboard.restore(state.pins || [], state.pin_connections || []);
     }
   } else {
     if (turnsContainer) turnsContainer.innerHTML = "";
@@ -444,21 +434,12 @@ function enterGame() {
     // Show the depth-discovery hint once per browser. Disappears the
     // moment the player scrolls or hovers a turn-block.
     _maybeShowDepthHint();
-    // Phase 2.8: register the freshly-built intro card with the
-    // corridor and bring it on-screen. apply board_state overrides
-    // and cut_threads first so the intro lands at its saved position
-    // and any prior-cut edges render severed if the player had
-    // dragged or cut on a previous visit.
-    if (typeof ChronosCorridor !== "undefined") {
-      if (state && (state.board_state || state.cut_threads)) {
-        ChronosCorridor.applyBoardOverrides(
-          state.board_state,
-          state.cut_threads,
-        );
-      }
-      ChronosCorridor.show(runId);
-      const intro = turnsContainer.querySelector(".manuscript-intro");
-      if (intro) ChronosCorridor.addIntroCard(intro);
+    // Phase 2.9: bring the pinboard panel up alongside the manuscript.
+    // Fresh runs start with no pins; the panel appears empty and
+    // waits for the player to highlight text in the manuscript.
+    if (typeof ChronosPinboard !== "undefined" && state) {
+      ChronosPinboard.show(runId);
+      ChronosPinboard.restore(state.pins || [], state.pin_connections || []);
     }
   }
 
@@ -829,22 +810,10 @@ function updateClock() {
 (function initZoomToggle() {
   document.addEventListener("keydown", (e) => {
     if (e.key !== "z" && e.key !== "Z") return;
-    // Don't hijack when typing
     const a = document.activeElement;
     if (a && (a.tagName === "INPUT" || a.tagName === "TEXTAREA" ||
               a.isContentEditable)) return;
     if (e.metaKey || e.ctrlKey || e.altKey) return;
-    // Phase 2.8: when the corridor is the active manuscript view,
-    // Z toggles the constellation overview (camera pulled back above
-    // the path) instead of the legacy zoomed-out scroll.
-    if (
-      typeof ChronosCorridor !== "undefined" &&
-      ChronosCorridor.isVisible() &&
-      document.body.classList.contains("chronos-corridor-manuscript")
-    ) {
-      ChronosCorridor.toggleConstellation();
-      return;
-    }
     const ms = document.getElementById("manuscript");
     if (!ms) return;
     ms.classList.toggle("zoomed-out");
@@ -1073,16 +1042,6 @@ async function submitTurn(text) {
   // flat intro for 5-30s while the spinner runs and conclude the 3D
   // isn't working at all.
   applyDepthLayering();
-
-  // Phase 2.8: route the in-flight block into the corridor. The block
-  // is now in #turns-container; addTurn moves it to #corridor-cards
-  // and registers it in the 3D scene at the next path position.
-  // turnData is null at this point (we don't have parsed_action yet);
-  // notifyTurnComplete will fill it in after /turn returns.
-  if (typeof ChronosCorridor !== "undefined") {
-    if (!ChronosCorridor.isVisible()) ChronosCorridor.show();
-    ChronosCorridor.addTurn(block, null);
-  }
 
   // Phase 2.7: race the inner thought against /turn. Kick off
   // immediately, render in the slot as soon as it arrives. Failure is
@@ -1448,14 +1407,6 @@ async function renderTurnStaggered(el, playerText, data) {
   el.innerHTML = playerLineHtml + thoughtHtml + h;
   el.scrollIntoView({ behavior: "smooth" });
 
-  // Phase 2.8: hand full turn data to the corridor so it can compute
-  // significance, register connection edges (action -> NPC reaction,
-  // action -> divergence, NPC <-> NPC), and update the card's tier
-  // styling. Idempotent if already added by submitTurn.
-  if (typeof ChronosCorridor !== "undefined") {
-    ChronosCorridor.notifyTurnComplete(el, data);
-  }
-
   for (let i = 0; i < npcIds.length; i++) {
     const { id, internal } = npcIds[i];
     const npcEl = document.getElementById(id);
@@ -1719,14 +1670,6 @@ function _maybeShowDepthHint() {
 
 function applyDepthLayering() {
   const enabled = document.body.classList.contains("chronos-stacked-manuscript");
-  // Phase 2.8: when the corridor manuscript is the active view, the
-  // depth-stack inline transforms would FIGHT the corridor's per-frame
-  // projection writes. Skip applyDepthLayering's transform writes when
-  // corridor is on. The function still runs (so data-has-turn etc.
-  // gets toggled), but the transform-setting branch is muted.
-  const corridorActive =
-    document.body.classList.contains("chronos-corridor-manuscript") &&
-    typeof ChronosCorridor !== "undefined";
 
   // Force the 3D context onto the inner element directly via inline
   // style. Three previous attempts via stylesheet rules failed for
@@ -1735,27 +1678,20 @@ function applyDepthLayering() {
   // stylesheet rule short of !important, and nothing in the cascade
   // sets these with !important. This is the belt-and-suspenders fix.
   const inner = document.getElementById("manuscript-inner");
-  if (inner && enabled && !corridorActive) {
+  if (inner && enabled) {
     inner.style.perspective = "1400px";
     inner.style.perspectiveOrigin = "50% 30%";
     inner.style.transformStyle = "preserve-3d";
   }
   const tc = document.getElementById("turns-container");
-  if (tc && enabled && !corridorActive) {
+  if (tc && enabled) {
     tc.style.transformStyle = "preserve-3d";
   }
 
   const blocks = document.querySelectorAll(".turn-block");
   const total = blocks.length;
-  // Mark the container the first time any real turn-block exists so
-  // the intro block recedes. We also force the intro recede via
-  // INLINE style here -- belt-and-suspenders for the same reason
-  // applyDepthLayering is now setting transforms directly on blocks.
   if (tc) {
-    // The intro might have been moved into #corridor-cards by the
-    // corridor; scope our query so we don't set styles on the corridor's
-    // copy.
-    const intro = corridorActive ? null : tc.querySelector(".manuscript-intro");
+    const intro = tc.querySelector(".manuscript-intro");
     if (total > 0) {
       tc.setAttribute("data-has-turn", "1");
       if (intro) {
@@ -1854,18 +1790,18 @@ window.chronosDiag = function chronosDiag() {
       ChronosWarTable_kind: typeof ChronosWarTable === "undefined"
         ? "undefined"
         : (ChronosWarTable.show ? "object" : typeof ChronosWarTable),
-      ChronosCorridor_kind: typeof ChronosCorridor === "undefined"
+      ChronosPinboard_kind: typeof ChronosPinboard === "undefined"
         ? "undefined"
-        : (ChronosCorridor.show ? "object" : typeof ChronosCorridor),
+        : (ChronosPinboard.show ? "object" : typeof ChronosPinboard),
       // state, runId, eraKey are module-scope `let`s, not on window.
       // We poke the closure references directly here.
       state_loaded: !!state,
       runId_loaded: !!runId,
       eraKey_loaded: !!eraKey,
     },
-    corridor: typeof ChronosCorridor === "undefined" || !ChronosCorridor.getDiag
+    pinboard: typeof ChronosPinboard === "undefined" || !ChronosPinboard.getDiag
       ? "(unavailable)"
-      : ChronosCorridor.getDiag(),
+      : ChronosPinboard.getDiag(),
     manuscript_inner_perspective: innerCS ? innerCS.perspective : "(no element)",
     manuscript_inner_transform_style: innerCS ? innerCS.transformStyle : "(no element)",
     turns_container_has_data: tc ? tc.getAttribute("data-has-turn") : "(no element)",
@@ -2456,14 +2392,6 @@ async function executeSkip(ticks) {
     `<div class="turn-spinner"><div class="turn-spinner-ring"></div><span class="streaming-dots">\u00b7 \u00b7 \u00b7</span></div>`;
   turnsContainer.appendChild(block);
   block.scrollIntoView({ behavior: "smooth" });
-
-  // Phase 2.8: a time-skip block also lands as a card in the corridor.
-  // No connection edges (skip has no parsed_action / npc_responses);
-  // it just shows up as a "time passes" marker along the path.
-  if (typeof ChronosCorridor !== "undefined") {
-    if (!ChronosCorridor.isVisible()) ChronosCorridor.show();
-    ChronosCorridor.addTurn(block, null);
-  }
 
   try {
     const res = await fetch(`/api/run/${runId}/skip`, {

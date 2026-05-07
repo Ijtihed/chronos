@@ -11,6 +11,7 @@ import asyncio
 import json
 import logging
 import math
+import time
 from collections import defaultdict
 from pathlib import Path
 from string import Template
@@ -68,7 +69,12 @@ from backend.world_engine import (
     simulate_turn,
 )
 from backend.world_state import (
+    PIN_CONNECTION_KINDS,
+    PIN_SOURCE_CONFIDENCES,
     Event,
+    Pin,
+    PinConnection,
+    PinSourceOffset,
     ScheduledConsequence,
     WorldState,
     apply_action,
@@ -77,6 +83,7 @@ from backend.world_state import (
     get_player_location,
     npcs_near_player,
 )
+from backend.pin_classifier import classify_pin_source
 
 logger = logging.getLogger("chronos")
 
@@ -409,81 +416,232 @@ async def take_turn(run_id: str, req: TurnRequest):
         return await _execute_turn(run_id, req)
 
 
-# Phase 2.8 — manuscript detective board persistence.
-#
-# The frontend computes deterministic INITIAL positions for every page
-# from (turn_idx, NPCs, location). When the player drags a page on the
-# board, the frontend sends a full snapshot of the current
-# board_state to this endpoint. We sanitize, replace state.board_state
-# wholesale, and save. No turn log entry (board edits are not
-# simulation events). Empty payload is valid (player resetting the
-# board to defaults).
-#
-# Why a full-snapshot replace instead of a partial update: simpler
-# protocol, the payload is tiny (~30 turns x 3 floats x JSON overhead
-# = ~2KB), and it eliminates any drift between client and server
-# views of the board. The client is authoritative for layout.
-class BoardUpdateRequest(BaseModel):
-    # Phase 2.8: both fields are optional so a partial update can change
-    # one without clobbering the other. The frontend may want to persist
-    # a fresh cut without re-sending all positions, or vice versa. When
-    # a field is None (or absent), the server leaves the existing
-    # state.<field> untouched.
-    board_state: dict[str, dict[str, float]] | None = None
-    cut_threads: list[str] | None = None
-
-
+# Phase 2.9 (2026-05-07): the 3D corridor manuscript and its
+# /api/run/{id}/board endpoint were deleted. They are replaced by the
+# 2D pinboard. The /board endpoint is intentionally retained for ONE
+# release as a 410 Gone shim so any in-flight frontend that still
+# tries to POST a board snapshot fails loudly with a clear message
+# instead of mysteriously appearing to succeed. Remove this shim
+# after one release if no client logs reference it.
 @app.post("/api/run/{run_id}/board")
-async def update_board(run_id: str, req: BoardUpdateRequest):
+async def update_board_gone(run_id: str):  # noqa: ARG001
+    raise HTTPException(
+        status_code=410,
+        detail=(
+            "The /board endpoint was removed when the 3D corridor manuscript "
+            "was deleted. Use POST /api/run/{run_id}/pinboard or "
+            "POST /api/run/{run_id}/pin instead. See "
+            "context/game logic context/manuscript-as-artifact.md."
+        ),
+    )
+
+
+# Phase 2.9 — Pinboard persistence.
+#
+# Two endpoints serve the pinboard:
+#
+#   POST /api/run/{id}/pin       — creates a single new pin.
+#                                  Server classifies source_confidence
+#                                  by reading the turn-log row for
+#                                  source_turn_id (player-perspective).
+#                                  Returns the full Pin object so the
+#                                  frontend can render it immediately.
+#
+#   POST /api/run/{id}/pinboard  — bulk-update pins and/or
+#                                  pin_connections. Both fields
+#                                  optional; partial-update semantics
+#                                  preserve whichever side is not sent.
+#                                  Used by the frontend for drag
+#                                  position updates and connection
+#                                  add/cut events.
+#
+# Sanitization caps: 200 pins per run, 1000 connections per run. Pin
+# text capped at 4000 chars (a long paragraph). Position clamped to
+# [-50000, 50000] to keep absurd numbers out of the JSON blob without
+# pinning the frontend to a particular coordinate scheme.
+
+class PinCreateRequest(BaseModel):
+    text: str
+    source_turn_id: str = ""
+    source_offset_start: int = 0
+    source_offset_end: int = 0
+    # Initial position on the panel. The frontend computes a default
+    # if the player hasn't dragged the pin yet.
+    x: float = 0.0
+    y: float = 0.0
+
+
+@app.post("/api/run/{run_id}/pin")
+async def create_pin(run_id: str, req: PinCreateRequest):
+    text = (req.text or "").strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="text is required")
+    if len(text) > 4000:
+        text = text[:4000]
+
     async with _session_locks[run_id]:
         state = await _load_or_404(run_id)
+        if len(state.pins or []) >= 200:
+            raise HTTPException(
+                status_code=400,
+                detail="pinboard is full (200 pin cap)",
+            )
 
-        # board_state replace (when sent). Sanitize: drop non-finite
-        # coords, cap dict size, clamp to a sane bbox.
-        if req.board_state is not None:
-            cleaned: dict[str, dict[str, float]] = {}
-            for key, pos in req.board_state.items():
-                if not isinstance(key, str):
-                    continue
-                if len(cleaned) >= 200:
-                    break
-                if not isinstance(pos, dict):
-                    continue
-                x, y, z = pos.get("x"), pos.get("y"), pos.get("z")
-                if not all(
-                    isinstance(v, (int, float)) and math.isfinite(v)
-                    for v in (x, y, z)
-                ):
-                    continue
-                cleaned[key] = {
-                    "x": max(-50.0, min(50.0, float(x))),
-                    "y": max(-50.0, min(50.0, float(y))),
-                    "z": max(-100.0, min(200.0, float(z))),
-                }
-            state.board_state = cleaned
+        # Classify outside the obvious code paths -- if the lookup fails
+        # for any reason we still write the pin with the conservative
+        # default ("inferred"), so the player never loses a pin to a
+        # transient lookup error.
+        try:
+            confidence, attribution = await classify_pin_source(
+                text=text,
+                run_id=run_id,
+                source_turn_id=req.source_turn_id or "",
+            )
+        except Exception:
+            confidence, attribution = "inferred", ""
 
-        # cut_threads replace (when sent). Sanitize: strings only, dedup,
-        # cap key length at 200 chars, cap list at 500 entries.
-        if req.cut_threads is not None:
-            seen: set[str] = set()
-            cleaned_cuts: list[str] = []
-            for k in req.cut_threads:
-                if not isinstance(k, str):
-                    continue
-                k = k[:200]
-                if k in seen:
-                    continue
-                if len(cleaned_cuts) >= 500:
-                    break
-                seen.add(k)
-                cleaned_cuts.append(k)
-            state.cut_threads = cleaned_cuts
+        if confidence not in PIN_SOURCE_CONFIDENCES:
+            confidence = "inferred"
 
+        x = float(req.x) if math.isfinite(req.x) else 0.0
+        y = float(req.y) if math.isfinite(req.y) else 0.0
+        x = max(-50000.0, min(50000.0, x))
+        y = max(-50000.0, min(50000.0, y))
+
+        pin = Pin(
+            text=text,
+            x=x,
+            y=y,
+            source_turn_id=(req.source_turn_id or "")[:200],
+            source_offset=PinSourceOffset(
+                start=max(0, min(int(req.source_offset_start or 0), 1_000_000)),
+                end=max(0, min(int(req.source_offset_end or 0), 1_000_000)),
+            ),
+            source_confidence=confidence,
+            source_attribution=(attribution or "")[:200],
+            created_at=time.time(),
+        )
+        state.pins = list(state.pins or []) + [pin]
+        await save_session(state)
+        return {"saved": True, "pin": pin.model_dump()}
+
+
+class PinPositionUpdate(BaseModel):
+    id: str
+    x: float
+    y: float
+
+
+class PinConnectionUpdate(BaseModel):
+    id: str = ""
+    from_pin_id: str
+    to_pin_id: str
+    kind: str = "player"
+    cut: bool = False
+    label: str = ""
+
+
+class PinboardUpdateRequest(BaseModel):
+    # Both optional with partial-update semantics. Frontend may send
+    # only a position update from a drag, only a new connection from
+    # a connect-action, only a cut, etc.
+    pin_positions: list[PinPositionUpdate] | None = None
+    delete_pin_ids: list[str] | None = None
+    pin_connections: list[PinConnectionUpdate] | None = None
+    # Convenience: setting cut=true on existing connections by id.
+    cut_connection_ids: list[str] | None = None
+
+
+@app.post("/api/run/{run_id}/pinboard")
+async def update_pinboard(run_id: str, req: PinboardUpdateRequest):
+    async with _session_locks[run_id]:
+        state = await _load_or_404(run_id)
+        pins = list(state.pins or [])
+        connections = list(state.pin_connections or [])
+
+        # ── Pin position updates ─────────────────────────────────────
+        if req.pin_positions is not None:
+            by_id = {p.id: p for p in pins}
+            for upd in req.pin_positions[:200]:  # cap incoming entries
+                if not isinstance(upd.id, str):
+                    continue
+                target = by_id.get(upd.id)
+                if target is None:
+                    continue
+                if not math.isfinite(upd.x) or not math.isfinite(upd.y):
+                    continue
+                target.x = max(-50000.0, min(50000.0, float(upd.x)))
+                target.y = max(-50000.0, min(50000.0, float(upd.y)))
+
+        # ── Pin deletions ────────────────────────────────────────────
+        if req.delete_pin_ids is not None:
+            doomed = set(req.delete_pin_ids[:200])
+            pins = [p for p in pins if p.id not in doomed]
+            # Connections that reference a deleted pin become orphans;
+            # drop them so the client never tries to render an arrow
+            # to a missing endpoint.
+            connections = [
+                c for c in connections
+                if c.from_pin_id not in doomed and c.to_pin_id not in doomed
+            ]
+
+        # ── Connection upserts ───────────────────────────────────────
+        if req.pin_connections is not None:
+            by_id = {c.id: c for c in connections}
+            seen_pair: set[tuple[str, str]] = {
+                (c.from_pin_id, c.to_pin_id) for c in connections
+            }
+            valid_pin_ids = {p.id for p in pins}
+            for upd in req.pin_connections[:1000]:
+                fid = (upd.from_pin_id or "")[:200]
+                tid = (upd.to_pin_id or "")[:200]
+                if not fid or not tid or fid == tid:
+                    continue
+                if fid not in valid_pin_ids or tid not in valid_pin_ids:
+                    # Orphan reference; refuse rather than write a
+                    # connection that can never be rendered.
+                    continue
+                kind = upd.kind if upd.kind in PIN_CONNECTION_KINDS else "player"
+                if upd.id and upd.id in by_id:
+                    existing = by_id[upd.id]
+                    existing.kind = kind
+                    existing.cut = bool(upd.cut)
+                    existing.label = (upd.label or "")[:200]
+                else:
+                    if (fid, tid) in seen_pair or (tid, fid) in seen_pair:
+                        # No duplicate edges in either direction.
+                        continue
+                    if len(connections) >= 1000:
+                        break
+                    new_kwargs = {
+                        "from_pin_id": fid,
+                        "to_pin_id": tid,
+                        "kind": kind,
+                        "cut": bool(upd.cut),
+                        "label": (upd.label or "")[:200],
+                    }
+                    # Honor a client-provided id only if it's a real
+                    # string; otherwise let Pydantic generate one.
+                    if upd.id:
+                        new_kwargs["id"] = upd.id[:200]
+                    connections.append(PinConnection(**new_kwargs))
+                    seen_pair.add((fid, tid))
+
+        # ── Mark cuts on existing connections by id ──────────────────
+        if req.cut_connection_ids is not None:
+            ids = set(req.cut_connection_ids[:1000])
+            for c in connections:
+                if c.id in ids:
+                    c.cut = True
+
+        state.pins = pins
+        state.pin_connections = connections
         await save_session(state)
         return {
             "saved": True,
-            "page_count": len(state.board_state or {}),
-            "cut_count": len(state.cut_threads or []),
+            "pin_count": len(pins),
+            "connection_count": len(connections),
+            "cut_count": sum(1 for c in connections if c.cut),
         }
 
 

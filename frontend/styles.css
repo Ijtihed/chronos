@@ -2899,306 +2899,231 @@ body.chronos-stacked-manuscript #turns-container[data-has-turn="1"] .manuscript-
  */
 #wartable-container.ready #wartable-loading,
 #map-container.ready #map-loading,
-#graph-container.ready #graph-loading,
-#corridor-container.ready #corridor-loading {
+#graph-container.ready #graph-loading {
   opacity: 0;
   pointer-events: none;
 }
 
 
 /* ═══════════════════════════════════════════════════════════════════════
- * PHASE 2.8 -- Corridor manuscript
+ * PHASE 2.9 -- Pinboard panel
  * ═══════════════════════════════════════════════════════════════════════
  *
- * The 3D corridor of past turns. Three.js renders connection lines on
- * a transparent canvas; turn-block DOM elements are projected onto the
- * canvas each frame by corridor.js _projectCards() and positioned via
- * inline transform: translate3d. This file styles the cards, the NPC
- * nodes, and the divergence markers; manages visibility of the
- * #corridor-container vs the legacy #manuscript via the body class.
+ * Right-side panel that lives next to the legacy scrollable manuscript.
+ * The player highlights text in the manuscript and pins it here as a
+ * card. Pins are draggable, connectable (click-A then click-B), and
+ * cuttable (click any connection line).
  *
- * Activation: body.chronos-corridor-manuscript (default on, ?flat=1
- * disables). When the body class is on:
- *   - #corridor-container is visible (its own .hidden controls show/hide)
- *   - #manuscript is HIDDEN (the legacy vertical scroll)
- * When the body class is off:
- *   - #corridor-container is hidden
- *   - #manuscript is visible
+ * Layout: index.html sets #manuscript width:60% and #pinboard-panel
+ * fixed right:0 width:40% top:10 (under the chrome handle) bottom:14
+ * (above the bottom bar). All pin coordinates are stored relative to
+ * the surface element's top-left.
+ *
+ * Source confidence (player-perspective): each pin's border style
+ * communicates how the character knew about the pinned passage.
+ *   solid    = observed   (first-person witness)
+ *   dashed   = told_by    (NPC dialogue)
+ *   dotted   = rumor      (overheard / ambient)
+ *   faint    = inferred   (default fallback / atmosphere)
+ *
+ * See manuscript-as-artifact.md Phase 2.9.
  * ─────────────────────────────────────────────────────────────────── */
 
-body.chronos-corridor-manuscript #manuscript {
-  display: none !important;
+#pinboard-panel {
+  /* Pinboard tints slightly when the player is dead, matching the
+   * manuscript's observation-muted treatment. */
 }
-body:not(.chronos-corridor-manuscript) #corridor-container {
-  display: none !important;
-}
-
-/* The container is full-bleed below the top bar.                       */
-#corridor-container {
-  z-index: 8; /* above the ground/vignette but below modal overlays */
+body.is-dead #pinboard-panel {
+  filter: contrast(0.85) brightness(0.7) saturate(0.7);
 }
 
-/* The card layer sits inside the container, transparent, with cards
- * positioned absolutely by corridor.js. perspective is set inline by
- * corridor.js init() too -- belt-and-suspenders so a stylesheet drift
- * doesn't break the depth. */
-#corridor-cards {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
+#pinboard-empty {
+  transition: opacity 0.35s ease;
 }
-
-/* Each turn-block, once moved into the corridor, becomes a .corridor-
- * card. The transform is set inline every frame by _projectCards;
- * everything else (size, padding, typography, decay, hover-recover,
- * inner-thought slot, NPC stagger blocks) inherits from the existing
- * Pass 1-7 rules. This file just adds the corridor-specific
- * presentation: card chrome, tier-based size/glow, hover lift.
- *
- * Width is constrained so cards don't span the whole viewport at
- * close range -- they're MEANT to be readable as discrete pages.
- */
-.corridor-card {
-  /* Phase 2.8 v3: pages, not cards. Wider + taller so each turn
-   * reads as a full readable page on a detective board. The 540px
-   * corridor card was a compromise between "card" and "page";
-   * commit to page. min/max-height let long turns expand within
-   * a sane band before clipping (rare in practice). */
-  width: 440px;
-  max-width: 460px;
-  min-height: 480px;
-  max-height: 720px;
-  overflow: hidden;
-  background: rgba(8, 8, 10, 0.82);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 6px;
-  padding: 24px 28px;
-  backdrop-filter: blur(6px);
-  box-shadow: 0 18px 64px rgba(0, 0, 0, 0.55);
-  /* Player can pick up any page and drag it to a new spot on the
-   * board. corridor.js wires per-card pointerdown -> pointermove
-   * (document-level) -> pointerup which raycasts a horizontal plane
-   * at the card's y to compute the world position. */
-  cursor: grab;
-  /* Don't transition transform -- corridor.js writes it inline every
-   * frame. Transitioning would lag every redraw by 50ms. Filter and
-   * opacity are fine to ease. */
-  will-change: transform, opacity;
-}
-
-/* Active drag state -- emphasizes the page being dragged and pins
- * it above all other DOM in the overlay so it never gets occluded
- * mid-drag. */
-.corridor-card.is-dragging {
-  cursor: grabbing;
-  z-index: 99999 !important;
-  filter: brightness(1.12);
-  box-shadow:
-    0 0 0 2px rgba(110, 231, 183, 0.18),
-    0 22px 80px rgba(0, 0, 0, 0.7);
-}
-
-/* Tier-based emphasis. The tier is set as data-significance-tier by
- * corridor.js addTurn() based on parsed_action.significance_score.
- * Decisions get a subtle warm-amber rim and a faint inset glow so
- * they read as "important nodes" in the corridor at a glance. Filler
- * gets desaturated/dimmer chrome so it visually recedes even when at
- * the same camera distance.
- */
-.corridor-card[data-significance-tier="decision"] {
-  border-color: rgba(252, 211, 77, 0.32);
-  box-shadow:
-    0 0 0 1px rgba(252, 211, 77, 0.12) inset,
-    0 22px 80px rgba(0, 0, 0, 0.55),
-    0 0 36px rgba(252, 211, 77, 0.06);
-  background: rgba(14, 12, 8, 0.82);
-}
-.corridor-card[data-significance-tier="filler"] {
-  border-color: rgba(255, 255, 255, 0.04);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
-  background: rgba(6, 6, 8, 0.72);
-}
-
-/* The most recent turn carries .is-current. Bumped border + a faint
- * cool-emerald accent so the player can see at a glance "this is the
- * present." Removed when a newer turn is added. */
-.corridor-card.is-current {
-  border-color: rgba(110, 231, 183, 0.28);
-  box-shadow:
-    0 0 0 1px rgba(110, 231, 183, 0.12) inset,
-    0 22px 80px rgba(0, 0, 0, 0.55),
-    0 0 32px rgba(110, 231, 183, 0.05);
-}
-
-/* Hover lifts the card forward. We can't translateZ (transform is
- * being driven by corridor.js inline each frame), but we CAN bump
- * opacity, brightness, and add a subtle scale animation. The existing
- * .recovering class still composes here -- hovering also recovers
- * any decayed words. corridor.js sets pointer-events:auto on cards
- * within reading range; this rule fires when hover is possible. */
-.corridor-card:hover {
-  filter: brightness(1.18);
-  border-color: rgba(255, 255, 255, 0.18);
-  z-index: 99999 !important;
-}
-
-/* The intro card -- anchored at the deepest point of the corridor,
- * marks "where the run started." Slightly larger and warmer.        */
-.corridor-card.corridor-card-intro {
-  width: 560px;
-  background: rgba(12, 10, 6, 0.82);
-  border-color: rgba(202, 138, 4, 0.18);
-  box-shadow:
-    0 0 0 1px rgba(202, 138, 4, 0.10) inset,
-    0 22px 80px rgba(0, 0, 0, 0.55);
-}
-
-/* NPC nodes -- small text labels off to the side of the path. Each
- * unique NPC gets one node that lives in the corridor and is the
- * target of action -> NPC connection lines.                         */
-.corridor-npc-node {
-  font-family: 'JetBrains Mono', ui-monospace, monospace;
-  background: rgba(0, 0, 0, 0.65);
-  border: 1px solid rgba(255, 255, 255, 0.10);
-  border-left-width: 2px;
-  border-left-color: rgba(161, 161, 170, 0.45);
-  border-radius: 4px;
-  padding: 6px 10px;
-  min-width: 110px;
-  backdrop-filter: blur(3px);
-  user-select: none;
-  white-space: nowrap;
-}
-.corridor-npc-node .cnn-name {
-  font-size: 11px;
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.85);
-  letter-spacing: 0.02em;
-}
-.corridor-npc-node .cnn-role {
-  font-size: 9px;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: rgba(255, 255, 255, 0.4);
-  margin-top: 2px;
-}
-
-/* Divergence anchor markers -- the off-path target of dashed amber
- * connection lines. "DIVERGENCE" label + a one-line snippet of the
- * canonical event the player superseded.                            */
-.corridor-divergence-marker {
-  font-family: 'JetBrains Mono', ui-monospace, monospace;
-  background: rgba(35, 25, 0, 0.72);
-  border: 1px dashed rgba(252, 211, 77, 0.45);
-  border-radius: 4px;
-  padding: 8px 12px;
-  max-width: 260px;
-  backdrop-filter: blur(3px);
-  user-select: none;
-}
-.corridor-divergence-marker .cdm-label {
-  font-size: 9px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.18em;
-  color: rgba(252, 211, 77, 0.7);
-  margin-bottom: 4px;
-}
-.corridor-divergence-marker .cdm-text {
-  font-size: 10px;
-  line-height: 1.45;
-  color: rgba(255, 255, 255, 0.65);
-}
-
-/* The hint banner ("WASD to walk...") fades after the player has
- * interacted with the corridor for the first time. corridor.js can
- * toggle a body class to hide it permanently per session. */
-#corridor-hint {
-  transition: opacity 0.6s ease;
-}
-body.chronos-corridor-hinted #corridor-hint {
+#pinboard-panel:not(.is-empty) #pinboard-empty {
   opacity: 0;
   pointer-events: none;
 }
 
-/* Observation mode tints the corridor exactly as it tints the legacy
- * manuscript. The .observation-muted filter is set on #manuscript by
- * enterObservationMode; we also apply it to #corridor-container. */
-body.is-dead #corridor-container {
-  filter: contrast(0.85) brightness(0.7) saturate(0.7);
-}
-
-/* ── Phase 2.8 strong-threads: hover tooltip + cut preview ─────────── *
- *
- * Threads on the manuscript board are now picked-able TubeGeometry
- * meshes. Hovering one shows a small floating tooltip near the
- * cursor with a templated explanation of what the connection is.
- * Clicking severs the thread and shows a longer "what would have
- * changed" preview note that auto-dismisses after 8s or on outside-
- * click.
- *
- * Both elements are appended to document.body (not the corridor
- * container) so they layer ABOVE all overlays and stay glued to
- * cursor coordinates without contending with the WebGL canvas's
- * stacking context.
- */
-#corridor-thread-tooltip {
-  position: fixed;
-  left: 0;
-  top: 0;
-  z-index: 9999;
-  background: rgba(10, 10, 10, 0.95);
+/* Pin cards. Absolutely positioned by JS; the JS writes
+ * left/top inline to drive the visual position. */
+.pin-card {
+  position: absolute;
+  width: 220px;
+  max-width: 260px;
+  background: rgba(12, 12, 14, 0.92);
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 6px;
-  padding: 10px 14px;
-  max-width: 320px;
-  font-family: 'JetBrains Mono', ui-monospace, monospace;
-  font-size: 12px;
-  line-height: 1.5;
-  color: #d4d4d8;
-  pointer-events: none;
-  display: none;
-  backdrop-filter: blur(8px);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
-  /* The tooltip is moved each frame via inline transform; the
-   * transform is what positions it relative to the cursor. */
-  will-change: transform;
-}
-
-.corridor-cut-preview {
-  position: fixed;
-  z-index: 9998;
-  background: rgba(35, 25, 0, 0.88);
-  border: 1px dashed rgba(252, 211, 77, 0.55);
-  border-radius: 4px;
-  padding: 10px 14px;
-  max-width: 280px;
+  padding: 10px 12px;
   font-family: 'JetBrains Mono', ui-monospace, monospace;
   font-size: 11px;
-  line-height: 1.55;
-  color: rgba(252, 211, 77, 0.92);
-  font-style: italic;
-  letter-spacing: 0.01em;
-  pointer-events: auto;
-  cursor: pointer;
+  line-height: 1.5;
+  color: rgba(229, 229, 234, 0.9);
+  cursor: grab;
+  user-select: none;
   backdrop-filter: blur(6px);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.7);
-  animation: corridorCutPreviewIn 0.32s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  z-index: 2;
+  transition: box-shadow 0.18s ease, border-color 0.18s ease, transform 0.12s ease;
+  /* Long passages get clipped with an ellipsis; the full text is
+   * available on hover via title attribute. */
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
-.corridor-cut-preview:hover {
-  background: rgba(45, 35, 5, 0.95);
+.pin-card:hover {
+  border-color: rgba(255, 255, 255, 0.25);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55);
+}
+.pin-card.is-dragging {
+  cursor: grabbing;
+  transition: none;
+  z-index: 99 !important;
+  box-shadow:
+    0 0 0 2px rgba(110, 231, 183, 0.25),
+    0 16px 40px rgba(0, 0, 0, 0.7);
+}
+.pin-card.is-connect-source {
+  /* Selected as the first endpoint of a player-drawn connection.
+   * Subtle emerald rim invites the player to click a second pin. */
+  border-color: rgba(110, 231, 183, 0.55) !important;
+  box-shadow: 0 0 0 1px rgba(110, 231, 183, 0.18) inset;
 }
 
-@keyframes corridorCutPreviewIn {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-    filter: blur(2px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-    filter: blur(0);
-  }
+/* Source-confidence border styling. Border-style alone reads at a
+ * glance from across the panel even at 220px wide. */
+.pin-card[data-confidence="observed"] {
+  border-style: solid;
+  border-color: rgba(255, 255, 255, 0.30);
+}
+.pin-card[data-confidence="told_by"] {
+  border-style: dashed;
+  border-color: rgba(252, 211, 77, 0.45);
+}
+.pin-card[data-confidence="rumor"] {
+  border-style: dotted;
+  border-color: rgba(96, 165, 250, 0.45);
+}
+.pin-card[data-confidence="inferred"] {
+  border-style: solid;
+  border-color: rgba(255, 255, 255, 0.10);
 }
 
+.pin-card .pin-text {
+  /* Three-line clamp; full content surfaced via title. */
+  display: -webkit-box;
+  -webkit-line-clamp: 5;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
+  color: rgba(229, 229, 234, 0.92);
+}
+.pin-card .pin-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: rgba(255, 255, 255, 0.30);
+  user-select: none;
+}
+.pin-card .pin-confidence-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+}
+.pin-card[data-confidence="observed"] .pin-confidence-dot {
+  background: rgba(255, 255, 255, 0.65);
+}
+.pin-card[data-confidence="told_by"] .pin-confidence-dot {
+  background: rgba(252, 211, 77, 0.85);
+}
+.pin-card[data-confidence="rumor"] .pin-confidence-dot {
+  background: rgba(96, 165, 250, 0.85);
+}
+.pin-card[data-confidence="inferred"] .pin-confidence-dot {
+  background: rgba(255, 255, 255, 0.30);
+}
+.pin-card .pin-attribution {
+  font-style: italic;
+}
+.pin-card .pin-delete {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  width: 14px;
+  height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.20);
+  font-size: 11px;
+  line-height: 1;
+  padding: 0;
+  opacity: 0;
+  transition: opacity 0.15s ease, color 0.15s ease;
+}
+.pin-card:hover .pin-delete {
+  opacity: 1;
+}
+.pin-card .pin-delete:hover {
+  color: rgba(248, 113, 113, 0.9);
+}
+
+/* Connection lines drawn in the SVG overlay. JS sets stroke + stroke-
+ * dasharray inline based on connection.kind / connection.cut. */
+#pinboard-edges line {
+  pointer-events: stroke;  /* lines are clickable for cut */
+  cursor: pointer;
+  transition: stroke-opacity 0.18s ease, stroke-width 0.18s ease;
+}
+#pinboard-edges line:hover {
+  stroke-width: 4;
+  stroke-opacity: 1;
+}
+#pinboard-edges line.is-cut {
+  stroke-dasharray: 2 4 !important;
+  stroke-opacity: 0.30 !important;
+}
+
+/* The "Pin this" floater. Absolutely positioned at the player's
+ * selection coordinates; JS toggles .hidden via inline display. */
+#pin-this-floater {
+  position: fixed;
+  z-index: 9990;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  background: rgba(10, 10, 10, 0.95);
+  border: 1px solid rgba(110, 231, 183, 0.40);
+  border-radius: 5px;
+  color: rgba(167, 243, 208, 0.95);
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  cursor: pointer;
+  user-select: none;
+  backdrop-filter: blur(4px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6);
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+#pin-this-floater.hidden {
+  display: none;
+}
+#pin-this-floater:hover {
+  background: rgba(20, 25, 22, 0.96);
+  border-color: rgba(110, 231, 183, 0.65);
+}
+
+/* Selection-to-pin highlight in the manuscript. The browser's default
+ * ::selection is fine; we lean on it. */
+#manuscript ::selection {
+  background: rgba(110, 231, 183, 0.30);
+  color: rgba(255, 255, 255, 0.95);
+}

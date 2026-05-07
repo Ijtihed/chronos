@@ -21,7 +21,12 @@ from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
 
 from backend.utils import graph_distance as _graph_distance_shared
-from backend.world_state import WorldState, get_player_location
+from backend.world_state import (
+    Pin,
+    PinConnection,
+    WorldState,
+    get_player_location,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -452,19 +457,15 @@ class PlayerView(BaseModel):
     cost_cap_state: str = "none"
     cost_cap_soft_eur: float = 1.0
     cost_cap_hard_eur: float = 2.0
-
-    # Phase 2.8: per-page positions on the manuscript detective board.
-    # Empty by default. Frontend writes via POST /api/run/{id}/board
-    # when the player drags a page. Read on initial run load to
-    # restore the player's saved layout. See manuscript-as-artifact.md.
-    board_state: Dict[str, Dict[str, float]] = Field(default_factory=dict)
-    # Phase 2.8: edge keys the player has CUT on the manuscript board.
-    # Saved alongside board_state via the same /board endpoint. The
-    # frontend re-applies cuts on initial load so severed threads
-    # render as severed. Phase B (simulation rewinding when a thread
-    # is cut) is still blocked by 3 open questions; cuts are
-    # visual + explanatory in this commit.
-    cut_threads: List[str] = Field(default_factory=list)
+    # Phase 2.9: pinboard state surfaced into the PlayerView. The
+    # corresponding Pin / PinConnection models are defined in
+    # backend/world_state.py; the frontend renders pins+connections
+    # next to the legacy manuscript. The 3D corridor's board_state /
+    # cut_threads were removed in this same migration; clients that
+    # still send a /board POST get a 410 Gone with a redirect-style
+    # message pointing at /pinboard.
+    pins: List[Pin] = Field(default_factory=list)
+    pin_connections: List[PinConnection] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -626,6 +627,6 @@ def build_player_view(
         cost_cap_state=getattr(state, "cost_cap_state", "none") or "none",
         cost_cap_soft_eur=_config.COST_CAP_SOFT_EUR,
         cost_cap_hard_eur=_config.COST_CAP_HARD_EUR,
-        board_state=getattr(state, "board_state", {}) or {},
-        cut_threads=getattr(state, "cut_threads", []) or [],
+        pins=getattr(state, "pins", []) or [],
+        pin_connections=getattr(state, "pin_connections", []) or [],
     )

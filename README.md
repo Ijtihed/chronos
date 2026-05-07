@@ -121,6 +121,7 @@ backend/              Python server (FastAPI)
 frontend/             Browser UI
   index.html              Manuscript-style UI (Tailwind)
   app.js                  Game loop, turn submission, narrative rendering, manuscript depth-stack (Pass 6)
+  pinboard.js             Phase 2.9 pinboard — vanilla DOM + SVG; player highlights manuscript text and pins it as a curated node
   globe.js                Three.js 3D globe — replaces flat Leaflet map (Phase 2.6)
   wartable.js             Three.js regional war-table view with real DEM terrain (Phase 2.6, T-key toggle)
   map.js                  Legacy Leaflet flat map. Kept as ?flat=1 fallback while the globe is being proven.
@@ -143,6 +144,9 @@ tests/                ~820 automated tests
 | GET | `/api/run/{id}/npc/{npc_id}/perception` | Character's subjective impression of an NPC |
 | GET | `/api/run/{id}/interaction_graph` | Player-centric NPC interaction graph (read-only snapshot) |
 | GET | `/api/run/{id}/events/visible` | Map event pins. Civilizational + regional events only, lifetime window, regional events constrained to era home region. |
+| POST | `/api/run/{id}/pin` | Phase 2.9 — create a single pin from a highlighted manuscript passage. Server classifies `source_confidence` (observed / told_by / rumor / inferred) by reading the source turn-log row. |
+| POST | `/api/run/{id}/pinboard` | Phase 2.9 — bulk pinboard update (positions, deletes, connection upserts, cuts). Partial-update semantics. |
+| POST | `/api/run/{id}/board` | **410 Gone** — the deleted Phase 2.8 corridor endpoint. Use `/pinboard` instead. |
 | POST | `/api/run/{id}/reset` | Reset run |
 | GET | `/api/runs` | List all runs |
 | GET | `/api/geo/{era_key}` | Historical border GeoJSON for an era |

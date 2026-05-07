@@ -252,62 +252,73 @@ The world has **volume** the player can handle. Manuscript scrolls in z, not jus
 
 ---
 
-## PHASE 2.8 — The corridor manuscript
+## PHASE 2.8 — The corridor manuscript (CANCELLED, 2026-05-07)
 
-**Goal:** Replace the manuscript-as-depth-stack (Phase 2.6) with a manuscript-as-corridor: past turns hang in 3D space along a path the character actually walked, causal connections between turns are drawn as visible lines, and the player navigates the past by moving the camera through the corridor. Decisions stand out spatially; filler turns recede along the path. Reading the past is travel.
+> **Status: cancelled and rolled back.** Phase 2.8 shipped a 3D corridor as the primary manuscript view across 2026-05-04 to 2026-05-07. It worked technically (TubeGeometry threads, draggable pages, persisted board state) but failed the design intent: the player had to fly a 3D camera to read paragraphs of text, and the spatial metaphor obscured rather than enhanced the reading experience. Player verdict: "lets get this game finished e2e." On 2026-05-07 the entire corridor was deleted (corridor.js, the WebGL canvas, body class, ~290 lines of CSS, the `WorldState.board_state` and `cut_threads` fields, the `/board` endpoint, and `tests/test_board_endpoint.py`).
+>
+> **What replaced it:** Phase 2.9 — a flat 2D pinboard panel beside the legacy scrollable manuscript. The depth-stack from Phase 2.6 (z-recession on past turn-blocks) **stays alive** as the legacy manuscript's recession metaphor; only the *corridor* surface and its persisted state were deleted.
+>
+> **What was kept:** the globe and war-table from Phase 2.6 stayed (those are good 3D surfaces — the map is a place; the manuscript is text). Three open questions on Phase B (cut semantics, persistence model, NPC memory consistency) carry forward to Phase 2.10 unchanged — the simulation-rewinds-when-cut decision is still pending.
+>
+> **Lesson:** 3D is the right metaphor for the world (globe, war-table) and the wrong metaphor for the run record. The chronicle reads flat; the player's own annotations are spatial. That split is what Phase 2.9 ships.
 
-**Why this exists right after 2.6/2.7:** Phase 2.6 (depth-stack) made the manuscript visibly 3D but didn't transform what the player *does* with it — depth-stack reads as a slightly-3D scroll, not as a place. Phase 2.8 replaces the metaphor with one that does: a corridor in space the player walks through, with connections between turns drawn explicitly. Design intent in [manuscript-as-artifact.md](manuscript-as-artifact.md).
+---
+
+## PHASE 2.9 — The pinboard
+
+**Goal:** Replace the failed 3D corridor with a flat 2D pinboard that lives next to the legacy scrollable manuscript. The player highlights text in the manuscript, the highlighted passage becomes a pin on the right-hand panel, and the player drags / connects / cuts pins as they curate their own reading of the run. Spatial interaction without flying a camera through paragraphs.
+
+**Why this exists:** Phase 2.8 proved that forcing 3D camera control on text reading hurts more than it helps. Phase 2.9 keeps the manuscript flat (where it should be) and gives the player a separate, lightweight, deterministic surface for the spatial work. **The manuscript answers what happened; the pinboard answers what the player thinks it means.** Design intent in [manuscript-as-artifact.md](manuscript-as-artifact.md).
 
 This phase ships in two halves:
-- **Phase A — read-only corridor** (this round). Visualization only. Player walks, sees connections, can't yet edit.
-- **Phase B — editable corridor** (future round). Player cuts a connection between two moments → the simulation rewrites from that point forward. Three open questions block Phase B; see [open-questions.md](open-questions.md) "Phase 2.8 Phase B blockers." Phase B is in the roadmap as a future phase, not in scope this round.
+- **Phase A — quiet pinboard** (this round). Player highlights, pins, drags, draws connections, cuts. No system-proposed connections. No LLM call. Pure DOM + SVG.
+- **Phase B — propose / agree / edit / reject + before/after** (next round, Phase 2.10). System auto-proposes connections from `PlayerView`-only data (information-as-geography: nothing the character couldn't plausibly know). A new Gemini call site (`connection_proposal`) generates the before/after preview text. Player agrees, edits the label and the meta, or rejects. **Simulation rewinds remain blocked by the same three open questions** (carried forward from Phase 2.8 Phase B); the propose/edit flow ships without them.
 
-### What exists at the end of this phase (Phase A only)
+### What exists at the end of Phase 2.9 Phase A
 
-- **Corridor manuscript** — Three.js + CSS3DRenderer scene replacing the vertical scroll. Each turn card hangs at a 3D position along a meandering path. Turn cards are the existing `.turn-block` DOM, so the entire memory-decay system, click affordances, inner-thought rendering, and ambient/voices markup work unchanged.
-- **Connection lines** drawn between turns, by type:
-  - Action → consequence (solid, color matches consequence kind)
-  - Action → divergence (dashed, amber, points to a side-anchored canonical-event marker)
-  - Action → NPC reaction (thin line to NPC node, color = sentiment)
-  - NPC ↔ NPC (faint, dashed, when both NPCs were present and interacted)
-- **Significance-weighted cards.** Cards size, brightness, and slight off-path anchoring scale with `parsed.significance_score`. Decisions stand out spatially; filler turns are small dim points.
-- **Camera navigation.** WASD / arrows for movement, mouse-drag for pivot. Forward = walking back in time. The current turn (newest) is in front of the player at rest.
-- **Composes with existing systems.** Memory decay strips words from far cards. Observation mode tints the corridor. Erasure dissolves cards along the path, oldest first. Inner thought renders inside the front-most card. Time-skip lays a long featureless segment of corridor.
-- **Feature flag** `body.chronos-corridor-manuscript` (on by default). `?flat=1` URL parameter falls back to the flat scroll (not the Phase 2.6 depth-stack — Phase 2.8 subsumes and removes that view from the active code path; the depth-stack lived for ~5 commits across one afternoon and never satisfied the design intent).
+- **Pinboard panel** — vanilla DOM + SVG, no Three.js. Always visible, fixed 60/40 split (manuscript left, pinboard right). Pins are absolutely-positioned cards; connections are SVG `<line>` elements that update live as the player drags pins.
+- **Pin-by-selection** — native `selectionchange` listener on `#manuscript`. After 150ms of stable selection (>3 chars), a small **Pin this** floater appears near the selection. Click → POST `/api/run/{id}/pin` → server classifies the pin's `source_confidence` (observed / told_by / rumor / inferred) by reading `PlayerView` for the source turn → returns the classified pin → frontend renders it on the panel.
+- **Player-perspective classification.** Pin `source_confidence` is the first persisted-state field in CHRONOS that explicitly encodes "what the character knew at the time of recording" rather than ground truth. The pinboard renders each pin's border style by confidence, so the player sees uncertainty as soon as they pin (solid = observed; dashed = told by an NPC; dotted = rumor; faint = inferred from atmosphere/narration). See `open-questions.md` Phase 2.9 entry.
+- **Drag, connect, cut.** Drag any pin to reposition (persists to `WorldState.pins[].position`). Click pin A then pin B → a player-drawn connection. Click any connection → `cut: true` (persists; Phase B / 2.10 simulation rewinds still blocked).
+- **Persistence.** New `WorldState.pins: List[Pin]` and `WorldState.pin_connections: List[PinConnection]` fields. New `POST /api/run/{id}/pinboard` endpoint with partial-update semantics. New `POST /api/run/{id}/pin` endpoint that creates+classifies a pin. Old `/board` returns 410 Gone with a message pointing at `/pinboard`.
+- **3D corridor deleted.** `frontend/corridor.js`, the corridor canvas/container, the `chronos-corridor-manuscript` body class, ~290 lines of corridor CSS, the `WorldState.board_state` and `cut_threads` fields, the `/board` endpoint, and `tests/test_board_endpoint.py` are removed in this same commit.
 
 ### Success criteria
 
-- [ ] A 30-turn run reads as a coherent corridor in space; the player can navigate to any turn by walking the camera there.
-- [ ] At least three of the four connection types are visible by turn 10 of a typical run (action→consequence is the most common; NPC reactions accumulate quickly).
-- [ ] Decisions (significance ≥ 0.8) are visually distinct from filler at a glance, without the player having to read text.
-- [ ] All Phase 2.5/2.6/2.7 success criteria still pass: memory decay still works on cards, hover-recover still works, inner thought still renders, observation mode still tints, erasure still dissolves cleanly.
-- [ ] `?flat=1` falls back to the legacy flat scroll without errors.
-- [ ] Performance: 60fps on M4 Max with 60 turns and ~240 connection lines.
+- [ ] On a fresh run, the manuscript renders normally and the pinboard panel appears empty on the right.
+- [ ] Selecting >3 chars of manuscript text for >150ms shows a "Pin this" floater. Clicking it creates a pin server-side and renders it on the pinboard.
+- [ ] Pins render with the correct `source_confidence` border style (solid/dashed/dotted/faint) based on what the player's character could know about the source text.
+- [ ] Pins drag smoothly; positions persist across reload.
+- [ ] Player can draw a connection (click pin A, click pin B) and cut a connection (click the line).
+- [ ] No regression in legacy manuscript behavior (memory decay, hover-recover, depth-stack recession, inner thought, observation mode, erasure).
+- [ ] Old runs with `board_state` / `cut_threads` load cleanly via Pydantic `extra="ignore"` and the next save rewrites without them.
+- [ ] No 3D corridor code paths fire on any URL combination.
 
 ### Definition of success
 
-The player's run *has a shape*. After 20 turns the corridor reads as a visible record of where the character has been and what they've done — the betrayals and the consequences are physically connected, the people met and the rumors heard are wired together, the decisions stand out from the filler. Pressing back walks you through your own past as a place. **The manuscript is no longer a record. It is a memory the player inhabits.**
+After playing 10 turns, the player has a pinboard with 4–8 pins they curated themselves, several connections they drew, and a clear visual sense of "what mattered to me in this run." The manuscript reads cleanly on its own; the pinboard reads cleanly as the player's working notes. **Reading and curating are two distinct surfaces, and both feel right.**
 
 ### How to verify
 
-1. **Build & run** — full corridor renders on a fresh run. No black screen, no missing cards.
-2. **Decision visibility** — submit a high-significance action (e.g. "betray the abbot to the Visigoths"). Confirm the resulting card is visibly larger / brighter / off-path compared to filler turns.
-3. **Connection lines** — submit an action that schedules a consequence (e.g. hostile action against an NPC). Skip 3+ turns until the consequence fires. Confirm a line is drawn from the source turn forward to the consequence turn.
-4. **NPC connections** — interact with an NPC. Confirm a line is drawn from the player's turn to the NPC's node, color-matched to sentiment.
-5. **Memory decay in space** — play 30+ turns. Walk back through the corridor. Confirm distant cards have lost words AND look distant.
-6. **Hover-recover** — hover any past card. Confirm it lifts forward and recovers its words, just like Phase 2.6.
-7. **Observation mode** — die mid-run. Confirm the corridor tints and the player can still navigate but not add new turns.
-8. **Erasure** — play to erasure. Confirm cards dissolve along the path, oldest first, ending with an empty path.
-9. **`?flat=1`** — append `?flat=1` to the URL. Confirm the legacy flat scroll renders.
-10. **Performance** — long-run check at 60 turns, 60fps target.
+1. **Build & run.** Manuscript renders; pinboard panel appears empty.
+2. **Pin creation.** Select a passage of text; "Pin this" floater appears within 200ms; click it; pin lands on the panel.
+3. **Confidence classification.** Pin a passage from an NPC's speech (told_by); pin a passage from the player's first-person turn (observed); pin a passage from an ambient_activity description (rumor). Confirm the pin border styles differ visibly.
+4. **Drag.** Drag any pin to a new position; reload; pin is in the new position.
+5. **Connect.** Click pin A, click pin B; a line appears. Reload; the line is still there.
+6. **Cut.** Click the line; it visually marks cut. Reload; cut state persists.
+7. **Old run migration.** Load a session created during Phase 2.8 (board_state + cut_threads); confirm no 500 error; the next save rewrites the row without those fields.
+8. **`/board` 410.** `curl -X POST /api/run/<id>/board` returns 410 with the message redirecting to `/pinboard`.
 
-### What is explicitly NOT in this phase
+### What is explicitly NOT in Phase 2.9
 
-- **Editing the past** (Phase B, deferred — three open questions block).
-- **3D scene illustrations** (Phase 3 / future Phase 6, deferred).
-- **Marginalia** in the corridor (deferred to a separate session, anchored at card position when it ships).
-- **Branching timelines / saved alternate histories** (Phase B and beyond).
-- **The Phase 2.6 depth-stack as a separate view.** Removed; subsumed by the corridor.
+- **Auto-proposed connections.** Phase 2.10. Plumbing is ready (`PinConnection.kind = "auto"` is a valid value), but no proposer fires.
+- **LLM-generated before/after preview.** Phase 2.10. New Gemini call site, requires explicit user review of the prompt template per `chronos-model-tier.mdc`.
+- **Connection labels.** Phase 2.10 — player-drawn connections in 2.9 have no label.
+- **Connection cuts that affect simulation.** Same three Phase B open questions still block; carried forward from 2.8.
+- **3D pinboard.** No.
+- **Drag-to-resize the divider.** Fixed 60/40 split; future commit can add resize.
+- **Pinboard search / filter.** Future commit.
+- **Pin-from-arbitrary-text** (no manuscript selection). Pins are always rooted in a manuscript passage in 2.9; "free notes" is a future commit.
 
 ---
 

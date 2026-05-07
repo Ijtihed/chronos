@@ -134,6 +134,91 @@ class ScheduledConsequence(BaseModel):
     fired: bool = False
 
 
+# ---------------------------------------------------------------------------
+# Phase 2.9 — Pinboard
+# ---------------------------------------------------------------------------
+#
+# The pinboard is the player's curated, spatial layer next to the
+# (flat) manuscript. The 3D corridor manuscript that previously owned
+# the player's spatial interactions was deleted in this same migration;
+# Pin / PinConnection replace `board_state` / `cut_threads` entirely.
+#
+# Player-perspective rule: `Pin.source_confidence` records what the
+# CHARACTER plausibly knew at the time of pinning, classified server-
+# side from `PlayerView` (not `WorldState`). This is the first piece
+# of persisted state in CHRONOS that explicitly encodes player
+# knowledge rather than ground truth. See manuscript-as-artifact.md
+# Phase 2.9 and open-questions.md "Phase 2.9 source_confidence".
+
+# Allowed values for Pin.source_confidence. Kept as a string union
+# rather than a Literal so the file stays Pydantic-v1-and-v2 compatible
+# with no Literal import in the existing world_state module.
+PIN_SOURCE_CONFIDENCES = ("observed", "told_by", "rumor", "inferred")
+# Allowed values for PinConnection.kind. "auto" is reserved for
+# Phase 2.10 (system-proposed connections); 2.9 only writes "player".
+PIN_CONNECTION_KINDS = ("player", "auto")
+
+
+class PinSourceOffset(BaseModel):
+    # Character offsets within the source turn's narrative HTML (or
+    # plain-text rendering). Stored as integers so the frontend can
+    # re-locate the original passage if it ever needs to. Capped on
+    # the API surface; 100k is far above any real run's text length.
+    start: int = 0
+    end: int = 0
+
+
+class Pin(BaseModel):
+    id: str = Field(default_factory=lambda: uuid.uuid4().hex[:12])
+    text: str
+    # Position on the pinboard panel. The panel is a 2D coordinate
+    # space owned by the frontend; the server only sanitizes finite
+    # numbers within a sane bbox.
+    x: float = 0.0
+    y: float = 0.0
+    # The turn-block that this pin was lifted from. The frontend uses
+    # this to render the pin's "source" label and to re-locate the
+    # passage in the manuscript on click.
+    source_turn_id: str = ""
+    source_offset: PinSourceOffset = Field(default_factory=PinSourceOffset)
+    # Player-perspective classification of the pin's source. One of
+    # PIN_SOURCE_CONFIDENCES. Defaults to "inferred" so a pin saved
+    # without classification (older clients, weird edge cases) renders
+    # with the most-conservative border style.
+    source_confidence: str = "inferred"
+    # If `source_confidence == "told_by"`, the NPC name. Empty
+    # otherwise. Kept as a free-form string, not a foreign key, so
+    # NPCs that later vanish or change names don't break old pins.
+    source_attribution: str = ""
+    # Unix-ish creation timestamp (seconds since epoch). Used by the
+    # frontend to sort pins by recency in the panel.
+    created_at: float = 0.0
+
+
+class PinConnection(BaseModel):
+    id: str = Field(default_factory=lambda: uuid.uuid4().hex[:12])
+    from_pin_id: str
+    to_pin_id: str
+    # Who created the connection. "player" in Phase 2.9; "auto" is
+    # reserved for Phase 2.10's auto-proposer (still empty in 2.9).
+    kind: str = "player"
+    # Whether the player has cut this connection. Cuts are visual +
+    # explanatory only in Phase 2.9 — the simulation does NOT rewind.
+    # Phase B (simulation rewinding when cut) is still blocked by 3
+    # open questions; see open-questions.md "Phase 2.8 Phase B blockers"
+    # (carried forward into Phase 2.10).
+    cut: bool = False
+    # Optional player-typed caption shown on/near the line. Empty by
+    # default. Phase 2.9 only writes empty labels (player-drawn lines
+    # have no UI to set a label); Phase 2.10's edit-label-and-meta
+    # flow will write here.
+    label: str = ""
+    # Optional structured metadata. Phase 2.9 writes nothing here;
+    # Phase 2.10 will populate it with edge-kind, before/after preview
+    # text, and any LLM-generated narrative.
+    meta: Dict = Field(default_factory=dict)
+
+
 class WorldState(BaseModel):
     run_id: str = Field(default_factory=lambda: uuid.uuid4().hex[:12])
     run_status: str = "active"
@@ -174,19 +259,13 @@ class WorldState(BaseModel):
     # into npc_pov.md and npc_addressed.md as $already_used_details. Resets
     # per run (new WorldState = empty list).
     used_grounding_details: List[str] = Field(default_factory=list)
-    # Phase 2.8: per-page positions on the manuscript detective board.
-    # Keyed by turn-block id ("turn-<timestamp>") or "manuscript-intro".
-    # Each value is {x: float, y: float, z: float}. Empty by default;
-    # the frontend computes a deterministic INITIAL position for each
-    # new page and only writes here when the player drags a page.
-    board_state: Dict[str, Dict[str, float]] = Field(default_factory=dict)
-    # Phase 2.8: edge keys the player has CUT on the manuscript board.
-    # The frontend persists these alongside drag positions via the
-    # /board endpoint. Cuts are visual + explanatory only in this
-    # commit; the simulation does NOT rewind. Phase B (simulation
-    # response to a cut) is blocked by 3 open questions; see
-    # open-questions.md "Phase 2.8 Phase B blockers".
-    cut_threads: List[str] = Field(default_factory=list)
+    # Phase 2.9 (2026-05-07): pinboard state. Replaces the deleted
+    # corridor's `board_state` (page positions) and `cut_threads`
+    # (severed edges). Old sessions with those fields load cleanly
+    # via Pydantic's default `extra="ignore"` and the next save
+    # rewrites without them. See manuscript-as-artifact.md.
+    pins: List[Pin] = Field(default_factory=list)
+    pin_connections: List[PinConnection] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
