@@ -98,14 +98,47 @@ A cut connection persists with `cut: true`. The simulation does not change when 
 - Persistence: POST `/api/run/{id}/pinboard` accepts `{pins?, pin_connections?}` with partial-update semantics. The server replaces whichever field is sent and leaves the other untouched. POST `/api/run/{id}/pin` accepts a single new pin and returns the classified pin object so the frontend can render it immediately.
 - Feature flag for the legacy manuscript fallback: `?flat=1` still disables the depth-stack class. The pinboard runs regardless.
 
-## Phase 2.10 preview (not in this commit)
+## Phase 2.10 — propose / agree / edit / reject (shipped 2026-05-07)
 
-Phase 2.10 will add the propose / agree / edit / reject + before/after flow:
+The pinboard becomes *active*: after each turn (gated), the system proposes a connection between same-turn pins it thinks belong together; the player adjudicates.
 
-- A new `kind` value `auto_proposed` for pin connections, distinct from `auto` and `player`.
-- A new backend endpoint `POST /api/run/{id}/pinboard/propose_connections` that runs after each turn and writes candidate connections built from `PlayerView` only.
-- A new LLM call site `connection_proposal` (Gemini Flash Lite) that narrates the **before/after** preview text — what the world looked like with the connection, what it looked like without. Per `chronos-model-tier.mdc`, this is a new call site that requires explicit user review of the prompt template before merge.
-- The proposal popup with **agree / edit-label-and-meta / reject** controls.
-- Phase B (simulation actually rewinds when the player edits a connection) **stays blocked** by the existing three open questions in `open-questions.md`.
+### Decisions locked in (2026-05-07)
 
-Phase 2.10 is queued behind Phase 2.9 stability.
+| topic | decision |
+|---|---|
+| **Trigger** | Auto, but gated. Proposer fires only when the player has ≥3 unconnected pins **and** ≥2 turns have passed since the last proposal. The frontend (`pinboard.js`) owns the gate. |
+| **Scope** | **Same `source_turn_id` only.** The proposer never links pins from different turns. Tightest semantics; cheapest LLM call; honors information-as-geography (a connection between same-turn pins is something the character could plausibly recognize in the moment). |
+| **Output** | **Claim only.** One short sentence asserting the connection. No before/after counterfactual. The "what would change" framing was rejected because it would lie about Phase B (simulation rewinds remain blocked). Honest about what we know. |
+| **Edit policy** | When the player edits a proposal, the player's text replaces the system's; we set `PinConnection.meta.was_edited = true` but do NOT keep the system's original. Middle ground; doesn't hoard data. |
+| **Reject policy** | **Tombstone.** Rejected pin pairs are persisted in `WorldState.rejected_pin_pairs`. Same pair (in either direction) is never re-proposed. Cascade-dropped when either pin is deleted. |
+| **Popup placement** | Anchored at the proposed line's midpoint. Spatial — the player adjudicates where they'll see the result. |
+
+### How the LLM call works
+
+- New call site `connection_proposal` (Gemini Flash Lite via `call_llm`).
+- Prompt template `prompts/connection_proposal.md` — 5 examples, JSON-shaped output, returns `{"claim": "..."}` or `{"claim": ""}` for "no connection."
+- Per-call cost: ~$0.00006 (~120 input + ~30 output tokens). With the threshold gate, ~$0.0001-$0.0003 per typical 10-turn run. Far below the €0.022 median target.
+- Failure mode: NoOp / circuit-breaker open / parse error → the proposer returns empty, the orchestrator skips the pair, the pinboard never blocks. Same robustness pattern as `inner_thought`.
+
+### Three connection kinds, three visuals
+
+| kind | visual | semantics |
+|---|---|---|
+| `player` | solid emerald line | Player drew it. Click cuts (visual only). |
+| `auto_proposed` | dashed faint yellow line + small "?" marker at midpoint | System proposal awaiting adjudication. Click opens the popup. |
+| `auto` | solid amber line | System proposal the player agreed (or edited) into. Click cuts (visual only). |
+
+Cuts on `auto_proposed` connections are not allowed — the player must adjudicate first (agree, edit, or reject). After agreement the connection becomes `auto` and is cuttable like any other.
+
+### Phase B still blocked
+
+The same three open questions that blocked the cancelled Phase 2.8 Phase B carry forward: cut semantics, persistence model, NPC memory consistency under past-edits. **Phase 2.10 does NOT add simulation rewinds.** The player can agree / edit / reject and cut connections; the simulation does not respond. Phase B is unblocked only when the three questions are answered in writing.
+
+## What is NOT in scope (Phase 2.10)
+
+- **Simulation rewinds.** Still blocked.
+- **Cross-turn proposals.** Same-turn-only is the rule.
+- **Counterfactual narration.** Claim-only; no "without this, X would not have happened."
+- **Player-typed connection labels for player-drawn lines.** Phase 2.9 lines stay label-less; only system-proposed lines have labels (which the player can edit on agree).
+- **Multiple pending proposals at once.** One adjudicate popup at a time. Future commit can add a queue.
+- **Proposal history / audit log.** A rejected pair is tombstoned; we don't keep a log of *which* proposals were rejected when. If you want a "you rejected 3 things this turn" UI, future commit.

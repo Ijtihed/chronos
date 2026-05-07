@@ -144,6 +144,38 @@
     return "Inferred";
   }
 
+  // Three connection kinds, three visual languages:
+  //   "player"        - solid emerald. Player drew it. Click = cut.
+  //   "auto"          - solid amber. System proposal the player agreed
+  //                     (or edited) into. Click = cut.
+  //   "auto_proposed" - faint dashed yellow. Awaiting adjudication.
+  //                     Click = open the agree/edit/reject popup; never
+  //                     cut directly.
+  function _connectionStyle(conn) {
+    if (conn.kind === "auto_proposed") {
+      return {
+        stroke: "rgba(252, 211, 77, 0.55)",
+        strokeWidth: 1.5,
+        dashArray: "6 4",
+        opacity: 0.85,
+      };
+    }
+    if (conn.kind === "auto") {
+      return {
+        stroke: "rgba(252, 211, 77, 0.7)",
+        strokeWidth: 2,
+        dashArray: null,
+        opacity: 0.9,
+      };
+    }
+    return {
+      stroke: "rgba(110, 231, 183, 0.55)",
+      strokeWidth: 2,
+      dashArray: null,
+      opacity: 0.85,
+    };
+  }
+
   function _redrawEdgesOnly() {
     if (!_initialized) return;
     while (edgesSvg.firstChild) edgesSvg.removeChild(edgesSvg.firstChild);
@@ -153,29 +185,66 @@
       const a = byId.get(conn.from_pin_id);
       const b = byId.get(conn.to_pin_id);
       if (!a || !b) return;
-      const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
       const ax = (a.x || 0) + 110;  // pin midpoint, half of 220px
       const ay = (a.y || 0) + 30;
       const bx = (b.x || 0) + 110;
       const by = (b.y || 0) + 30;
+      const style = _connectionStyle(conn);
+      const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
       line.setAttribute("x1", ax);
       line.setAttribute("y1", ay);
       line.setAttribute("x2", bx);
       line.setAttribute("y2", by);
-      line.setAttribute("stroke",
-        conn.kind === "auto" ? "rgba(252, 211, 77, 0.55)"
-                             : "rgba(110, 231, 183, 0.55)"
-      );
-      line.setAttribute("stroke-width", "2");
-      line.setAttribute("stroke-opacity", "0.75");
+      line.setAttribute("stroke", style.stroke);
+      line.setAttribute("stroke-width", String(style.strokeWidth));
+      line.setAttribute("stroke-opacity", String(style.opacity));
       line.setAttribute("stroke-linecap", "round");
+      if (style.dashArray) line.setAttribute("stroke-dasharray", style.dashArray);
       line.dataset.connectionId = conn.id;
       if (conn.cut) line.classList.add("is-cut");
+      if (conn.kind === "auto_proposed") line.classList.add("is-proposed");
       line.addEventListener("click", (e) => {
         e.stopPropagation();
-        _cutConnection(conn);
+        if (conn.kind === "auto_proposed") {
+          _openAdjudicatePopup(conn, (ax + bx) / 2, (ay + by) / 2);
+        } else {
+          _cutConnection(conn);
+        }
       });
       edgesSvg.appendChild(line);
+
+      // Adjudicate icon at the midpoint of an auto_proposed line.
+      // Visually invites the player to interact even before they
+      // hover the line itself. Clicking it does the same as clicking
+      // the line.
+      if (conn.kind === "auto_proposed") {
+        const mx = (ax + bx) / 2;
+        const my = (ay + by) / 2;
+        const icon = document.createElementNS("http://www.w3.org/2000/svg", "g");
+        icon.setAttribute("class", "proposal-marker");
+        icon.setAttribute("transform", "translate(" + mx + "," + my + ")");
+        const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+        circle.setAttribute("r", "9");
+        circle.setAttribute("fill", "rgba(20, 18, 10, 0.95)");
+        circle.setAttribute("stroke", "rgba(252, 211, 77, 0.85)");
+        circle.setAttribute("stroke-width", "1.4");
+        const qm = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        qm.setAttribute("text-anchor", "middle");
+        qm.setAttribute("dominant-baseline", "central");
+        qm.setAttribute("y", "0.5");
+        qm.setAttribute("fill", "rgba(252, 211, 77, 0.95)");
+        qm.setAttribute("font-size", "11");
+        qm.setAttribute("font-family", "JetBrains Mono, monospace");
+        qm.setAttribute("font-weight", "600");
+        qm.textContent = "?";
+        icon.appendChild(circle);
+        icon.appendChild(qm);
+        icon.addEventListener("click", (e) => {
+          e.stopPropagation();
+          _openAdjudicatePopup(conn, mx, my);
+        });
+        edgesSvg.appendChild(icon);
+      }
     });
   }
 
@@ -522,6 +591,219 @@
       console.warn("[pinboard] /pinboard error:", err);
     }
   }
+
+  // ── Phase 2.10: adjudicate popup ────────────────────────────────────
+  //
+  // Anchored at the line midpoint of an auto_proposed connection. The
+  // player sees the system's claim, and adjudicates: Agree, Edit, or
+  // Reject. Keyboard: Enter agrees, Esc rejects, Tab moves into the
+  // editable textarea.
+  //
+  // Only one popup is open at a time. Opening a new one closes the
+  // previous. Clicking outside closes it (Esc-equivalent reject? no:
+  // outside-click is a soft cancel, not a reject -- the proposal
+  // stays for later adjudication).
+  let _adjudicatePopupEl = null;
+  let _adjudicateTarget = null;  // the connection currently being adjudicated
+
+  function _ensureAdjudicatePopup() {
+    if (_adjudicatePopupEl && _adjudicatePopupEl.isConnected) return _adjudicatePopupEl;
+    const el = document.createElement("div");
+    el.id = "pinboard-adjudicate";
+    el.className = "hidden";
+    el.innerHTML =
+      '<div class="adj-header">A connection between two pins on this turn</div>' +
+      '<div class="adj-claim" id="adj-claim"></div>' +
+      '<textarea id="adj-edit" class="hidden" rows="3" maxlength="140" ' +
+      '          placeholder="Rewrite the claim..."></textarea>' +
+      '<div class="adj-buttons">' +
+      '  <button id="adj-reject" type="button" class="adj-btn adj-reject">Reject</button>' +
+      '  <button id="adj-edit-toggle" type="button" class="adj-btn adj-edit">Edit</button>' +
+      '  <button id="adj-agree" type="button" class="adj-btn adj-agree">Agree</button>' +
+      '</div>' +
+      '<div class="adj-keyhint">Enter \u2014 agree \u00b7 Esc \u2014 close</div>';
+    document.body.appendChild(el);
+    _adjudicatePopupEl = el;
+    el.querySelector("#adj-agree").addEventListener("click", _onAdjAgree);
+    el.querySelector("#adj-reject").addEventListener("click", _onAdjReject);
+    el.querySelector("#adj-edit-toggle").addEventListener("click", _onAdjEditToggle);
+    document.addEventListener("pointerdown", _onOutsideClick, true);
+    document.addEventListener("keydown", _onAdjKeydown);
+    return el;
+  }
+
+  function _openAdjudicatePopup(conn, midX, midY) {
+    const el = _ensureAdjudicatePopup();
+    _adjudicateTarget = conn;
+    el.querySelector("#adj-claim").textContent = conn.label || "(no claim)";
+    const textarea = el.querySelector("#adj-edit");
+    textarea.value = conn.label || "";
+    textarea.classList.add("hidden");
+    el.classList.remove("hidden");
+    // Position the popup near the line midpoint, in viewport
+    // coordinates. The midX/midY we got are in #pinboard-edges
+    // coordinate space (same as the SVG); convert via the surface's
+    // bounding rect to viewport coords.
+    const rect = surfaceEl.getBoundingClientRect();
+    const viewX = rect.left + midX;
+    const viewY = rect.top + midY;
+    // Clamp so the popup stays on-screen.
+    const popupW = 320;
+    const popupH = 170;
+    let x = viewX - popupW / 2;
+    let y = viewY + 14;  // below the marker
+    if (x + popupW > window.innerWidth - 8) x = window.innerWidth - popupW - 8;
+    if (x < 8) x = 8;
+    if (y + popupH > window.innerHeight - 8) y = viewY - popupH - 14;
+    el.style.left = x + "px";
+    el.style.top = y + "px";
+  }
+
+  function _closeAdjudicatePopup() {
+    if (_adjudicatePopupEl) _adjudicatePopupEl.classList.add("hidden");
+    _adjudicateTarget = null;
+  }
+
+  function _onOutsideClick(e) {
+    if (!_adjudicatePopupEl || _adjudicatePopupEl.classList.contains("hidden")) return;
+    if (_adjudicatePopupEl.contains(e.target)) return;
+    // Clicking the proposal marker / line REopens the popup; we don't
+    // want a marker click to also close it. SVG event ordering puts
+    // the marker click first; if it landed inside <line> or <g> we
+    // bail out here.
+    if (e.target.closest && e.target.closest("#pinboard-edges")) return;
+    _closeAdjudicatePopup();
+  }
+
+  function _onAdjKeydown(e) {
+    if (!_adjudicatePopupEl || _adjudicatePopupEl.classList.contains("hidden")) return;
+    if (e.key === "Escape") {
+      e.preventDefault();
+      _closeAdjudicatePopup();
+      return;
+    }
+    if (e.key === "Enter" && !e.shiftKey) {
+      // Don't hijack Enter inside a textarea -- the player is editing.
+      const a = document.activeElement;
+      if (a && a.id === "adj-edit") return;
+      e.preventDefault();
+      _onAdjAgree();
+    }
+  }
+
+  function _onAdjEditToggle() {
+    const el = _ensureAdjudicatePopup();
+    const textarea = el.querySelector("#adj-edit");
+    const claim = el.querySelector("#adj-claim");
+    if (textarea.classList.contains("hidden")) {
+      textarea.classList.remove("hidden");
+      claim.classList.add("hidden");
+      textarea.focus();
+      textarea.select();
+    } else {
+      // Toggle back to read-only display.
+      textarea.classList.add("hidden");
+      claim.classList.remove("hidden");
+    }
+  }
+
+  async function _onAdjAgree() {
+    const conn = _adjudicateTarget;
+    if (!conn) return _closeAdjudicatePopup();
+    const el = _ensureAdjudicatePopup();
+    const textarea = el.querySelector("#adj-edit");
+    const wasEdited = !textarea.classList.contains("hidden");
+    const finalLabel = wasEdited
+      ? (textarea.value || "").trim().slice(0, 140)
+      : (conn.label || "");
+    if (wasEdited && !finalLabel) {
+      // Edit-to-empty isn't a meaningful agree. Treat as cancel.
+      _closeAdjudicatePopup();
+      return;
+    }
+    // Optimistic local update.
+    conn.kind = "auto";
+    conn.label = finalLabel;
+    if (wasEdited) {
+      conn.meta = Object.assign({}, conn.meta || {}, { was_edited: true });
+    }
+    _redrawEdgesOnly();
+    _closeAdjudicatePopup();
+    // Persist via the upsert path.
+    _post({
+      pin_connections: [{
+        id: conn.id,
+        from_pin_id: conn.from_pin_id,
+        to_pin_id: conn.to_pin_id,
+        kind: "auto",
+        label: finalLabel,
+        meta_was_edited: !!wasEdited,
+      }],
+    });
+  }
+
+  async function _onAdjReject() {
+    const conn = _adjudicateTarget;
+    if (!conn) return _closeAdjudicatePopup();
+    const a_id = conn.from_pin_id;
+    const b_id = conn.to_pin_id;
+    // Local removal first; the line will disappear immediately.
+    connections = connections.filter((c) => c.id !== conn.id);
+    _redrawEdgesOnly();
+    _closeAdjudicatePopup();
+    // Persist: hard-delete + tombstone the pair so the proposer
+    // doesn't suggest the same connection on a future turn.
+    _post({
+      delete_connection_ids: [conn.id],
+      tombstone_pin_pairs: [[a_id, b_id]],
+    });
+  }
+
+  // ── Phase 2.10: trigger the proposer after a turn ───────────────────
+  //
+  // Called by app.js after a turn completes. Honors the threshold gate
+  // ">=3 unconnected pins AND >=2 turns since last proposal." If the
+  // gate passes, POST /pinboard/propose_connections; merge any
+  // returned proposals into the local connections array and redraw.
+  let _lastProposeTurn = -1;
+
+  async function maybePropose(currentTurn) {
+    if (!runId) return;
+    if (typeof currentTurn !== "number") currentTurn = 0;
+    // Threshold gate.
+    const unconnected = pins.filter((p) => {
+      return !connections.some(
+        (c) => c.from_pin_id === p.id || c.to_pin_id === p.id,
+      );
+    }).length;
+    if (unconnected < 3) return;
+    if (currentTurn - _lastProposeTurn < 2) return;
+    _lastProposeTurn = currentTurn;
+    try {
+      const res = await fetch(
+        "/api/run/" + runId + "/pinboard/propose_connections",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ current_turn: currentTurn }),
+        },
+      );
+      if (!res.ok) {
+        console.warn("[pinboard] propose_connections failed:", res.status);
+        return;
+      }
+      const body = await res.json();
+      const proposed = Array.isArray(body.proposed) ? body.proposed : [];
+      if (proposed.length === 0) return;
+      // Append the new auto_proposed connections; redraw.
+      connections = connections.concat(proposed);
+      _redrawEdgesOnly();
+    } catch (err) {
+      console.warn("[pinboard] propose_connections error:", err);
+    }
+  }
+  // Expose for the trigger in app.js.
+  api.maybePropose = maybePropose;
 
   // ── Helpers ─────────────────────────────────────────────────────────
   function _esc(s) {

@@ -154,9 +154,15 @@ class ScheduledConsequence(BaseModel):
 # rather than a Literal so the file stays Pydantic-v1-and-v2 compatible
 # with no Literal import in the existing world_state module.
 PIN_SOURCE_CONFIDENCES = ("observed", "told_by", "rumor", "inferred")
-# Allowed values for PinConnection.kind. "auto" is reserved for
-# Phase 2.10 (system-proposed connections); 2.9 only writes "player".
-PIN_CONNECTION_KINDS = ("player", "auto")
+# Allowed values for PinConnection.kind.
+#   - "player"        : player-drawn line (Phase 2.9, default).
+#   - "auto_proposed" : system-proposed line awaiting player adjudication
+#                       (Phase 2.10). Renders faint+dashed; goes away on
+#                       reject, becomes "auto" on agree, becomes "auto"
+#                       with edited meta on edit.
+#   - "auto"          : system-proposed AND player-confirmed (Phase 2.10).
+#                       Permanent until cut.
+PIN_CONNECTION_KINDS = ("player", "auto_proposed", "auto")
 
 
 class PinSourceOffset(BaseModel):
@@ -266,6 +272,18 @@ class WorldState(BaseModel):
     # rewrites without them. See manuscript-as-artifact.md.
     pins: List[Pin] = Field(default_factory=list)
     pin_connections: List[PinConnection] = Field(default_factory=list)
+    # Phase 2.10: pin pairs the player has explicitly REJECTED in the
+    # propose/edit/reject flow. Stored as a flat list of [from_id,
+    # to_id] pairs; reverse-pair equivalence is checked in code so
+    # rejecting (A, B) also blocks (B, A). Used by the proposer to
+    # avoid re-suggesting the same connection. Cascade-dropped when
+    # either pin is deleted -- the rejection no longer has meaning.
+    rejected_pin_pairs: List[List[str]] = Field(default_factory=list)
+    # Phase 2.10: turn index at which the auto-proposer last fired.
+    # The trigger gate ("auto, but only when >=3 unconnected pins AND
+    # >=2 turns since last") reads this to decide whether to call out
+    # to the LLM. -1 means "never fired."
+    last_propose_turn: int = -1
 
 
 # ---------------------------------------------------------------------------

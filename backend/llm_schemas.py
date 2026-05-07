@@ -268,6 +268,34 @@ class InnerThoughtResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# ConnectionProposalResponse — connection_proposal.py (Phase 2.10)
+# ---------------------------------------------------------------------------
+
+class ConnectionProposalResponse(BaseModel):
+    """A single one-sentence claim linking two pinned passages from the
+    same turn. Empty `claim` is a valid response meaning "no connection
+    found"; the orchestrator skips the pair without proposing.
+
+    See prompts/connection_proposal.md for the prompt + design intent.
+    The 140-char cap is enforced here so the popup never has to truncate.
+    """
+    claim: str = ""
+
+    @field_validator("claim", mode="before")
+    @classmethod
+    def coerce_claim(cls, v):
+        if v is None:
+            return ""
+        if not isinstance(v, str):
+            return ""
+        s = v.strip()
+        # Strip leading/trailing quotes that some LLMs wrap output in.
+        if s.startswith('"') and s.endswith('"') and len(s) >= 2:
+            s = s[1:-1].strip()
+        return s[:140]
+
+
+# ---------------------------------------------------------------------------
 # leaks_raw_numbers — narrative output safety check
 # ---------------------------------------------------------------------------
 

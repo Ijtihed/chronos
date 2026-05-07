@@ -115,6 +115,8 @@ backend/              Python server (FastAPI)
   character_gen.py       Character + NPC generation at run start (LLM)
   persistence.py         SQLite session storage (WAL mode, performance-tuned)
   llm_provider.py        All-Gemini LLM dispatcher -- Gemini + circuit breaker + NoOp fallback + cost accounting
+  pin_classifier.py      Phase 2.9 — classifies pin source_confidence (observed/told_by/rumor/inferred) by reading turn_logs. No LLM.
+  connection_proposal.py Phase 2.10 — Gemini Flash Lite proposer that writes one-sentence claims linking same-turn pin pairs.
   config.py              Environment config — API keys, pricing constants, cost caps
   eras/                  5 era configs with locations, archetypes, coordinates
   hke/                   Historical Knowledge Engine (RAG — Chroma + Gutenberg/Wikipedia)
@@ -145,7 +147,8 @@ tests/                ~820 automated tests
 | GET | `/api/run/{id}/interaction_graph` | Player-centric NPC interaction graph (read-only snapshot) |
 | GET | `/api/run/{id}/events/visible` | Map event pins. Civilizational + regional events only, lifetime window, regional events constrained to era home region. |
 | POST | `/api/run/{id}/pin` | Phase 2.9 — create a single pin from a highlighted manuscript passage. Server classifies `source_confidence` (observed / told_by / rumor / inferred) by reading the source turn-log row. |
-| POST | `/api/run/{id}/pinboard` | Phase 2.9 — bulk pinboard update (positions, deletes, connection upserts, cuts). Partial-update semantics. |
+| POST | `/api/run/{id}/pinboard` | Phase 2.9 — bulk pinboard update (positions, deletes, connection upserts, cuts). Partial-update semantics. Phase 2.10 extended: `delete_connection_ids`, `tombstone_pin_pairs`, `meta_was_edited` for the agree/edit/reject flow. |
+| POST | `/api/run/{id}/pinboard/propose_connections` | Phase 2.10 — auto-proposer. Walks same-turn pin pairs, skips already-connected and tombstoned, asks Gemini Flash Lite for one-sentence claims, writes them as `kind="auto_proposed"`. Frontend gates the call (≥3 unconnected pins, ≥2 turns since last). |
 | POST | `/api/run/{id}/board` | **410 Gone** — the deleted Phase 2.8 corridor endpoint. Use `/pinboard` instead. |
 | POST | `/api/run/{id}/reset` | Reset run |
 | GET | `/api/runs` | List all runs |

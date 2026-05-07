@@ -83,6 +83,7 @@ from backend.world_state import (
     get_player_location,
     npcs_near_player,
 )
+from backend.connection_proposal import generate_connection_proposal
 from backend.pin_classifier import classify_pin_source
 
 logger = logging.getLogger("chronos")
@@ -539,6 +540,11 @@ class PinConnectionUpdate(BaseModel):
     kind: str = "player"
     cut: bool = False
     label: str = ""
+    # Phase 2.10: when the player edits a proposed connection's text,
+    # the frontend sends both the new label AND `meta_was_edited=true`
+    # so we record the edit alongside the kind transition. Other meta
+    # fields are reserved for future use.
+    meta_was_edited: bool = False
 
 
 class PinboardUpdateRequest(BaseModel):
@@ -550,6 +556,13 @@ class PinboardUpdateRequest(BaseModel):
     pin_connections: list[PinConnectionUpdate] | None = None
     # Convenience: setting cut=true on existing connections by id.
     cut_connection_ids: list[str] | None = None
+    # Phase 2.10: hard-delete connections by id. Used by the reject
+    # action: an auto_proposed connection is removed entirely (cut
+    # would leave a stub). The frontend sends the rejected pin pair
+    # in `tombstone_pin_pairs` alongside this so the proposer doesn't
+    # re-suggest the same connection.
+    delete_connection_ids: list[str] | None = None
+    tombstone_pin_pairs: list[list[str]] | None = None
 
 
 @app.post("/api/run/{run_id}/pinboard")
@@ -558,6 +571,7 @@ async def update_pinboard(run_id: str, req: PinboardUpdateRequest):
         state = await _load_or_404(run_id)
         pins = list(state.pins or [])
         connections = list(state.pin_connections or [])
+        rejected_pairs = list(getattr(state, "rejected_pin_pairs", []) or [])
 
         # ── Pin position updates ─────────────────────────────────────
         if req.pin_positions is not None:
@@ -584,6 +598,18 @@ async def update_pinboard(run_id: str, req: PinboardUpdateRequest):
                 c for c in connections
                 if c.from_pin_id not in doomed and c.to_pin_id not in doomed
             ]
+            # Phase 2.10 cascade: tombstones referencing a deleted pin
+            # are meaningless. Drop them so a re-pinned passage isn't
+            # silently blocked from being proposed.
+            rejected_pairs = [
+                pair for pair in rejected_pairs
+                if (
+                    isinstance(pair, list)
+                    and len(pair) == 2
+                    and pair[0] not in doomed
+                    and pair[1] not in doomed
+                )
+            ]
 
         # ── Connection upserts ───────────────────────────────────────
         if req.pin_connections is not None:
@@ -604,21 +630,32 @@ async def update_pinboard(run_id: str, req: PinboardUpdateRequest):
                 kind = upd.kind if upd.kind in PIN_CONNECTION_KINDS else "player"
                 if upd.id and upd.id in by_id:
                     existing = by_id[upd.id]
+                    # Kind transition is allowed: auto_proposed -> auto
+                    # is the agree/edit path. Player can also change
+                    # label via edit. cut is honored too.
                     existing.kind = kind
                     existing.cut = bool(upd.cut)
                     existing.label = (upd.label or "")[:200]
+                    if upd.meta_was_edited:
+                        meta = dict(existing.meta or {})
+                        meta["was_edited"] = True
+                        existing.meta = meta
                 else:
                     if (fid, tid) in seen_pair or (tid, fid) in seen_pair:
                         # No duplicate edges in either direction.
                         continue
                     if len(connections) >= 1000:
                         break
+                    new_meta: dict = {}
+                    if upd.meta_was_edited:
+                        new_meta["was_edited"] = True
                     new_kwargs = {
                         "from_pin_id": fid,
                         "to_pin_id": tid,
                         "kind": kind,
                         "cut": bool(upd.cut),
                         "label": (upd.label or "")[:200],
+                        "meta": new_meta,
                     }
                     # Honor a client-provided id only if it's a real
                     # string; otherwise let Pydantic generate one.
@@ -634,14 +671,187 @@ async def update_pinboard(run_id: str, req: PinboardUpdateRequest):
                 if c.id in ids:
                     c.cut = True
 
+        # ── Hard-delete connections by id (reject action) ────────────
+        if req.delete_connection_ids is not None:
+            ids = set(req.delete_connection_ids[:1000])
+            connections = [c for c in connections if c.id not in ids]
+
+        # ── Tombstone pin pairs (reject action) ──────────────────────
+        if req.tombstone_pin_pairs is not None:
+            existing_pairs = {
+                (pair[0], pair[1]) for pair in rejected_pairs
+                if isinstance(pair, list) and len(pair) == 2
+            }
+            for pair in req.tombstone_pin_pairs[:200]:
+                if not isinstance(pair, list) or len(pair) != 2:
+                    continue
+                a, b = (pair[0] or "")[:200], (pair[1] or "")[:200]
+                if not a or not b or a == b:
+                    continue
+                if (a, b) in existing_pairs or (b, a) in existing_pairs:
+                    continue
+                if len(rejected_pairs) >= 500:
+                    break
+                rejected_pairs.append([a, b])
+                existing_pairs.add((a, b))
+
         state.pins = pins
         state.pin_connections = connections
+        state.rejected_pin_pairs = rejected_pairs
         await save_session(state)
         return {
             "saved": True,
             "pin_count": len(pins),
             "connection_count": len(connections),
+            "rejected_pair_count": len(rejected_pairs),
             "cut_count": sum(1 for c in connections if c.cut),
+        }
+
+
+# Phase 2.10 — auto-proposer.
+#
+# The orchestrator decides WHEN to call this; the orchestrator (which
+# in this build is the frontend's app.js after each turn) is also
+# responsible for the threshold gate ">=3 unconnected pins AND >=2
+# turns since last proposal." Once the gate passes, the frontend
+# POSTs here. We:
+#
+#   1. group pins by source_turn_id (same-turn-only scope rule),
+#   2. for each turn group with >= 2 pins, walk every unordered pair,
+#   3. skip pairs that are already connected (any kind, even cut) or
+#      tombstoned in `state.rejected_pin_pairs`,
+#   4. for each surviving pair, ask Gemini for a one-sentence claim,
+#   5. write each non-empty claim as a new PinConnection with
+#      kind="auto_proposed".
+#
+# We also write `state.last_propose_turn = current_turn` so the gate
+# can read it back. Cap of 8 LLM calls per request to protect against
+# runaway proposing on a 30-turn pinboard with many same-turn pins.
+
+class ProposeConnectionsRequest(BaseModel):
+    # Optional. The frontend can pass the current turn index so the
+    # gate's "since last propose" calculation is meaningful. If None,
+    # we default to 0 (always-passes gate). Phase 2.10 doesn't act on
+    # it server-side; the frontend owns the gate.
+    current_turn: int | None = None
+    # Optional cap. Defaults to 8 to protect cost. Per-call ~$0.00006
+    # so 8 calls ~ $0.00048 per /propose_connections request.
+    max_calls: int = 8
+
+
+@app.post("/api/run/{run_id}/pinboard/propose_connections")
+async def propose_connections(run_id: str, req: ProposeConnectionsRequest):
+    async with _session_locks[run_id]:
+        state = await _load_or_404(run_id)
+        pins: list[Pin] = list(state.pins or [])
+        connections: list[PinConnection] = list(state.pin_connections or [])
+        rejected_pairs: list[list[str]] = (
+            list(getattr(state, "rejected_pin_pairs", []) or [])
+        )
+
+        # Hard cost cap: refuse any new LLM calls if the run is past
+        # the hard cap. Same protection that /turn already enforces.
+        if (state.cost_cap_state or "none") == "hard":
+            raise HTTPException(
+                status_code=402,
+                detail={
+                    "code": "cost_cap_hard",
+                    "message": (
+                        "This run has reached the hard cost cap. "
+                        "Auto-proposer is disabled."
+                    ),
+                },
+            )
+
+        if len(pins) < 2:
+            return {"saved": False, "proposed": [], "skipped_reason": "not_enough_pins"}
+
+        # Index existing connections + tombstones for O(1) skip checks.
+        # Both directions count -- (A,B) and (B,A) are the same pair.
+        existing_pairs: set[tuple[str, str]] = set()
+        for c in connections:
+            existing_pairs.add((c.from_pin_id, c.to_pin_id))
+            existing_pairs.add((c.to_pin_id, c.from_pin_id))
+        rejected_set: set[tuple[str, str]] = set()
+        for pair in rejected_pairs:
+            if isinstance(pair, list) and len(pair) == 2:
+                rejected_set.add((pair[0], pair[1]))
+                rejected_set.add((pair[1], pair[0]))
+
+        # Group pins by source_turn_id. Same-turn-only scope rule
+        # (locked-in by user 2026-05-07) -- the proposer never links
+        # pins from different turns, even if they're related.
+        by_turn: dict[str, list[Pin]] = {}
+        for pin in pins:
+            tid = pin.source_turn_id or ""
+            if not tid:
+                continue
+            by_turn.setdefault(tid, []).append(pin)
+
+        max_calls = max(1, min(int(req.max_calls or 8), 16))
+        calls_made = 0
+        proposed: list[PinConnection] = []
+
+        # Wrap the LLM-firing path in track_turn_cost() so the
+        # connection_proposal call site's cost aggregates into the
+        # run total via _finalize_turn_cost. Per chronos-model-tier.mdc,
+        # every LLM call MUST land inside a tracked bucket; an
+        # unwrapped call is an unprotected hole in the cost ceiling.
+        with track_turn_cost() as bucket:
+            # Walk same-turn pairs. Within a turn, we walk pins in
+            # creation-order (the order they appear on `pins`); pairs
+            # are unordered (we always emit (earlier, later)).
+            for tid, turn_pins in by_turn.items():
+                if len(turn_pins) < 2:
+                    continue
+                turn_label = tid  # The frontend can stash a richer
+                                  # label; for now the id is enough.
+                for i in range(len(turn_pins)):
+                    if calls_made >= max_calls:
+                        break
+                    for j in range(i + 1, len(turn_pins)):
+                        if calls_made >= max_calls:
+                            break
+                        a, b = turn_pins[i], turn_pins[j]
+                        if (a.id, b.id) in existing_pairs:
+                            continue
+                        if (a.id, b.id) in rejected_set:
+                            continue
+                        calls_made += 1
+                        claim = await generate_connection_proposal(a, b, turn_label)
+                        if not claim:
+                            continue
+                        new_conn = PinConnection(
+                            from_pin_id=a.id,
+                            to_pin_id=b.id,
+                            kind="auto_proposed",
+                            cut=False,
+                            label=claim,
+                            meta={"system_text": claim, "source_turn_id": tid},
+                        )
+                        connections.append(new_conn)
+                        existing_pairs.add((a.id, b.id))
+                        existing_pairs.add((b.id, a.id))
+                        proposed.append(new_conn)
+                if calls_made >= max_calls:
+                    break
+
+            # Aggregate the proposer's cost into the run total. This
+            # also flips state.cost_cap_state if the run crosses
+            # soft/hard thresholds during this call.
+            cost_delta = _finalize_turn_cost(state, bucket)
+
+        if req.current_turn is not None and isinstance(req.current_turn, int):
+            state.last_propose_turn = max(int(req.current_turn), state.last_propose_turn or -1)
+        state.pin_connections = connections
+        await save_session(state)
+        return {
+            "saved": True,
+            "proposed": [c.model_dump() for c in proposed],
+            "calls_made": calls_made,
+            "connection_count": len(connections),
+            "cost_delta_usd": cost_delta,
+            "cost_cap_state": state.cost_cap_state,
         }
 
 

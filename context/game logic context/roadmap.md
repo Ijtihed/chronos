@@ -322,6 +322,50 @@ After playing 10 turns, the player has a pinboard with 4–8 pins they curated t
 
 ---
 
+## PHASE 2.10 — The pinboard becomes active (propose / agree / edit / reject)
+
+**Goal:** The pinboard stops being a quiet curation surface and starts proposing connections the player adjudicates. After each turn (gated), the system suggests one or more links between same-turn pins; the player agrees, edits, or rejects.
+
+**Why this exists right after 2.9:** Phase 2.9 shipped the pinboard as a *passive* surface — the player can pin and connect, but the system never participates. That made the pinboard feel inert: a notepad, not a sub-agent. Phase 2.10 wakes it up. The pinboard now reads what you pinned and offers an interpretation, which you accept, rewrite, or refuse.
+
+### What exists at the end of this phase
+
+- **Auto-proposer endpoint.** `POST /api/run/{id}/pinboard/propose_connections`. The frontend triggers it after each turn when the gate condition is met (≥3 unconnected pins, ≥2 turns since last proposal). Server walks same-turn pin pairs (no cross-turn fishing), skips already-connected and tombstoned pairs, capped at 8 LLM calls per request. Each surviving pair gets one Gemini Flash Lite call for a one-sentence claim.
+- **New `PinConnection.kind = "auto_proposed"`** state, distinct from `player` (solid emerald) and `auto` (solid amber). Renders as a faint dashed yellow line with a small `?` marker at the midpoint.
+- **Adjudicate popup.** Click an `auto_proposed` line or its `?` marker → popup at the line midpoint showing the claim + Agree / Edit / Reject buttons. Esc closes; Enter agrees (when not in textarea).
+- **Three transitions.** Agree → `kind` becomes `auto`, label preserved. Edit → `kind` becomes `auto`, label replaced with player text, `meta.was_edited = true`. Reject → connection hard-deleted AND pin pair tombstoned in `WorldState.rejected_pin_pairs` so the pair is never re-suggested.
+- **New `WorldState.rejected_pin_pairs: List[List[str]]`** for tombstones. Cascade-dropped on pin delete. Reverse-pair equivalence (`(A,B)` and `(B,A)` count as the same rejection).
+- **New `WorldState.last_propose_turn: int`** so the gate can read it.
+- **New LLM call site `connection_proposal`** (Gemini Flash Lite). Per `chronos-model-tier.mdc` flagged for explicit review; prompt template in `prompts/connection_proposal.md`. Per-call ~$0.00006; per typical 10-turn run ~$0.0001–$0.0003. Far below cost cap.
+- **NoOp / failure path.** If Gemini returns NoOp / circuit-breaker is open / JSON parse fails → empty claim → no proposal written for that pair → pinboard never blocks → no banner, no error.
+
+### Success criteria
+
+- [ ] After playing 6+ turns with ≥3 same-turn pins on the pinboard, a faint dashed yellow line with a `?` marker appears between two of them.
+- [ ] Clicking the line or marker opens an adjudicate popup with the claim text and three buttons.
+- [ ] Agree → line turns solid amber; reload → line is still solid amber.
+- [ ] Edit → textarea replaces claim; Agree saves the edited text + `meta.was_edited`. Reload preserves both.
+- [ ] Reject → line vanishes; same pair never re-proposed even after 5+ further turns.
+- [ ] Cross-turn pin pairs are NEVER proposed.
+- [ ] Already-connected pairs (any kind, any cut state) are NEVER proposed.
+- [ ] Per-run cost contribution from `connection_proposal` stays under €0.001 across a 30-turn playtest.
+- [ ] Phase 2.9 success criteria still pass (no regressions on pin create / drag / connect / cut / restore).
+
+### Definition of success
+
+The pinboard now feels like a co-author. The player pins what mattered to them; the system reads those pins back and proposes how they relate; the player adjudicates. The flow is honest: the system says "this is what I think connects them," and the player has full authority to accept, rewrite, or refuse.
+
+### What is explicitly NOT in this phase
+
+- **Simulation rewinds when a player edits a connection.** Phase B. Still blocked by three open questions in `open-questions.md` ("Phase 2.10 Phase B blockers"). Carried forward unchanged from cancelled Phase 2.8 Phase B.
+- **Counterfactual / before-after narration.** Claim-only output. The "what would change without this connection" framing was deliberately rejected because it would lie about Phase B (the simulation isn't actually going to rewind).
+- **Cross-turn proposals.** Same-turn-only scope rule.
+- **Multiple pending proposals visible at once.** One popup at a time.
+- **Proposal history / audit log.** Rejected pairs are tombstoned; we don't keep a per-rejection log.
+- **Player-typed labels on player-drawn lines.** Only system-proposed lines have labels in 2.10. Free-form labeling is a future commit.
+
+---
+
 ## PHASE 3 — Scene Illustrations
 
 **Goal:** When the player experiences a major event — their character's defining moment, an encounter with a key NPC, a turning point in the run — a diffusion-generated scene illustration renders what they are experiencing.

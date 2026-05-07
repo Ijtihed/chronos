@@ -1088,6 +1088,20 @@ async function submitTurn(text) {
     _wireDecayHoverAll();
     saveRunToStorage();
 
+    // Phase 2.10: ask the pinboard if it wants to propose connections.
+    // The pinboard owns the threshold gate (>=3 unconnected pins,
+    // >=2 turns since last proposal) and the LLM call; we only nudge
+    // it with the current turn index. Best-effort -- never blocks
+    // the turn, never throws.
+    if (typeof ChronosPinboard !== "undefined" && ChronosPinboard.maybePropose) {
+      try {
+        const turnIdx = (state && typeof state.turn === "number") ? state.turn : 0;
+        ChronosPinboard.maybePropose(turnIdx);
+      } catch (e) {
+        console.warn("[app] maybePropose failed:", e);
+      }
+    }
+
     if (data.death) {
       showDeathMarker(data.death.cause);
       enterObservationMode();

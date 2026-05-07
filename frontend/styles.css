@@ -3127,3 +3127,139 @@ body.is-dead #pinboard-panel {
   background: rgba(110, 231, 183, 0.30);
   color: rgba(255, 255, 255, 0.95);
 }
+
+/* ─── Phase 2.10: auto_proposed connection visuals ──────────────────── *
+ *
+ * A connection in the kind="auto_proposed" state is a system suggestion
+ * the player hasn't yet adjudicated. It renders as a faint dashed
+ * yellow line with a small "?" marker at the midpoint that opens the
+ * adjudicate popup on click.
+ */
+#pinboard-edges line.is-proposed {
+  /* Stroke + dasharray are set inline on the element; this rule just
+   * adds a subtle pulse on hover so it reads as actionable. */
+  filter: drop-shadow(0 0 3px rgba(252, 211, 77, 0.25));
+  cursor: help;
+}
+#pinboard-edges line.is-proposed:hover {
+  stroke-opacity: 1 !important;
+  stroke-width: 2.4 !important;
+}
+#pinboard-edges .proposal-marker {
+  cursor: pointer;
+}
+#pinboard-edges .proposal-marker:hover circle {
+  fill: rgba(40, 32, 8, 1);
+}
+
+/* ─── Phase 2.10: adjudicate popup ──────────────────────────────────── *
+ *
+ * Shown near the line midpoint when the player clicks an auto_proposed
+ * connection or its "?" marker. Fixed-position so it floats above
+ * everything, including the manuscript's depth-stack. The body
+ * appendChild path means we don't have to thread it through a
+ * specific stacking context.
+ */
+#pinboard-adjudicate {
+  position: fixed;
+  z-index: 9995;
+  width: 320px;
+  background: rgba(8, 8, 10, 0.97);
+  border: 1px solid rgba(252, 211, 77, 0.40);
+  border-radius: 6px;
+  padding: 14px 16px;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  color: rgba(229, 229, 234, 0.95);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.65),
+              0 0 0 1px rgba(252, 211, 77, 0.10) inset;
+  backdrop-filter: blur(8px);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+#pinboard-adjudicate.hidden {
+  display: none;
+}
+#pinboard-adjudicate .adj-header {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: rgba(252, 211, 77, 0.70);
+  font-weight: 600;
+}
+#pinboard-adjudicate .adj-claim {
+  font-size: 12px;
+  line-height: 1.55;
+  color: rgba(229, 229, 234, 0.92);
+  font-style: italic;
+}
+#pinboard-adjudicate .adj-claim.hidden {
+  display: none;
+}
+#pinboard-adjudicate textarea#adj-edit {
+  width: 100%;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+  padding: 8px 10px;
+  color: rgba(229, 229, 234, 0.95);
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1.5;
+  resize: vertical;
+  outline: none;
+}
+#pinboard-adjudicate textarea#adj-edit:focus {
+  border-color: rgba(110, 231, 183, 0.55);
+}
+#pinboard-adjudicate textarea#adj-edit.hidden {
+  display: none;
+}
+#pinboard-adjudicate .adj-buttons {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+  align-items: center;
+}
+#pinboard-adjudicate .adj-btn {
+  font-family: inherit;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  padding: 6px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.45);
+  color: rgba(229, 229, 234, 0.75);
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+#pinboard-adjudicate .adj-btn:hover {
+  color: rgba(255, 255, 255, 0.95);
+  border-color: rgba(255, 255, 255, 0.30);
+}
+#pinboard-adjudicate .adj-reject {
+  color: rgba(248, 113, 113, 0.75);
+  border-color: rgba(248, 113, 113, 0.30);
+}
+#pinboard-adjudicate .adj-reject:hover {
+  color: rgba(252, 165, 165, 0.95);
+  border-color: rgba(248, 113, 113, 0.55);
+}
+#pinboard-adjudicate .adj-agree {
+  color: rgba(110, 231, 183, 0.95);
+  border-color: rgba(110, 231, 183, 0.45);
+  background: rgba(20, 35, 25, 0.60);
+}
+#pinboard-adjudicate .adj-agree:hover {
+  color: rgba(167, 243, 208, 1);
+  border-color: rgba(110, 231, 183, 0.70);
+  background: rgba(28, 50, 35, 0.75);
+}
+#pinboard-adjudicate .adj-keyhint {
+  font-size: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: rgba(255, 255, 255, 0.20);
+  text-align: right;
+}
