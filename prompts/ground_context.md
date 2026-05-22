@@ -1,5 +1,5 @@
 # Ground Context Generator -- prompt template
-# Model tier: Gemini (`CHRONOS_GEMINI_MODEL`, default `gemini-3-flash-preview`)
+# Model tier: Gemini (`CHRONOS_GEMINI_MODEL`, default `gemini-2.5-flash-lite`)
 # Called: at run initialization and whenever ground_context_stale is set (location change, significant world event)
 # Review status: NEEDS USER REVIEW (per chronos-ai-dev-protocol.mdc)
 ---

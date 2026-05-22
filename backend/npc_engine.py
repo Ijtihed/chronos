@@ -1,9 +1,8 @@
 """Generate NPC point-of-view responses via the LLM provider.
 
-Model tier: QUALITY — this is the most prose-critical call in the game.
+All LLM calls route to Gemini (tier parameter is a no-op).
 Returns structured NPCPOVResponse; stores emotional_state on the NPC.
-On JSON parse failure, retries with raw text (still via the same tier
-dispatcher so quality-vs-fast routing is preserved on the retry).
+On JSON parse failure, retries with raw text.
 """
 
 from __future__ import annotations
@@ -100,7 +99,10 @@ async def generate_npc_pov(
     raw_template = load_prompt(_TEMPLATE_PATH)
     template = Template(raw_template)
 
-    player_loc = get_player_location(state)
+    try:
+        player_loc = get_player_location(state)
+    except ValueError:
+        return f"{npc.name} continues about their day."
 
     query = action.get("era_description", action.get("intent", ""))
     historical_context = retrieve_context(state.era.name, query) if query else ""
@@ -165,7 +167,6 @@ async def generate_npc_pov(
         era_description_of_action=action.get(
             "era_description", "Something has happened in town."
         ),
-        action_intent=action.get("intent", "unknown"),
         this_turn_events=this_turn_str,
         already_used_details=already_used_details,
     )
@@ -218,7 +219,10 @@ async def generate_npc_addressed(
     raw_template = load_prompt(_ADDRESSED_TEMPLATE_PATH)
     template = Template(raw_template)
 
-    player_loc = get_player_location(state)
+    try:
+        player_loc = get_player_location(state)
+    except ValueError:
+        return {"reply": f"{npc.name} continues about their day.", "internal": None, "emotional_state": ""}
 
     query = action.get("era_description", action.get("intent", ""))
     historical_context = retrieve_context(state.era.name, query) if query else ""
@@ -318,6 +322,8 @@ async def generate_npc_addressed(
                 tier="quality",
                 call_site="npc_addressed.retry",
             )
+            if leaks_raw_numbers(raw_text):
+                raw_text = scrub_leaked_numbers(raw_text)
             return {"reply": raw_text, "internal": None, "emotional_state": ""}
         except Exception as exc:
             return {**fallback, "reply": f"[{npc.name} is silent — LLM error: {exc}]"}

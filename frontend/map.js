@@ -460,7 +460,7 @@ const ChronosMap = (function () {
       locById[knownLocs[k].id] = knownLocs[k];
     }
 
-    if (playerLoc && playerLoc.lat && playerLoc.lon) {
+    if (playerLoc && playerLoc.lat != null && playerLoc.lon != null) {
       var playerClass =
         runStatus === "dead_observing"
           ? "marker-faded"
@@ -501,7 +501,7 @@ const ChronosMap = (function () {
     }
 
     if (runStatus === "ended") {
-      if (playerLoc && playerLoc.lat && _firstMarkerPlacement) {
+      if (playerLoc && playerLoc.lat != null && _firstMarkerPlacement) {
         map.setView([playerLoc.lat, playerLoc.lon], map.getZoom(), { animate: true, duration: 0.8 });
       }
       return;
@@ -511,7 +511,7 @@ const ChronosMap = (function () {
     var npcsHere = pv.npcs_here || [];
     for (var n = 0; n < npcsHere.length; n++) {
       var npc = npcsHere[n];
-      if (!playerLoc || !playerLoc.lat) continue;
+      if (!playerLoc || playerLoc.lat == null) continue;
 
       var offset = (n * 0.003) % 0.01;
       var m = L.marker([playerLoc.lat + offset, playerLoc.lon + offset], {
@@ -554,7 +554,7 @@ const ChronosMap = (function () {
           break;
         }
       }
-      if (!knownLoc || !knownLoc.lat) continue;
+      if (!knownLoc || knownLoc.lat == null) continue;
 
       var markerClass = runStatus === "dead_observing" ? "marker-faded" : "marker-visited";
       var kOffset = (kn * 0.003) % 0.01;
@@ -587,7 +587,7 @@ const ChronosMap = (function () {
       npcMarkers.push(uvm);
     }
 
-    if (playerLoc && playerLoc.lat && _firstMarkerPlacement) {
+    if (playerLoc && playerLoc.lat != null && _firstMarkerPlacement) {
       map.setView([playerLoc.lat, playerLoc.lon], map.getZoom(), {
         animate: true,
         duration: 0.8,
@@ -615,7 +615,14 @@ const ChronosMap = (function () {
     ).openPopup();
     try {
       var res = await fetch("/api/run/" + currentRunId + "/npc/" + npc.id + "/perception");
-      if (!res.ok) return;
+      if (!res.ok) {
+        marker.unbindPopup();
+        marker.bindPopup(
+          '<div style="font-size:10px;color:rgba(255,255,255,0.25);text-transform:uppercase;letter-spacing:0.1em;padding:4px;">unable to read them</div>',
+          { className: "perception-popup", closeButton: false }
+        ).openPopup();
+        return;
+      }
       var data = await res.json();
       perceptionCache[cacheKey] = data.perception;
       marker.unbindPopup();
@@ -641,7 +648,7 @@ const ChronosMap = (function () {
     var body = document.getElementById("region-panel-body");
     if (!panel || !body) return;
 
-    title.textContent = data.polity_name;
+    if (title) title.textContent = data.polity_name;
 
     var h = "";
 
@@ -659,7 +666,7 @@ const ChronosMap = (function () {
       }
     }
 
-    if (!data.known_facts.length && !data.rumors.length) {
+    if (!(data.known_facts && data.known_facts.length) && !(data.rumors && data.rumors.length)) {
       h += '<p class="region-fact" style="color:rgba(255,255,255,0.2);font-style:italic;">You know nothing of this place.</p>';
     }
 
@@ -804,7 +811,7 @@ const ChronosMap = (function () {
     var type = (ev.type || "").toUpperCase();
     return (
       '<span style="font-size:11px;color:#d4d4d8;">' + year + " — " + type + "</span>" +
-      '<br><span style="font-size:9px;color:#a1a1aa;">' + _esc(ev.summary.substring(0, 80)) + "</span>"
+      '<br><span style="font-size:9px;color:#a1a1aa;">' + _esc(ev.summary ? ev.summary.substring(0, 80) : "No details") + "</span>"
     );
   }
 
@@ -894,6 +901,12 @@ const ChronosMap = (function () {
     }
     _loadEventsForRun(currentRunId);
     _updateZoomHint();
+
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () {
+        container.classList.add("ready");
+      });
+    });
   }
 
   function hide() {

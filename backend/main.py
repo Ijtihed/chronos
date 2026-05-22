@@ -11,10 +11,13 @@ import asyncio
 import json
 import logging
 import math
+import re
 import time
-from collections import defaultdict
 from pathlib import Path
 from string import Template
+from typing import Any
+
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
@@ -50,6 +53,7 @@ from backend.persistence import (
     load_session,
     query_historical_events,
     save_session,
+    seed_historical_events_if_empty,
 )
 from backend.llm_schemas import leaks_raw_numbers, scrub_leaked_numbers
 from backend.player_knowledge import (
@@ -64,7 +68,6 @@ from backend.scene_triggers import (
 from backend.world_engine import (
     advance_world,
     advance_world_skip,
-    generate_arrival_catchup,
     mark_consequence_superseded_mem,
     player_skip_turn,
     simulate_turn,
@@ -91,6 +94,7 @@ from backend.world_state import (
     get_location,
     get_player_location,
     npcs_near_player,
+    _npc_name_matches,
 )
 from backend.connection_proposal import generate_connection_proposal
 from backend.pin_classifier import classify_pin_source
@@ -98,9 +102,73 @@ from backend.scene_director import generate_scene_spec
 
 logger = logging.getLogger("chronos")
 
-app = FastAPI(title="CHRONOS", version="0.2.0")
 
-_session_locks: dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
+@asynccontextmanager
+async def _lifespan(app: FastAPI):
+    """FastAPI lifespan hook (replaces the deprecated on_event("startup")).
+
+    Runs once at server start: schema migrations + auto-seed of the
+    historical_events table + one-shot Gemini smoke test. The auto-seed
+    is idempotent (skips when the table already has data), so a richer
+    `scripts/build_events_db.py` ingest survives restarts.
+    """
+    await init_db()
+    try:
+        await seed_historical_events_if_empty()
+    except Exception as exc:
+        logger.warning(
+            "Auto-seed of historical_events failed (non-fatal, game still "
+            "playable but HCE content will be sparse): %s: %s",
+            type(exc).__name__, exc,
+        )
+    config.startup_log(logger)
+    if config.GEMINI_API_KEY:
+        ok, detail = await gemini_ok()
+        if ok:
+            logger.info(
+                "Gemini startup smoke test OK (%s, %s)",
+                config.CHRONOS_GEMINI_MODEL, detail,
+            )
+        else:
+            logger.warning(
+                "Gemini startup smoke test FAILED (%s). LLM calls will return "
+                "NoOp responses until the circuit recovers. "
+                "Check GEMINI_API_KEY and model name '%s'.",
+                detail, config.CHRONOS_GEMINI_MODEL,
+            )
+    yield
+
+
+app = FastAPI(title="CHRONOS", version="0.2.0", lifespan=_lifespan)
+
+# Per-run async locks. Created lazily via `_get_lock(run_id)`; the helper
+# refuses to mint new locks for run_ids that don't even look like one of
+# ours (12 lowercase hex chars from `uuid4().hex[:12]`). That means the
+# defaultdict-style implicit creation is gone -- a probe like
+# `/api/run/admin/turn` or `/api/run/<sql-injection-attempt>/pinboard`
+# returns 404 (or 400) without leaking a lock. Without this guard, every
+# bogus run_id ever requested accumulated one asyncio.Lock for the
+# lifetime of the process, an unbounded memory leak under hostile
+# traffic. Real run_ids that 404 (deleted runs, race with delete) still
+# briefly create a lock; the explicit cleanup hook in delete_run pops it.
+_session_locks: dict[str, asyncio.Lock] = {}
+
+# uuid.uuid4().hex[:12] -> 12 lowercase hex chars. Anything else is a
+# probe / typo / attack -- never a real run_id we minted.
+_RUN_ID_RE = re.compile(r"^[0-9a-f]{12}$")
+
+
+def _get_lock(run_id: str) -> asyncio.Lock:
+    """Return the per-run lock, creating it lazily but only for
+    plausibly-valid run_ids. Raises HTTPException(404) for malformed
+    ids so probe traffic can't grow the lock dict without bound."""
+    if not isinstance(run_id, str) or not _RUN_ID_RE.match(run_id):
+        raise HTTPException(404, f"Run '{run_id}' not found")
+    lock = _session_locks.get(run_id)
+    if lock is None:
+        lock = asyncio.Lock()
+        _session_locks[run_id] = lock
+    return lock
 
 _NPC_PERCEPTION_PATH = (
     Path(__file__).resolve().parent.parent / "prompts" / "npc_perception.md"
@@ -183,30 +251,6 @@ class RunRequest(BaseModel):
 
 
 # ------------------------------------------------------------------
-# Startup
-# ------------------------------------------------------------------
-
-@app.on_event("startup")
-async def _startup() -> None:
-    await init_db()
-    config.startup_log(logger)
-    if config.GEMINI_API_KEY:
-        ok, detail = await gemini_ok()
-        if ok:
-            logger.info(
-                "Gemini startup smoke test OK (%s, %s)",
-                config.CHRONOS_GEMINI_MODEL, detail,
-            )
-        else:
-            logger.warning(
-                "Gemini startup smoke test FAILED (%s). LLM calls will return "
-                "NoOp responses until the circuit recovers. "
-                "Check GEMINI_API_KEY and model name '%s'.",
-                detail, config.CHRONOS_GEMINI_MODEL,
-            )
-
-
-# ------------------------------------------------------------------
 # Health + Geo
 # ------------------------------------------------------------------
 
@@ -216,10 +260,17 @@ async def health():
     return {"status": "ok", "phase": 2, "gemini": gemini_status, "gemini_detail": gemini_detail}
 
 
+_ERA_KEY_RE = re.compile(r"^[A-Za-z0-9_]+$")
+
+
 @app.get("/api/geo/{era_key}")
 async def get_geo(era_key: str):
+    if not _ERA_KEY_RE.match(era_key):
+        raise HTTPException(400, "Invalid era key")
     geo_dir = Path(__file__).resolve().parent.parent / "frontend" / "geo"
     border_file = geo_dir / f"borders_{era_key}.geojson"
+    if not border_file.resolve().is_relative_to(geo_dir.resolve()):
+        raise HTTPException(400, "Invalid era key")
     if not border_file.exists():
         raise HTTPException(404, f"No border data for era '{era_key}'")
     try:
@@ -400,15 +451,24 @@ async def get_run_state(run_id: str):
 
 @app.delete("/api/run/{run_id}")
 async def delete_run(run_id: str):
-    await delete_session(run_id)
+    # Take the per-run lock so a delete that races with a /turn
+    # write doesn't corrupt the row, then drop the lock entry from
+    # the per-process dict so the live-runs set tracks reality.
+    # _get_lock validates the run_id format (12 hex chars) -- a
+    # probe like /api/run/admin gets 404 cleanly without minting a
+    # lock and pop is a no-op.
+    async with _get_lock(run_id):
+        await delete_session(run_id)
+    _session_locks.pop(run_id, None)
     return {"status": "deleted", "run_id": run_id}
 
 
 @app.post("/api/run/{run_id}/reset")
 async def reset_run(run_id: str):
-    state = create_initial_state()
-    state.run_id = run_id
-    await save_session(state)
+    async with _get_lock(run_id):
+        state = create_initial_state()
+        state.run_id = run_id
+        await save_session(state)
     return {"status": "reset", "player_view": build_player_view(state, run_id).model_dump()}
 
 
@@ -423,7 +483,7 @@ async def reset_run(run_id: str):
 
 @app.post("/api/run/{run_id}/turn")
 async def take_turn(run_id: str, req: TurnRequest):
-    async with _session_locks[run_id]:
+    async with _get_lock(run_id):
         return await _execute_turn(run_id, req)
 
 
@@ -490,7 +550,7 @@ async def create_pin(run_id: str, req: PinCreateRequest):
     if len(text) > 4000:
         text = text[:4000]
 
-    async with _session_locks[run_id]:
+    async with _get_lock(run_id):
         state = await _load_or_404(run_id)
         if len(state.pins or []) >= 200:
             raise HTTPException(
@@ -577,7 +637,7 @@ class PinboardUpdateRequest(BaseModel):
 
 @app.post("/api/run/{run_id}/pinboard")
 async def update_pinboard(run_id: str, req: PinboardUpdateRequest):
-    async with _session_locks[run_id]:
+    async with _get_lock(run_id):
         state = await _load_or_404(run_id)
         pins = list(state.pins or [])
         connections = list(state.pin_connections or [])
@@ -667,9 +727,17 @@ async def update_pinboard(run_id: str, req: PinboardUpdateRequest):
                         "label": (upd.label or "")[:200],
                         "meta": new_meta,
                     }
-                    # Honor a client-provided id only if it's a real
-                    # string; otherwise let Pydantic generate one.
-                    if upd.id:
+                    # Honor a client-provided id only if it looks like
+                    # a real one (12 lowercase hex chars from
+                    # uuid.uuid4().hex[:12]). Reject client-side
+                    # placeholder ids like "tmp-abc123" — frontend
+                    # pinboard.js uses those for optimistic local
+                    # inserts and relies on the server to mint a real
+                    # id, then re-fetches the connections list to
+                    # adopt it. If we silently accepted "tmp-..." here
+                    # the round-trip would loop, and cuts against a
+                    # tmp- id would never resolve.
+                    if upd.id and _RUN_ID_RE.match(upd.id):
                         new_kwargs["id"] = upd.id[:200]
                     connections.append(PinConnection(**new_kwargs))
                     seen_pair.add((fid, tid))
@@ -751,7 +819,7 @@ class ProposeConnectionsRequest(BaseModel):
 
 @app.post("/api/run/{run_id}/pinboard/propose_connections")
 async def propose_connections(run_id: str, req: ProposeConnectionsRequest):
-    async with _session_locks[run_id]:
+    async with _get_lock(run_id):
         state = await _load_or_404(run_id)
         pins: list[Pin] = list(state.pins or [])
         connections: list[PinConnection] = list(state.pin_connections or [])
@@ -852,7 +920,12 @@ async def propose_connections(run_id: str, req: ProposeConnectionsRequest):
             cost_delta = _finalize_turn_cost(state, bucket)
 
         if req.current_turn is not None and isinstance(req.current_turn, int):
-            state.last_propose_turn = max(int(req.current_turn), state.last_propose_turn or -1)
+            # Treat None as -1 only; preserve `0` literally. `state.last_propose_turn or -1`
+            # collapsed 0 to -1, which would let the gate re-fire on turn 0 -> turn 2
+            # twice instead of once. Default is -1, so this matters only for runs where the
+            # proposer fired on turn 0, which is rare but real.
+            prev = state.last_propose_turn if state.last_propose_turn is not None else -1
+            state.last_propose_turn = max(int(req.current_turn), prev)
         state.pin_connections = connections
         await save_session(state)
         return {
@@ -956,7 +1029,7 @@ def _build_minimal_diorama(source_turn_id: str) -> Diorama:
 
 @app.post("/api/run/{run_id}/diorama/{turn_id}")
 async def create_diorama(run_id: str, turn_id: str):
-    async with _session_locks[run_id]:
+    async with _get_lock(run_id):
         state = await _load_or_404(run_id)
 
         # Hard cost cap refusal.
@@ -1104,16 +1177,45 @@ async def create_diorama(run_id: str, turn_id: str):
 #     world does next. No reason to gate it behind world simulation.
 #
 # Cost: ~$0.0002 per call → ~€0.002 / 10-turn run, well under the cap.
-# State changes: NONE. Read-only against the current state snapshot.
+# State changes: writes the per-call cost into state.cumulative_cost_usd
+# so the run's cost ceiling stays tight (otherwise inner_thought is a
+# silent hole in the cost-cap accounting -- LLM calls fired outside any
+# track_turn_cost() scope skip _record_usage and trigger a one-shot
+# warning per process).
 @app.post("/api/run/{run_id}/inner_thought")
 async def inner_thought_endpoint(run_id: str, req: TurnRequest):
-    state = await _load_or_404(run_id)
-    if state.run_status not in {"active"}:
-        return {"inner_thought": ""}
     text = (req.player_input or "").strip()
     if not text:
         return {"inner_thought": ""}
-    thought = await generate_inner_thought(text, state)
+    # Race-safety: inner_thought fires in parallel with /turn from the
+    # frontend, so it cannot block on the same _session_locks[run_id]
+    # that /turn holds (that would force the thought to wait for the
+    # full simulation, defeating the latency budget). Instead, we
+    # snapshot the state without lock contention and accept the
+    # rare-stale read. The thought is informationally orthogonal to
+    # the turn outcome.
+    state = await _load_or_404(run_id)
+    if state.run_status not in {"active"}:
+        return {"inner_thought": ""}
+    # The frontend fires /inner_thought in parallel with /turn, so the
+    # /turn endpoint's hard-cap 402 won't reach inner_thought on its own.
+    # Without this guard, a run at the hard cost cap would still burn a
+    # Gemini call on every Enter — silently blowing the cap. Same
+    # 402 + cost_cap_hard contract as every other turn-advancing path.
+    if (state.cost_cap_state or "none") == "hard":
+        return {"inner_thought": ""}
+
+    with track_turn_cost() as bucket:
+        thought = await generate_inner_thought(text, state)
+        # Aggregate the per-call cost into the run total. We re-load
+        # state under the lock here so we don't trample a concurrent
+        # /turn writer, then flush the delta. The thought endpoint
+        # never mutates anything else on state; this is purely the
+        # cost accounting that was missing pre-fix.
+        async with _get_lock(run_id):
+            fresh = await _load_or_404(run_id)
+            _finalize_turn_cost(fresh, bucket)
+            await save_session(fresh)
     return {"inner_thought": thought}
 
 
@@ -1124,7 +1226,14 @@ async def _execute_turn(run_id: str, req: TurnRequest) -> dict:
         raise HTTPException(403, "Run has ended")
 
     if state.run_status == "dead_observing":
-        return await _handle_observation(state, req.player_input.strip())
+        text = req.player_input.strip()
+        if not text:
+            # Observation mode rejects empty inputs the same way the
+            # live-turn path does. Without this guard parse_action
+            # would fire an LLM call with no content -- wasting a
+            # token roundtrip and producing a junk response.
+            raise HTTPException(400, "Empty input")
+        return await _handle_observation(state, text)
 
     if state.run_status != "active":
         raise HTTPException(403, f"Run is '{state.run_status}'")
@@ -1250,7 +1359,7 @@ class SkipRequest(BaseModel):
 
 @app.post("/api/run/{run_id}/skip")
 async def skip_turns(run_id: str, req: SkipRequest):
-    async with _session_locks[run_id]:
+    async with _get_lock(run_id):
         return await _execute_skip(run_id, req)
 
 
@@ -1325,6 +1434,11 @@ async def npc_perception(run_id: str, npc_id: str):
         "faint" if npc.memory_of_player > 0.3 else "barely remember them"
     )
 
+    try:
+        player_loc_name = get_player_location(state).name
+    except ValueError:
+        player_loc_name = ""
+
     prompt = Template(raw_template).safe_substitute(
         player_name=state.player.name,
         player_role=state.player.role,
@@ -1336,6 +1450,8 @@ async def npc_perception(run_id: str, npc_id: str):
         relationship_to_player=npc.relationship_to_player,
         memory_level=mem_level,
         story_so_far=build_story_summary(state),
+        location_name=player_loc_name,
+        year=state.current_year or state.era.year_start,
     )
 
     # Read-only endpoint; wrap in a local bucket so ContextVar warnings
@@ -1597,7 +1713,6 @@ async def events_visible(run_id: str):
     centroid are also omitted — no pin we could plausibly render.
     """
     from backend.geo.centroids import (
-        resolve_region,
         resolve_event_location,
         jitter_point,
     )
@@ -1734,11 +1849,10 @@ def _graph_memory_label(memory: float) -> str:
 
 
 def _graph_npc_matches_event_target(npc, target_raw: str) -> bool:
-    """Mirror world_state._apply_target_fallback's matching rule."""
+    """Mirror world_state._apply_target_fallback's word-boundary matching."""
     if not target_raw:
         return False
-    t = target_raw.lower()
-    return t in npc.name.lower() or t in npc.role.lower()
+    return _npc_name_matches(target_raw, npc.name) or _npc_name_matches(target_raw, npc.role)
 
 
 @app.get("/api/run/{run_id}/interaction_graph")
@@ -2004,10 +2118,16 @@ async def _handle_observation(state: WorldState, text: str) -> dict:
     _check_hard_cap_or_raise(state)
 
     state_before = state.model_dump()
-    parsed = await parse_action(text, state)
-    state = state.model_copy(deep=True)
 
+    # Open the cost bucket BEFORE parse_action so its action_parser
+    # call site aggregates into the run total. Otherwise the call
+    # fires outside any tracking context and triggers the
+    # "unwrapped" warning in llm_provider._record_usage. Same
+    # contract every other turn-advancing path uses.
     with track_turn_cost() as bucket:
+        parsed = await parse_action(text, state)
+        state = state.model_copy(deep=True)
+
         if parsed.get("is_travel") and parsed.get("destination"):
             dest_id = parsed["destination"].lower().strip()
             player_loc = get_player_location(state)
@@ -2017,7 +2137,14 @@ async def _handle_observation(state: WorldState, text: str) -> dict:
                 for _ in range(travel_turns):
                     state = decay_memories(state)
                 if state.run_status == "ended":
-                    erasure_text = await generate_erasure(state)
+                    # Generate erasure once and persist it so a reload of
+                    # an ended run can still display the closing passage
+                    # rather than the generic fallback.
+                    if not state.final_erasure_text:
+                        erasure_text = await generate_erasure(state)
+                        state.final_erasure_text = erasure_text
+                    else:
+                        erasure_text = state.final_erasure_text
                     state.player.location = dest_id
                     trigger_log = await _check_and_record_illustration_trigger(
                         state, parsed=parsed,
@@ -2046,6 +2173,10 @@ async def _handle_observation(state: WorldState, text: str) -> dict:
                     state.ground_context_stale = False
                 except Exception:
                     state.ground_context_stale = True
+                try:
+                    dest_name = get_location(state, dest_id).name
+                except ValueError:
+                    dest_name = dest_id
                 fade_text = await generate_memory_fade(state)
                 trigger_log = await _check_and_record_illustration_trigger(
                     state, parsed=parsed,
@@ -2053,7 +2184,8 @@ async def _handle_observation(state: WorldState, text: str) -> dict:
                 turn_cost_usd = _finalize_turn_cost(state, bucket)
                 await save_session(state)
                 pv = build_player_view(state, state.run_id)
-                narrative = build_narrative_output([], parsed, [])
+                travel_info = {"from": player_loc.name, "to": dest_name, "turns_spent": travel_turns}
+                narrative = build_narrative_output([], parsed, [], travel=travel_info)
                 await append_turn_log(
                     run_id=state.run_id, turn_number=state.turn,
                     player_input=text, parsed_action=parsed,
@@ -2071,6 +2203,7 @@ async def _handle_observation(state: WorldState, text: str) -> dict:
                     "npc_responses": [],
                     "death": None,
                     "memory_fade": fade_text,
+                    "travel": travel_info,
                 }
 
         # World keeps moving even after death — run full simulation
@@ -2081,7 +2214,14 @@ async def _handle_observation(state: WorldState, text: str) -> dict:
         fade_text = await generate_memory_fade(state)
 
         if state.run_status == "ended":
-            erasure_text = await generate_erasure(state)
+            # Generate erasure once and persist it so a reload of
+            # an ended run can still display the closing passage
+            # rather than the generic fallback.
+            if not state.final_erasure_text:
+                erasure_text = await generate_erasure(state)
+                state.final_erasure_text = erasure_text
+            else:
+                erasure_text = state.final_erasure_text
             trigger_log = await _check_and_record_illustration_trigger(
                 state, parsed=parsed,
             )
@@ -2145,10 +2285,10 @@ def _filter_relevant(nearby_npcs, npc_impacts, target: str | None = None):
     """
     target_npc = None
     if target:
-        target_lower = target.lower().strip()
-        if target_lower:
+        target_stripped = target.strip()
+        if target_stripped:
             target_npc = next(
-                (n for n in nearby_npcs if target_lower in n.name.lower()),
+                (n for n in nearby_npcs if _npc_name_matches(target_stripped, n.name)),
                 None,
             )
 
@@ -2183,7 +2323,7 @@ def _filter_relevant(nearby_npcs, npc_impacts, target: str | None = None):
 
     matched = [
         npc for npc in nearby_npcs
-        if any(rn in npc.name.lower() for rn in relevant_names)
+        if any(_npc_name_matches(rn, npc.name) for rn in relevant_names)
     ]
     return _ensure_target_first(matched)
 
@@ -2207,7 +2347,7 @@ def _split_addressed(relevant_npcs, parsed: dict, state):
         if (
             addressed is None
             and npc.location == player_loc
-            and target_raw in npc.name.lower()
+            and _npc_name_matches(target_raw, npc.name)
         ):
             addressed = npc
         else:
@@ -2433,9 +2573,8 @@ def _find_target_npc(state: WorldState, target: str):
     """Resolve a target string to an NPC, or None."""
     if not target:
         return None
-    target_lower = target.lower()
     return next(
-        (n for n in state.npcs if target_lower in n.name.lower()),
+        (n for n in state.npcs if _npc_name_matches(target, n.name)),
         None,
     )
 
@@ -2597,7 +2736,7 @@ def _cq_save(state, action_type, target, sig, player_loc, player_name, era_desc)
     ))
 
 
-_CONSEQUENCE_DISPATCH: dict[str, callable] = {
+_CONSEQUENCE_DISPATCH: dict[str, Any] = {
     "betray":    _cq_betray,
     "attack":    _cq_hostile,
     "threaten":  _cq_hostile,

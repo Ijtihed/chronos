@@ -544,7 +544,10 @@ All **20** era buckets are **playable** with ingested corpus + smoke-tested arch
 
 The historic fast/quality tier split has been retired. Ollama is no longer used at runtime.
 All call sites route to `call_llm()` which dispatches to Gemini
-(`CHRONOS_GEMINI_MODEL`, default `gemini-3-flash-preview`).
+(`CHRONOS_GEMINI_MODEL`, default `gemini-2.5-flash-lite` -- the stable / GA model that
+matches the pricing constants in `backend/config.py`. Set the env var to
+`gemini-3-flash-preview` if your AI Studio key has preview access, but update the
+pricing constants in the same change so cost accounting stays honest).
 
 The `tier` parameter on `call_llm` is accepted for backward compatibility but is a no-op.
 Do not add new `tier` routing logic.
@@ -579,7 +582,8 @@ NoOp triggers when:
 
 ### Current runtime status (2026-04-23)
 
-All-Gemini provider active (`gemini-3-flash-preview`). The two-tier
+All-Gemini provider active (default `gemini-2.5-flash-lite`; `gemini-3-flash-preview`
+is opt-in via the env var when the key has preview access). The two-tier
 (Gemini quality + Ollama fast) configuration is retired. Ollama is no longer in the
 runtime path. The two-tier migration itself replaced the previous Ollama-only architecture
 because 70b auto-selection on capable hardware produced ~6 min per turn, blocking
@@ -592,7 +596,7 @@ by env var). `CHRONOS_GEMINI_MAX_CONCURRENT` default 15. Paid tier (300 RPM) abs
 
 ### Per-run cost ceiling
 
-- **~EUR 0.022 median per 10-turn run** (gemini-3-flash-preview pricing)
+- **~EUR 0.022 median per 10-turn run** (gemini-2.5-flash-lite pricing: $0.10 / $0.40 per M input/output)
 - **EUR 1.00 soft cap** -- UI banner, dismissible, once per run; turns continue
 - **EUR 2.00 hard cap** -- turn endpoints reject further advances with `402` + `code: cost_cap_hard`; player can still observe the world and end the run manually
 
@@ -625,7 +629,7 @@ A single-player, turn-based historical simulation. You are assigned a random min
 | Backend | FastAPI + Uvicorn | Python 3.11 |
 | Database | SQLite (WAL mode, aiosqlite) | Sessions, Events DB, turn logs (with `turn_cost_usd`), consequence queue |
 | Embeddings | ChromaDB + nomic-embed-text | Local, free |
-| LLM | Gemini (`CHRONOS_GEMINI_MODEL`, default `gemini-3-flash-preview`) via `google-genai` | all call sites; ~EUR 0.022 median per 10-turn run |
+| LLM | Gemini (`CHRONOS_GEMINI_MODEL`, default `gemini-2.5-flash-lite`; `gemini-3-flash-preview` opt-in if preview access) via `google-genai` | all call sites; ~EUR 0.022 median per 10-turn run |
 | LLM fallback | NoOp ("...") | `GEMINI_API_KEY` unset or circuit breaker open (3 fails/60s -> 5 min); keeps turns alive on transient failure |
 | Cost ceiling | €1.00 soft / €2.00 hard per run | Tracked in USD, displayed in EUR; persisted in `WorldState.cumulative_cost_usd` and `turn_logs.turn_cost_usd` |
 

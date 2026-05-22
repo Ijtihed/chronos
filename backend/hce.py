@@ -6,7 +6,8 @@ Layer 2: Ground-Level Context Generator (dynamic, generated once at run init)
 The HCE answers: "What was the world actually like at this moment, from the
 ground up, for a specific person in a specific place?"
 
-Model tier: LOCAL (llama3.1:8b) — one call at run init, not per-turn.
+Model tier: Gemini (CHRONOS_GEMINI_MODEL, default gemini-2.5-flash-lite).
+One call at run init and on travel/event-driven refresh, not per-turn.
 Prompt template: prompts/ground_context.md (design artifact, reviewed separately).
 
 Design source: context/game logic context/historical-context-engine.md
@@ -25,10 +26,7 @@ from pydantic import ValidationError
 from backend.llm_provider import call_llm, load_prompt
 from backend.llm_schemas import GroundContextResponse
 from backend.persistence import query_historical_events
-from backend.player_knowledge import (
-    filter_historical_events,
-    _knowledge_tier,
-)
+from backend.player_knowledge import filter_historical_events
 from backend.world_state import ScheduledConsequence, WorldState, get_player_location
 
 logger = logging.getLogger("chronos.hce")
@@ -77,7 +75,12 @@ async def generate_ground_context(state: WorldState) -> Dict[str, Any]:
     known_text = _format_events_for_prompt(known_events) or "No major events known."
     rumor_text = _format_rumors_for_prompt(rumor_events) or "No rumors heard."
 
-    player_loc = get_player_location(state)
+    try:
+        player_loc = get_player_location(state)
+    except ValueError:
+        logger.warning("get_player_location failed in generate_ground_context, using fallback")
+        return _fallback_context(state, known_events, rumor_events)
+
     raw_template = load_prompt(_PROMPT_PATH)
 
     prompt = Template(raw_template).safe_substitute(
@@ -98,7 +101,8 @@ async def generate_ground_context(state: WorldState) -> Dict[str, Any]:
             schema=GroundContextResponse,
             call_site="ground_context",
         )
-        parsed = json.loads(raw_response)
+        from backend.utils import strip_json_fences
+        parsed = json.loads(strip_json_fences(raw_response))
         context = GroundContextResponse.model_validate(parsed)
         return context.model_dump()
     except (json.JSONDecodeError, ValidationError, Exception) as exc:
@@ -167,9 +171,13 @@ def _fallback_context(
     rumors: list,
 ) -> Dict[str, Any]:
     """Build a minimal GroundContext without an LLM call."""
-    player_loc = get_player_location(state)
+    try:
+        player_loc = get_player_location(state)
+        loc_name = player_loc.name
+    except ValueError:
+        loc_name = state.locations[0].name if state.locations else "this place"
     return GroundContextResponse(
-        era_feel=f"Life in {player_loc.name} is uncertain. The air is thick with worry.",
+        era_feel=f"Life in {loc_name} is uncertain. The air is thick with worry.",
         what_character_knows=f"As a {state.player.archetype}, you know what anyone in your position would know.",
         local_rumors=[ev.event for ev in rumors[:5]],
         material_conditions="Conditions are difficult but survivable.",

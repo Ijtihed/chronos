@@ -11,10 +11,16 @@ This is the first piece of persisted state in CHRONOS that explicitly
 encodes player knowledge rather than ground truth. The classifier
 reads the turn_logs row for the source turn and inspects:
 
-    - npc_responses[].text          -> told_by (with attribution)
-    - ambient_activity[].activity   -> rumor
-    - narrative_output (player POV) -> observed
-    - everything else               -> inferred (default fallback)
+    - npc_responses[].pov / .internal / .text -> told_by (with attribution)
+    - ambient_activity[].activity             -> rumor
+    - narrative_output (player POV)           -> observed
+    - everything else                         -> inferred (default fallback)
+
+Key shape note: the orchestrator (main.py `_build_npc_responses_mixed`
+and `_build_npc_responses`) writes NPC speech under the key `pov` for
+ambient NPCs and the key `pov` (reply) plus `internal` (private
+thought) for addressed NPCs. The legacy `text` key is also accepted
+as a fallback so older runs and synthetic test fixtures still work.
 
 It is deterministic, has no LLM call, and is cheap. It runs once per
 pin creation in the POST /api/run/{id}/pin handler and writes its
@@ -50,12 +56,28 @@ def _normalize(s: str) -> str:
 
 def _pick_best_npc_response(text_norm: str, npc_responses: List[dict]) -> Tuple[bool, str]:
     """Returns (matched, attribution). Walks the turn's NPC responses
-    and returns the first one whose `.text` contains the pinned text.
-    Attribution is the NPC's display name."""
+    and returns the first one whose visible body contains the pinned
+    text. Attribution is the NPC's display name.
+
+    Body source priority: `pov` (the production key for both ambient
+    POV and addressed-mode reply) > `internal` (addressed-mode private
+    thought, also rendered to the player as italic text) > `text`
+    (legacy key kept for back-compat with synthetic tests and any older
+    persisted rows). Both `pov` and `internal` are concatenated when
+    present, since either can carry the highlighted passage.
+    """
     for resp in npc_responses or []:
         if not isinstance(resp, dict):
             continue
-        body = _normalize(resp.get("text") or "")
+        # Concatenate every visible field so a pin that straddles the
+        # reply and the internal thought still matches. Falls back to
+        # the legacy `text` key.
+        parts: list[str] = []
+        for key in ("pov", "internal", "text"):
+            v = resp.get(key)
+            if v:
+                parts.append(str(v))
+        body = _normalize(" ".join(parts))
         if body and text_norm in body:
             return True, str(resp.get("npc_name") or resp.get("npc_id") or "").strip()
     return False, ""

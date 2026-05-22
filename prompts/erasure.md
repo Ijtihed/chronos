@@ -1,6 +1,6 @@
 # Erasure — Final Passage
 
-> **Model tier:** Gemini (`CHRONOS_GEMINI_MODEL`, default `gemini-3-flash-preview`)
+> **Model tier:** Gemini (`CHRONOS_GEMINI_MODEL`, default `gemini-2.5-flash-lite`)
 > **Purpose:** Generate the final text when the last NPC forgets the player
 > **Volume:** Called once per run at the very end (the emotional climax)
 

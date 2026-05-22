@@ -134,11 +134,19 @@ class TestSplitAddressed:
         addressed, ambient = _split_addressed([npc], parsed, state)
         assert addressed is None
 
-    def test_partial_name_match(self):
+    def test_partial_prefix_does_not_match(self):
         from backend.main import _split_addressed
         state, npc, _ = self._make_state_with_npc()
-        # "hel" matches "Helena"
+        # "hel" should NOT match "Helena" — word-boundary matching
+        # prevents false positives like "al" matching "Gallius"
         parsed = {"target": "hel", "action_type": "speak"}
+        addressed, ambient = _split_addressed([npc], parsed, state)
+        assert addressed is None
+
+    def test_full_name_match(self):
+        from backend.main import _split_addressed
+        state, npc, _ = self._make_state_with_npc()
+        parsed = {"target": "Helena", "action_type": "speak"}
         addressed, ambient = _split_addressed([npc], parsed, state)
         assert addressed is npc
 

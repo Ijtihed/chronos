@@ -8,7 +8,7 @@ The needs system drives autonomous NPC behavior without LLM calls.
 from __future__ import annotations
 
 import random
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from backend.utils import tension_index as _tension_index_util
 from backend.world_state import NPC, NpcNeeds, PersonalityTraits, WorldState
@@ -438,16 +438,47 @@ def apply_need_shift(
 # Archetype baseline dispositions (used by drift system)
 # ---------------------------------------------------------------------------
 
+# Baseline disposition each archetype drifts toward over time when
+# nothing else is acting on the NPC. tick_disposition_drift skips any
+# archetype missing from this map; previously civilian/scholar/healer/
+# caretaker were absent and never drifted, so their dispositions
+# stayed wherever the LLM placed them at character_gen forever.
 ARCHETYPE_BASELINE_DISPOSITION: Dict[str, str] = {
-    "merchant": "cautious",
-    "soldier":  "guarded",
-    "priest":   "formal",
-    "clergy":   "formal",
-    "farmer":   "wary",
-    "noble":    "reserved",
-    "scribe":   "neutral",
-    "refugee":  "fearful",
-    "general":  "commanding",
+    "merchant":    "cautious",
+    "soldier":     "guarded",
+    "priest":      "formal",
+    "clergy":      "formal",
+    "farmer":      "wary",
+    "noble":       "reserved",
+    "scribe":      "neutral",
+    "refugee":     "fearful",
+    "general":     "commanding",
+    "civilian":    "neutral",
+    "scholar":     "reserved",
+    "healer":      "engaged",
+    "caretaker":   "engaged",
+    "administrator": "formal",
+    "outsider":    "wary",
+    "knight":      "guarded",
+    "diplomat":    "formal",
+    "interpreter": "cautious",
+    "pilgrim":     "fervent",
+    "craftsman":   "neutral",
+    "artisan":     "neutral",
+    "outcast":     "wary",
+    "peasant":     "wary",
+    "sailor":      "cautious",
+    "mercenary":   "guarded",
+    "engineer":    "neutral",
+    "warrior":     "guarded",
+    "mystic":      "reserved",
+    "storyteller": "engaged",
+    "freed_slave": "wary",
+    "captive":     "fearful",
+    "fanatic":     "fervent",
+    "financier":   "cautious",
+    "laborer":     "neutral",
+    "orphan":      "fearful",
 }
 
 
@@ -505,50 +536,70 @@ def need_urgency_weight(need_value: float) -> float:
 
 def _get_relevant_needs(
     opportunity: Dict, npc_archetype: str, npc_traits: PersonalityTraits,
-) -> List[str]:
-    """Resolve which needs an opportunity addresses for this specific NPC."""
-    needs: List[str] = []
+) -> Tuple[List[str], List[str], List[str]]:
+    """Resolve which needs an opportunity addresses for this specific NPC.
 
-    needs.extend(opportunity.get("satisfies", []))
-    needs.extend(opportunity.get("threatens", []))
-    needs.extend(opportunity.get("costs", []))
+    Returns (satisfies, threatens, costs) as three separate lists so callers
+    can weight them differently.
+    """
+    satisfies: List[str] = list(opportunity.get("satisfies", []))
+    threatens: List[str] = list(opportunity.get("threatens", []))
+    costs: List[str] = list(opportunity.get("costs", []))
 
     if npc_archetype in ("soldier", "general"):
-        needs.extend(opportunity.get("satisfies_if_soldier", []))
+        satisfies.extend(opportunity.get("satisfies_if_soldier", []))
     if npc_archetype in ("noble",):
-        needs.extend(opportunity.get("satisfies_if_noble", []))
+        satisfies.extend(opportunity.get("satisfies_if_noble", []))
     if npc_traits.compassion > 60:
-        needs.extend(opportunity.get("satisfies_if_compassionate", []))
+        satisfies.extend(opportunity.get("satisfies_if_compassionate", []))
 
-    return needs
+    return satisfies, threatens, costs
 
 
-def score_opportunity(npc: NPC, opportunity_type: str, context: Dict = None) -> float:
+def score_opportunity(
+    npc: NPC, opportunity_type: str, context: Optional[Dict] = None,
+) -> float:
     """Score how strongly an NPC is drawn to an opportunity.
 
     Higher score = more compelling. Uses Maslow-weighted need urgency.
+
+    - *satisfies*: the NPC wants this (positive draw).
+    - *threatens*: the situation demands urgent response (positive urgency --
+      a food shortage that threatens survival is MORE pressing when survival
+      is low).
+    - *costs*: the opportunity has a downside (subtracts from score at half
+      weight).
     """
     opp = WORLD_OPPORTUNITIES.get(opportunity_type)
     if not opp:
         return 0.0
 
-    relevant_needs = _get_relevant_needs(opp, npc.archetype, npc.personality)
-    if not relevant_needs:
+    satisfies, threatens, costs = _get_relevant_needs(
+        opp, npc.archetype, npc.personality,
+    )
+    if not satisfies and not threatens and not costs:
         return 0.0
 
     needs_dict = npc.needs.model_dump()
     total = 0.0
-    for need_name in relevant_needs:
+
+    for need_name in satisfies:
         val = needs_dict.get(need_name, 50.0)
         total += need_urgency_weight(val) * (100.0 - val) / 100.0
+
+    for need_name in threatens:
+        val = needs_dict.get(need_name, 50.0)
+        total += need_urgency_weight(val) * (100.0 - val) / 100.0
+
+    for need_name in costs:
+        val = needs_dict.get(need_name, 50.0)
+        total -= 0.5 * need_urgency_weight(val) * (100.0 - val) / 100.0
 
     return total
 
 
 def _detect_opportunities(npc: NPC, state) -> List[str]:
     """Detect which opportunities are present at the NPC's location."""
-    from backend.world_state import TENSION_LEVELS
-
     opportunities: List[str] = []
 
     try:

@@ -1,6 +1,6 @@
 # NPC Autonomous Activity
 
-> **Model tier:** Gemini (`CHRONOS_GEMINI_MODEL`, default `gemini-3-flash-preview`)
+> **Model tier:** Gemini (`CHRONOS_GEMINI_MODEL`, default `gemini-2.5-flash-lite`)
 > **Purpose:** What an NPC does this turn. Their own life. Nothing to do with the player.
 > **Volume:** 2-4 NPCs per turn at the player's location. Full context.
 

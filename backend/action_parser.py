@@ -1,20 +1,21 @@
 """Parse player natural language into a structured action via LLM.
 
-Model tier: FAST (Gemini). Short, highly structured JSON.
-All calls route to Gemini via call_llm() — Ollama is no longer used.
+All LLM calls route to Gemini (tier parameter is a no-op).
+Short, highly structured JSON output.
 """
 
 from __future__ import annotations
 
 import json
 import logging
+import re
 from pathlib import Path
 from string import Template
 
 from pydantic import ValidationError
 
 from backend.llm_provider import call_llm, load_prompt
-from backend.llm_schemas import ActionParserResponse, action_parser_default
+from backend.llm_schemas import ActionParserResponse
 from backend.world_state import (
     WorldState,
     build_story_summary,
@@ -30,10 +31,10 @@ _TEMPLATE_PATH = Path(__file__).resolve().parent.parent / "prompts" / "action_pa
 # ---------------------------------------------------------------------------
 # Action-type normalization
 #
-# llama3.1:8b returns free-form action_type labels.  Downstream code in
+# LLMs return free-form action_type labels. Downstream code in
 # world_state.apply_action, _apply_target_fallback, _schedule_player_
 # consequences, and _check_historical_divergence branches on exact
-# canonical values.  ALIASES maps known LLM drift variants to those
+# canonical values.  ALIASES maps known drift variants to those
 # canonical types so routing works regardless of the synonym the model
 # picks.  Unknown values pass through with a debug log.
 #
@@ -157,14 +158,27 @@ _CANONICAL_TYPES = frozenset({
     "hoard", "prevent", "save", "flee", "other",
 })
 
+_FENCE_RE = re.compile(r"^```(?:\w+)?\s*\n(.*?)```\s*$", re.DOTALL)
+
+
+def _strip_fences(text: str) -> str:
+    """Remove markdown code fences (```json ... ```) that Gemini sometimes wraps around JSON."""
+    text = text.strip()
+    m = _FENCE_RE.match(text)
+    return m.group(1).strip() if m else text
+
 
 async def parse_action(player_input: str, state: WorldState) -> dict:
     raw_template = load_prompt(_TEMPLATE_PATH)
     template = Template(raw_template)
 
-    nearby = npcs_near_player(state)
-    npc_list = ", ".join(f"{n.name} ({n.role})" for n in nearby)
-    player_loc = get_player_location(state)
+    try:
+        nearby = npcs_near_player(state)
+        npc_list = ", ".join(f"{n.name} ({n.role})" for n in nearby)
+        player_loc = get_player_location(state)
+    except (ValueError, Exception) as exc:
+        logger.warning("parse_action: location lookup failed, using fallback: %s", exc)
+        return _fallback(player_input, state, str(exc))
 
     reachable = []
     for nid, cost in player_loc.neighbors.items():
@@ -196,7 +210,7 @@ async def parse_action(player_input: str, state: WorldState) -> dict:
             schema=ActionParserResponse,
             call_site="action_parser",
         )
-        parsed = ActionParserResponse.model_validate(json.loads(raw))
+        parsed = ActionParserResponse.model_validate(json.loads(_strip_fences(raw)))
         result = parsed.model_dump()
         result["action_type"] = normalize_action_type(result["action_type"])
         return result
@@ -208,6 +222,31 @@ async def parse_action(player_input: str, state: WorldState) -> dict:
 
 
 def _fallback(player_input: str, state: WorldState, error: str) -> dict:
+    """Build a safe-default parsed action when the LLM call fails.
+
+    The error string is logged at WARNING (the caller already does that
+    for ValidationError; this re-logs unconditionally so wrapped Exception
+    branches surface too) but is NOT included in the returned dict. The
+    parsed_action shape is part of the public /turn response and the
+    persisted turn_logs row; leaking `_parse_error` into either makes
+    the API contract leaky and pollutes the audit trail with internal
+    LLM-failure strings the player should never see. Live tests assert
+    `_parse_error` is absent on the happy path; this keeps it absent on
+    the unhappy path too.
+
+    Shape must mirror EVERY key downstream code reads via dict.get():
+    main.py reads `significance_score` (consequence/divergence gates),
+    `npc_impacts` (NPC POV selection / Addressed-mode pre-filtering),
+    `action_type` (consequence dispatch), `target` (Addressed-mode
+    resolution). The schema `ActionParserResponse` carries those
+    defaults via Pydantic, but this dict is the LLM-failure path
+    which never goes through the schema. Including the defaults
+    explicitly here keeps the dict's shape identical to a successful
+    parse (modulo no `relevant=True` NPC impacts), so downstream code
+    paths don't branch differently on the fallback path.
+    """
+    if error:
+        logger.warning("Action parser fallback for input %r: %s", player_input[:80], error)
     try:
         loc_name = get_player_location(state).name
     except ValueError:
@@ -222,5 +261,6 @@ def _fallback(player_input: str, state: WorldState, error: str) -> dict:
         "is_travel": False,
         "destination": None,
         "is_inaction": False,
-        "_parse_error": error,
+        "significance_score": 0.2,
+        "npc_impacts": [],
     }

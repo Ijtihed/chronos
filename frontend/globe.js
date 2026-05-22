@@ -1101,6 +1101,7 @@
         _markGlobeReady(container);
       }).catch(() => {
         setStage("Borders failed");
+        _markGlobeReady(container);
       });
     } else {
       // Same era; if borders already loaded from a prior show, mark
@@ -1117,6 +1118,8 @@
             _markGlobeReady(container);
           } else if (_polls++ < 40) {
             setTimeout(_check, 100);
+          } else {
+            _markGlobeReady(container);
           }
         };
         _check();

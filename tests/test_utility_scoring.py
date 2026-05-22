@@ -97,26 +97,30 @@ class TestGetRelevantNeeds:
     def test_basic_satisfies(self):
         opp = WORLD_OPPORTUNITIES["trade_caravan_passing"]
         traits = PersonalityTraits(ambition=50, compassion=50, courage=50, piety=50, pragmatism=50)
-        needs = _get_relevant_needs(opp, "merchant", traits)
-        assert "trade" in needs
-        assert "profit" in needs
+        satisfies, threatens, costs = _get_relevant_needs(opp, "merchant", traits)
+        assert "trade" in satisfies
+        assert "profit" in satisfies
 
     def test_soldier_gets_siege_bonus(self):
         opp = WORLD_OPPORTUNITIES["siege_threat"]
         traits = PersonalityTraits(ambition=50, compassion=50, courage=50, piety=50, pragmatism=50)
-        soldier_needs = _get_relevant_needs(opp, "soldier", traits)
-        merchant_needs = _get_relevant_needs(opp, "merchant", traits)
-        assert "duty" in soldier_needs
-        assert "duty" not in merchant_needs
+        s_sat, s_thr, s_cost = _get_relevant_needs(opp, "soldier", traits)
+        m_sat, m_thr, m_cost = _get_relevant_needs(opp, "merchant", traits)
+        all_soldier = s_sat + s_thr + s_cost
+        all_merchant = m_sat + m_thr + m_cost
+        assert "duty" in all_soldier
+        assert "duty" not in all_merchant
 
     def test_compassionate_gets_sick_bonus(self):
         opp = WORLD_OPPORTUNITIES["sick_community_member"]
         compassionate = PersonalityTraits(ambition=50, compassion=80, courage=50, piety=50, pragmatism=50)
         cold = PersonalityTraits(ambition=50, compassion=20, courage=50, piety=50, pragmatism=50)
-        c_needs = _get_relevant_needs(opp, "merchant", compassionate)
-        n_needs = _get_relevant_needs(opp, "merchant", cold)
-        assert "community" in c_needs
-        assert "community" not in n_needs
+        c_sat, c_thr, c_cost = _get_relevant_needs(opp, "merchant", compassionate)
+        n_sat, n_thr, n_cost = _get_relevant_needs(opp, "merchant", cold)
+        all_compassionate = c_sat + c_thr + c_cost
+        all_cold = n_sat + n_thr + n_cost
+        assert "community" in all_compassionate
+        assert "community" not in all_cold
 
 
 class TestDetectOpportunities:

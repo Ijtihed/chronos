@@ -240,6 +240,26 @@
       </button>
     </div>
 
+    <!--
+      Gemini-down banner. Surfaces a discreet warning when the LLM
+      provider's startup smoke test fails (expired key, 4xx, etc.) so
+      the player knows the prose is degraded ("...") instead of being
+      mystified by empty turns. Dismissible per-page-load only — we
+      do NOT persist the dismissal because the next time the user
+      starts a session they should know if the key is still bad.
+    -->
+    <div id="gemini-down-banner"
+         class="hidden fixed top-10 left-1/2 -translate-x-1/2 z-[310]
+                bg-red-950/90 border border-red-500/30 text-red-200
+                text-[11px] tracking-wide px-4 py-2 rounded-sm shadow-lg
+                backdrop-blur-sm flex items-center gap-3 max-w-[640px]">
+      <span id="gemini-down-banner-text">Gemini is unavailable for this server. Turns will still advance, but NPC voices and narrative will render as "&hellip;". Renew <code class="text-red-300">GEMINI_API_KEY</code> in <code class="text-red-300">.env</code> and restart the server to fix.</span>
+      <button id="gemini-down-banner-dismiss"
+              class="text-red-200/60 hover:text-red-100 uppercase tracking-[0.15em] text-[9px] px-2 py-1 border border-red-500/20 rounded-sm cursor-pointer">
+        Dismiss
+      </button>
+    </div>
+
     <!-- Hard-cap overlay (blocks further turn advances) -->
     <div id="cost-hard-overlay"
          class="hidden fixed inset-0 z-[320] bg-black/80 backdrop-blur-sm flex items-center justify-center">

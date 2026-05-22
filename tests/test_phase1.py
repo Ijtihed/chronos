@@ -74,6 +74,47 @@ def _chat(*c):
     )
 
 
+# ---------------------------------------------------------------------------
+# Post-Gemini-migration test helper.
+# `_chat()` above mocks the legacy Ollama HTTP path which is no longer
+# in the runtime path -- runtime traffic now goes through the Gemini
+# SDK. Tests that need to drive a *specific* parser/NPC response must
+# patch call_llm() directly. This helper does that across every module
+# that imports call_llm so the patch is consistent regardless of which
+# call site fires first.
+# ---------------------------------------------------------------------------
+def _patch_call_llm_returning(monkeypatch, raw_text: str):
+    """Make every call_llm() return (raw_text, NoOp UsageInfo)."""
+    from backend.llm_provider import UsageInfo
+
+    usage = UsageInfo(
+        provider="noop", model="noop",
+        input_tokens=0, output_tokens=0,
+        cost_usd=0.0, duration_s=0.0,
+    )
+
+    async def _fake(prompt, **kw):
+        return raw_text, usage
+
+    import backend.llm_provider as _llm
+    monkeypatch.setattr(_llm, "call_llm", _fake)
+    for mod in (
+        "backend.action_parser",
+        "backend.npc_engine",
+        "backend.world_engine",
+        "backend.hce",
+        "backend.death_engine",
+        "backend.character_gen",
+        "backend.scene_director",
+        "backend.connection_proposal",
+        "backend.inner_thought",
+    ):
+        try:
+            monkeypatch.setattr(f"{mod}.call_llm", _fake)
+        except AttributeError:
+            pass
+
+
 class TestEraConfigs:
     def test_five_eras(self):
         assert len(ALL_ERAS) == 5
@@ -118,23 +159,53 @@ class TestUnifiedTurnAction:
 
 class TestUnifiedTurnTravel:
     @pytest.mark.asyncio
-    @respx.mock
-    async def test_travel_changes_location(self, client):
-        _down()
-        rid = (await client.post("/api/run")).json()["run_id"]
-        respx.get(OLLAMA_TAGS_URL).mock(return_value=httpx.Response(200, json={"models": []}))
-        _chat(FAKE_SKIP, FAKE_SKIP, FAKE_TRAVEL, FAKE_SKIP, FAKE_SKIP, FAKE_NPC_POV)
-        resp = await client.post(f"/api/run/{rid}/turn", json={"player_input": "go to Ravenna"})
+    async def test_travel_changes_location(self, client, monkeypatch):
+        # Force the action_parser path to emit a deterministic travel
+        # response. Patch every call_llm import site so character_gen
+        # for the new run, the parser, and the NPC POV calls all get
+        # the same canned reply -- a JSON travel action. Non-JSON
+        # callers (NPC POV, addressed mode) accept any string and
+        # render it as their text.
+        _patch_call_llm_returning(monkeypatch, FAKE_TRAVEL)
+
+        rid = (await client.post(
+            "/api/run", json={"era": "roman_late_empire"},
+        )).json()["run_id"]
+        # Ensure ariminum is the start location so "ravenna" is a valid
+        # neighbor for the travel hop. Roman Late Empire ships with
+        # ariminum -> ravenna in its location graph; character_gen
+        # may have placed the player elsewhere when it ran on the
+        # NoOp fallback.
+        from backend import persistence
+        state = await persistence.load_session(rid)
+        state.player.location = "ariminum"
+        if "ariminum" not in state.visited_locations:
+            state.visited_locations.append("ariminum")
+        await persistence.save_session(state)
+
+        resp = await client.post(
+            f"/api/run/{rid}/turn", json={"player_input": "go to Ravenna"},
+        )
+        assert resp.status_code == 200
         assert resp.json()["player_view"]["player_location"] == "ravenna"
 
     @pytest.mark.asyncio
-    @respx.mock
-    async def test_travel_returns_info(self, client):
-        _down()
-        rid = (await client.post("/api/run")).json()["run_id"]
-        respx.get(OLLAMA_TAGS_URL).mock(return_value=httpx.Response(200, json={"models": []}))
-        _chat(FAKE_SKIP, FAKE_SKIP, FAKE_TRAVEL, FAKE_SKIP, FAKE_SKIP, FAKE_NPC_POV)
-        resp = await client.post(f"/api/run/{rid}/turn", json={"player_input": "travel to Ravenna"})
+    async def test_travel_returns_info(self, client, monkeypatch):
+        _patch_call_llm_returning(monkeypatch, FAKE_TRAVEL)
+        rid = (await client.post(
+            "/api/run", json={"era": "roman_late_empire"},
+        )).json()["run_id"]
+        from backend import persistence
+        state = await persistence.load_session(rid)
+        state.player.location = "ariminum"
+        if "ariminum" not in state.visited_locations:
+            state.visited_locations.append("ariminum")
+        await persistence.save_session(state)
+
+        resp = await client.post(
+            f"/api/run/{rid}/turn", json={"player_input": "travel to Ravenna"},
+        )
+        assert resp.status_code == 200
         assert "travel" in resp.json()
 
 

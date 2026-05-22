@@ -27,7 +27,7 @@ import logging
 from pathlib import Path
 from string import Template
 
-from backend.llm_provider import call_llm
+from backend.llm_provider import call_llm, load_prompt
 from backend.llm_schemas import InnerThoughtResponse
 from backend.world_state import WorldState, get_player_location
 
@@ -38,9 +38,17 @@ _TEMPLATE_CACHE: str | None = None
 
 
 def _load_template() -> str:
+    """Load the inner-thought prompt with its metadata header stripped.
+
+    The .md file ships with a `# Inner Thought ...` heading + a `>`
+    block describing the call site, model, and cost; everything above
+    the first `\\n---\\n` divider is design notes, not prompt text the
+    LLM should see. Using `load_prompt()` matches every other LLM call
+    site in the project (action_parser, npc_pov, etc.).
+    """
     global _TEMPLATE_CACHE
     if _TEMPLATE_CACHE is None:
-        _TEMPLATE_CACHE = _TEMPLATE_PATH.read_text(encoding="utf-8")
+        _TEMPLATE_CACHE = load_prompt(_TEMPLATE_PATH)
     return _TEMPLATE_CACHE
 
 
@@ -60,17 +68,32 @@ async def generate_inner_thought(player_input: str, state: WorldState) -> str:
     ground = getattr(state, "ground_context", None)
     era_feel = ""
     material_conditions = ""
-    if ground is not None:
+    # ground_context is persisted as a Dict on WorldState (see
+    # world_state.py: `ground_context: Optional[Dict] = None`). Earlier
+    # versions used getattr() against it, which always missed because
+    # dicts don't expose those keys as attributes -- the prompt was
+    # silently degraded. Use dict.get() so era_feel and
+    # material_conditions actually reach Gemini.
+    if isinstance(ground, dict):
+        era_feel = ground.get("era_feel", "") or ""
+        material_conditions = ground.get("material_conditions", "") or ""
+    elif ground is not None:
+        # Defensive: tolerate a rare object-shape if a future caller
+        # changes the type. Keeps the code from regressing back to
+        # silent-empty if ground_context becomes a Pydantic model.
         era_feel = getattr(ground, "era_feel", "") or ""
         material_conditions = getattr(ground, "material_conditions", "") or ""
-
-    preoccupation = getattr(state.player, "current_preoccupation", "") or ""
 
     # Story-so-far is intentionally short here — the inner thought is
     # about the FELT moment, not the plot. Long history dilutes the
     # voice and pushes Gemini toward summary mode.
     story_summary = _short_story_summary(state)
 
+    # Note on absent variables: `current_preoccupation` is a per-NPC
+    # field rotated by tick_preoccupation_drift; PlayerCharacter has no
+    # such field. The inner-thought prompt body deliberately does NOT
+    # substitute it, so we don't pass it here either. Adding it would
+    # be a dead .substitute() entry.
     template = Template(_load_template())
     prompt = template.safe_substitute(
         player_name=getattr(state.player, "name", "") or "",
@@ -82,11 +105,11 @@ async def generate_inner_thought(player_input: str, state: WorldState) -> str:
         political_tension=getattr(player_loc, "political_tension", "") or "",
         era_feel=era_feel,
         material_conditions=material_conditions,
-        current_preoccupation=preoccupation,
         story_so_far=story_summary,
         player_input=player_input.strip(),
     )
 
+    raw = ""  # Initialize so the JSONDecodeError logger never NameErrors.
     try:
         raw, _ = await call_llm(
             prompt,
@@ -98,13 +121,14 @@ async def generate_inner_thought(player_input: str, state: WorldState) -> str:
         # is not useful prose. Treat short / placeholder responses as empty.
         if not raw or raw.strip() in {"...", "…"}:
             return ""
-        parsed = InnerThoughtResponse.model_validate(json.loads(raw))
+        from backend.utils import strip_json_fences
+        parsed = InnerThoughtResponse.model_validate(json.loads(strip_json_fences(raw)))
         thought = parsed.inner_thought.strip()
         if not thought or thought in {"...", "…"}:
             return ""
         return thought
     except json.JSONDecodeError as exc:
-        logger.warning("inner_thought JSON decode failed: %s; raw=%r", exc, raw[:120] if "raw" in dir() else "")
+        logger.warning("inner_thought JSON decode failed: %s; raw=%r", exc, raw[:120])
         return ""
     except Exception as exc:  # noqa: BLE001 — we never want this to break a turn
         logger.warning("inner_thought generation failed: %s", exc)

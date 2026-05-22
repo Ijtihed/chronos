@@ -48,7 +48,7 @@ except ImportError:
 
 from backend.character_gen import generate_run
 from backend.eras import ALL_ERAS
-from backend.llm_provider import ollama_ok, track_turn_cost
+from backend.llm_provider import gemini_ok, track_turn_cost
 from backend.main import (  # noqa: E402 — path insert above
     SkipRequest,
     TurnRequest,
@@ -378,17 +378,14 @@ async def _main() -> int:
     print("Phase 3 Step 3.1 — trigger smoke test")
     print("-" * 72)
 
-    # Fail fast if Ollama is down.
-    print("[precheck] verifying Ollama reachability...")
-    if not await ollama_ok():
+    print("[precheck] verifying Gemini reachability...")
+    if not await gemini_ok():
         print(
-            "\n[fatal] Ollama is not reachable. Start it with:\n"
-            "    ollama serve\n"
-            "and ensure a model is pulled (e.g. llama3.1:8b).\n"
+            "\n[fatal] Gemini is not reachable. Check that GEMINI_API_KEY is set.\n"
             "Aborting."
         )
         return 2
-    print("[precheck] ollama ok")
+    print("[precheck] gemini ok")
 
     await init_db()
 

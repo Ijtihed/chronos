@@ -48,6 +48,11 @@
   let _selectionTimer = null;
   let _initialized = false;
   let _droppedThisCommit = 0;  // diag
+  // Phase 2.10 cooldown gate. Hoisted to module scope so `restore()`
+  // can seed it from server state on init (was previously declared
+  // next to maybePropose() near the bottom of the IIFE; moving it
+  // here is the smallest change that lets reload survive correctly).
+  let _lastProposeTurn = -1;
 
   // ── Public API ──────────────────────────────────────────────────────
   const api = {
@@ -62,9 +67,16 @@
     _ensureInit();
   }
 
-  function restore(serverPins, serverConnections) {
+  function restore(serverPins, serverConnections, lastProposeTurn) {
     pins = Array.isArray(serverPins) ? serverPins.slice() : [];
     connections = Array.isArray(serverConnections) ? serverConnections.slice() : [];
+    // Phase 2.10: seed the cooldown gate from server state so a page
+    // reload doesn't reset _lastProposeTurn back to -1 and re-trigger
+    // the proposer on the next turn. Treat undefined / non-numeric as
+    // "no value provided" and leave the existing client value alone.
+    if (typeof lastProposeTurn === "number" && isFinite(lastProposeTurn)) {
+      _lastProposeTurn = Math.max(_lastProposeTurn, Math.floor(lastProposeTurn));
+    }
     _ensureInit();
     _redraw();
   }
@@ -287,7 +299,18 @@
     while (node && node.nodeType !== Node.ELEMENT_NODE) node = node.parentNode;
     let cur = node;
     while (cur && cur !== document.body) {
-      if (cur.classList && cur.classList.contains("turn-block") && cur.id) return cur.id;
+      if (cur.classList && cur.classList.contains("turn-block")) {
+        // Prefer the post-turn `data-turn-number` stamp set by
+        // app.js renderTurnStaggered. That value matches the
+        // backend's `turn_logs.turn_number` and the classifier's
+        // `turn-<turn_number>` candidate id, so the pin is attached
+        // to the right row. The DOM `id` (`turn-<Date.now()>`) is
+        // the legacy fallback for older runs whose manuscript was
+        // restored from localStorage and pre-dates the dataset stamp.
+        const tn = cur.dataset && cur.dataset.turnNumber;
+        if (tn != null && tn !== "") return "turn-" + tn;
+        if (cur.id) return cur.id;
+      }
       if (cur.classList && cur.classList.contains("manuscript-intro")) return "manuscript-intro";
       cur = cur.parentNode;
     }
@@ -765,7 +788,8 @@
   // ">=3 unconnected pins AND >=2 turns since last proposal." If the
   // gate passes, POST /pinboard/propose_connections; merge any
   // returned proposals into the local connections array and redraw.
-  let _lastProposeTurn = -1;
+  // (`_lastProposeTurn` is declared at module scope above so restore()
+  // can seed it from server state.)
 
   async function maybePropose(currentTurn) {
     if (!runId) return;
@@ -778,7 +802,15 @@
     }).length;
     if (unconnected < 3) return;
     if (currentTurn - _lastProposeTurn < 2) return;
+    // Reserve the cooldown slot OPTIMISTICALLY so a slow LLM call
+    // doesn't get re-fired on the next turn boundary, but only ADVANCE
+    // the cooldown on a successful response. A failure (network error,
+    // backend 5xx, NoOp circuit) restores the previous value so the
+    // gate retries on the next turn -- otherwise repeated transient
+    // errors silently freeze the proposer for the rest of the run.
+    const prevLastProposeTurn = _lastProposeTurn;
     _lastProposeTurn = currentTurn;
+    let succeeded = false;
     try {
       const res = await fetch(
         "/api/run/" + runId + "/pinboard/propose_connections",
@@ -792,6 +824,7 @@
         console.warn("[pinboard] propose_connections failed:", res.status);
         return;
       }
+      succeeded = true;
       const body = await res.json();
       const proposed = Array.isArray(body.proposed) ? body.proposed : [];
       if (proposed.length === 0) return;
@@ -800,6 +833,10 @@
       _redrawEdgesOnly();
     } catch (err) {
       console.warn("[pinboard] propose_connections error:", err);
+    } finally {
+      if (!succeeded) {
+        _lastProposeTurn = prevLastProposeTurn;
+      }
     }
   }
   // Expose for the trigger in app.js.

@@ -74,6 +74,41 @@ def _mock_chat(*contents):
     )
 
 
+# Post-Gemini-migration helper. The Ollama HTTP path is no longer in
+# the runtime path; respx-mocking it is a no-op for the actual code.
+# Tests that need a deterministic call_llm response must patch
+# call_llm() at every import site.
+def _patch_call_llm_returning(monkeypatch, raw_text: str):
+    from backend.llm_provider import UsageInfo
+
+    usage = UsageInfo(
+        provider="noop", model="noop",
+        input_tokens=0, output_tokens=0,
+        cost_usd=0.0, duration_s=0.0,
+    )
+
+    async def _fake(prompt, **kw):
+        return raw_text, usage
+
+    import backend.llm_provider as _llm
+    monkeypatch.setattr(_llm, "call_llm", _fake)
+    for mod in (
+        "backend.action_parser",
+        "backend.npc_engine",
+        "backend.world_engine",
+        "backend.hce",
+        "backend.death_engine",
+        "backend.character_gen",
+        "backend.scene_director",
+        "backend.connection_proposal",
+        "backend.inner_thought",
+    ):
+        try:
+            monkeypatch.setattr(f"{mod}.call_llm", _fake)
+        except AttributeError:
+            pass
+
+
 class TestHealth:
     @pytest.mark.asyncio
     @respx.mock
@@ -144,15 +179,18 @@ class TestUnifiedTurn:
         assert "npc_responses" in data
 
     @pytest.mark.asyncio
-    @respx.mock
-    async def test_travel_via_turn(self, client):
-        _mock_ollama_down()
-        run_id = (await client.post("/api/run")).json()["run_id"]
+    async def test_travel_via_turn(self, client, monkeypatch):
+        _patch_call_llm_returning(monkeypatch, FAKE_TRAVEL_ACTION)
+        run_id = (await client.post(
+            "/api/run", json={"era": "roman_late_empire"},
+        )).json()["run_id"]
 
-        respx.get(OLLAMA_TAGS_URL).mock(
-            return_value=httpx.Response(200, json={"models": []})
-        )
-        _mock_chat(FAKE_SKIP, FAKE_SKIP, FAKE_TRAVEL_ACTION, FAKE_SKIP, FAKE_SKIP, FAKE_NPC_POV, FAKE_NPC_POV)
+        from backend import persistence
+        state = await persistence.load_session(run_id)
+        state.player.location = "ariminum"
+        if "ariminum" not in state.visited_locations:
+            state.visited_locations.append("ariminum")
+        await persistence.save_session(state)
 
         resp = await client.post(
             f"/api/run/{run_id}/turn",

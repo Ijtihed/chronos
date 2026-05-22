@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import json
 import logging
-import random
 from pathlib import Path
 from string import Template
 
@@ -80,7 +79,16 @@ async def check_death(state: WorldState, action: dict) -> dict:
             }
 
         return {"died": False, "cause": None, "death_risk": combined_risk}
-    except Exception:
+    except Exception as exc:
+        # Surface the failure rather than silently returning the
+        # safe-default risk -- otherwise real bugs in _llm_death_check
+        # are indistinguishable from the LLM saying "you live". The
+        # turn still proceeds with an alive-but-aged risk so a Gemini
+        # hiccup never accidentally kills the player.
+        logger.warning(
+            "check_death failed (returning age-only fallback): %s: %s",
+            type(exc).__name__, exc,
+        )
         return {"died": False, "cause": None, "death_risk": age_factor * 0.3}
 
 
@@ -110,7 +118,8 @@ async def _llm_death_check(state: WorldState, action: dict) -> dict:
             schema=DeathCheckResponse,
             call_site="death_check",
         )
-        return DeathCheckResponse.model_validate(json.loads(raw)).model_dump()
+        from backend.utils import strip_json_fences
+        return DeathCheckResponse.model_validate(json.loads(strip_json_fences(raw))).model_dump()
     except (json.JSONDecodeError, ValidationError) as exc:
         logger.warning("Death check validation failed: %s", exc)
         return DEATH_CHECK_SAFE.model_dump()
@@ -138,6 +147,11 @@ def decay_memories(state: WorldState) -> WorldState:
     during observation mode. When all memories reach 0, the run ends.
     """
     new = state.model_copy(deep=True)
+
+    if not new.npcs:
+        logger.warning("decay_memories called with no NPCs — ending run immediately")
+        new.run_status = "ended"
+        return new
 
     all_forgotten = True
     for npc in new.npcs:
@@ -191,7 +205,11 @@ async def generate_memory_fade(state: WorldState) -> str:
     """Generate one fade-framing sentence for observation mode."""
     rememberers = [n for n in state.npcs if n.memory_of_player > 0]
     if not rememberers:
-        return f"No one in {get_player_location(state).name} remembers {state.player.name}."
+        try:
+            loc_name = get_player_location(state).name
+        except ValueError:
+            loc_name = "this place"
+        return f"No one in {loc_name} remembers {state.player.name}."
 
     try:
         raw_template = load_prompt(_MEMORY_FADE_PATH)
@@ -211,7 +229,8 @@ async def generate_memory_fade(state: WorldState) -> str:
         if leaks_raw_numbers(text):
             text = scrub_leaked_numbers(text)
         return text.strip().split("\n")[0][:200]
-    except Exception:
+    except Exception as exc:
+        logger.warning("generate_memory_fade failed: %s: %s", type(exc).__name__, exc)
         count = len(rememberers)
         if count == 1:
             return f"Only {rememberers[0].name} still remembers {state.player.name}."
@@ -220,20 +239,22 @@ async def generate_memory_fade(state: WorldState) -> str:
 
 async def generate_erasure(state: WorldState) -> str:
     """Generate the final erasure passage when the run ends."""
-    raw_template = load_prompt(_ERASURE_PATH)
-    player_loc = get_player_location(state)
-
-    prompt = Template(raw_template).safe_substitute(
-        player_name=state.player.name,
-        player_role=state.player.role,
-        location_name=player_loc.name,
-        era_name=state.era.name,
-        year=state.current_year,
-        era_description=state.era.description,
-        story_so_far=build_story_summary(state),
-    )
-
     try:
+        raw_template = load_prompt(_ERASURE_PATH)
+        try:
+            player_loc_name = get_player_location(state).name
+        except ValueError:
+            player_loc_name = "an unknown place"
+
+        prompt = Template(raw_template).safe_substitute(
+            player_name=state.player.name,
+            player_role=state.player.role,
+            location_name=player_loc_name,
+            era_name=state.era.name,
+            year=state.current_year,
+            era_description=state.era.description,
+            story_so_far=build_story_summary(state),
+        )
         # Erasure is the emotional climax of every run — QUALITY tier.
         # Fires exactly once per run; cost is negligible, narrative
         # fidelity matters.
@@ -246,7 +267,8 @@ async def generate_erasure(state: WorldState) -> str:
             logger.warning("Erasure text leaked raw numbers, scrubbing")
             text = scrub_leaked_numbers(text)
         return text
-    except Exception:
+    except Exception as exc:
+        logger.warning("generate_erasure failed: %s: %s", type(exc).__name__, exc)
         return (
             f"No record remains of {state.player.name}. "
             f"The world continued without them."

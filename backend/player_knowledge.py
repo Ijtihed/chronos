@@ -15,7 +15,6 @@ Design source: context/game logic context/gameplay.md (information system),
 
 from __future__ import annotations
 
-from collections import deque
 from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
@@ -467,11 +466,23 @@ class PlayerView(BaseModel):
     # message pointing at /pinboard.
     pins: List[Pin] = Field(default_factory=list)
     pin_connections: List[PinConnection] = Field(default_factory=list)
+    # Phase 2.10: turn index at which the auto-proposer last fired.
+    # Surfaced so the pinboard's client-side gate ("≥3 unconnected pins
+    # AND ≥2 turns since last proposal") survives a page reload. -1
+    # means "never fired"; the client should treat any value ≥0 as
+    # authoritative on init.
+    last_propose_turn: int = -1
     # Phase 3b: stylized 3D dioramas the player has earned through
     # high-significance moments. Surfaced so the frontend can rebuild
     # the WebGL scenes on initial run load (after a refresh, the
     # manuscript scrolls past the same insets in the same places).
     dioramas: List[Diorama] = Field(default_factory=list)
+    # The closing erasure passage when the run ended (`run_status ==
+    # "ended"`). Empty for active or observation-mode runs. Surfaced
+    # so reloading an ended run can still display the closing text
+    # rather than a generic "the world has finished forgetting you"
+    # fallback. Persisted on WorldState.final_erasure_text.
+    final_erasure_text: str = ""
 
 
 # ---------------------------------------------------------------------------
@@ -490,7 +501,18 @@ def build_player_view(
     Knowledge Matrix and included in the PlayerView.
     """
     tier = _knowledge_tier(state.player.archetype)
-    player_loc = get_player_location(state)
+    try:
+        player_loc = get_player_location(state)
+    except ValueError:
+        player_loc = type("_FallbackLoc", (), {
+            "id": state.player.location or "unknown",
+            "name": state.player.location or "Unknown location",
+            "description": "",
+            "political_tension": "moderate",
+            "lat": 0.0,
+            "lon": 0.0,
+            "neighbors": {},
+        })()
 
     visited_set = set(state.visited_locations)
     neighbor_ids: set[str] = set()
@@ -635,5 +657,15 @@ def build_player_view(
         cost_cap_hard_eur=_config.COST_CAP_HARD_EUR,
         pins=getattr(state, "pins", []) or [],
         pin_connections=getattr(state, "pin_connections", []) or [],
+        last_propose_turn=int(
+            # Preserve `0` literally. `... or -1` would collapse turn 0
+            # to "never fired", letting the proposer's threshold gate
+            # re-trigger across a reload boundary on rare turn-0
+            # proposals. Same fix as main.py /propose_connections.
+            getattr(state, "last_propose_turn", -1)
+            if getattr(state, "last_propose_turn", -1) is not None
+            else -1
+        ),
         dioramas=getattr(state, "dioramas", []) or [],
+        final_erasure_text=getattr(state, "final_erasure_text", "") or "",
     )

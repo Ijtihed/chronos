@@ -304,12 +304,28 @@
       try { s.renderer.dispose(); } catch (_) {}
     }
     if (s.scene) {
-      // Walk and dispose all geometries / materials.
+      // Walk and dispose all geometries / materials. Several setting
+      // kits share a single CylinderGeometry across multiple column
+      // meshes (see _addColumns), and a single MeshStandardMaterial
+      // across every architectural piece in a scene. dispose() is
+      // idempotent at the WebGL layer but each call dispatches a
+      // `dispose` event; deduping keeps the event noise down and
+      // makes long-run telemetry readable.
+      const seenGeo = new Set();
+      const seenMat = new Set();
       s.scene.traverse((obj) => {
-        if (obj.geometry) obj.geometry.dispose();
+        if (obj.geometry && !seenGeo.has(obj.geometry)) {
+          seenGeo.add(obj.geometry);
+          try { obj.geometry.dispose(); } catch (_) {}
+        }
         if (obj.material) {
           const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
-          mats.forEach((m) => m && m.dispose && m.dispose());
+          mats.forEach((m) => {
+            if (m && !seenMat.has(m)) {
+              seenMat.add(m);
+              try { m.dispose && m.dispose(); } catch (_) {}
+            }
+          });
         }
       });
     }

@@ -7,6 +7,7 @@ world_events, world_engine, npc_personality, and player_knowledge.
 
 from __future__ import annotations
 
+import re
 from collections import deque
 from typing import TYPE_CHECKING, Dict
 
@@ -28,6 +29,29 @@ def tension_index(tension: str) -> int:
     if tension in TENSION_LEVELS:
         return TENSION_LEVELS.index(tension)
     return 1
+
+
+_FENCE_RE = re.compile(r"^```(?:\w+)?\s*\n(.*?)```\s*$", re.DOTALL)
+
+
+def strip_json_fences(text: str) -> str:
+    """Remove markdown code fences (```json ... ```) that Gemini wraps around JSON.
+
+    Gemini occasionally returns JSON inside markdown fences. json.loads
+    rejects the fences; this strips them before parsing. Called from
+    every LLM call site that expects structured JSON output.
+    """
+    stripped = text.strip()
+    m = _FENCE_RE.match(stripped)
+    if m:
+        return m.group(1).strip()
+    if stripped.startswith("```"):
+        lines = stripped.splitlines()
+        inner = lines[1:]
+        if inner and inner[-1].strip() == "```":
+            inner = inner[:-1]
+        return "\n".join(inner).strip()
+    return text
 
 
 def graph_distance(loc_a: str, loc_b: str, state: "WorldState") -> int:

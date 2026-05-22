@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import logging
 import os
+import random
 from pathlib import Path
 
 try:
@@ -27,6 +28,41 @@ except ImportError:
     pass
 
 logger = logging.getLogger("chronos.config")
+
+
+# ---------------------------------------------------------------------------
+# Global random seed (opt-in, for reproducibility)
+# ---------------------------------------------------------------------------
+#
+# world_drift, world_events, npc_personality, character_gen, eras, and
+# world_engine all reach for `random` at module load and at runtime.
+# Production play wants real randomness — the world should feel different
+# every run. Tests and reproducible-bug investigations want determinism.
+#
+# `CHRONOS_RANDOM_SEED` opt-in: set to any integer (e.g. `42`) and we
+# seed Python's global `random` at config import. Unset = real entropy.
+# Setting it to "0" still counts as a seed (0 is a valid seed); only an
+# unset / empty value means "don't touch the seed".
+#
+# This is the lightest possible change that lets tests pin behaviour
+# without rewriting every `random.foo()` call site to thread a Random
+# instance.
+
+_RAW_SEED = os.environ.get("CHRONOS_RANDOM_SEED", "").strip()
+CHRONOS_RANDOM_SEED: int | None = None
+if _RAW_SEED:
+    try:
+        CHRONOS_RANDOM_SEED = int(_RAW_SEED)
+        random.seed(CHRONOS_RANDOM_SEED)
+        logger.info(
+            "CHRONOS_RANDOM_SEED set to %d -- world drift / events are deterministic this process",
+            CHRONOS_RANDOM_SEED,
+        )
+    except ValueError:
+        logger.warning(
+            "CHRONOS_RANDOM_SEED=%r is not an integer; ignoring (using system entropy).",
+            _RAW_SEED,
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -73,8 +109,12 @@ CHRONOS_GEMINI_MAX_CONCURRENT: int = min(
 # The _PER_M constants below match whichever model is *actually* set
 # in CHRONOS_QUALITY_MODEL. If you change models, update both rows.
 
-GEMINI_3_1_FLASH_LITE_INPUT_PER_M_USD: float = 0.10   # Gemini 2.5 Flash-Lite input
-GEMINI_3_1_FLASH_LITE_OUTPUT_PER_M_USD: float = 0.40  # Gemini 2.5 Flash-Lite output
+GEMINI_INPUT_PER_M_USD: float = 0.10   # Gemini 2.5 Flash-Lite input
+GEMINI_OUTPUT_PER_M_USD: float = 0.40  # Gemini 2.5 Flash-Lite output
+
+# Legacy aliases (used in llm_provider and tests; kept for backward compat)
+GEMINI_3_1_FLASH_LITE_INPUT_PER_M_USD = GEMINI_INPUT_PER_M_USD
+GEMINI_3_1_FLASH_LITE_OUTPUT_PER_M_USD = GEMINI_OUTPUT_PER_M_USD
 
 # TODO: Update from ECB reference rate periodically. If EUR/USD volatility
 # exceeds ±5% (e.g. rate moves to 0.85 or 0.99), recompute the soft/hard
@@ -93,7 +133,7 @@ COST_CAP_HARD_EUR: float = 2.00
 
 
 # ---------------------------------------------------------------------------
-# Circuit breaker (Gemini → Ollama fallback)
+# Circuit breaker (Gemini → NoOp fallback)
 # ---------------------------------------------------------------------------
 
 GEMINI_CIRCUIT_FAIL_THRESHOLD: int = 3
@@ -109,6 +149,11 @@ def startup_log(log: logging.Logger | None = None) -> None:
     """Log effective LLM configuration at server startup.
 
     Never logs the API key value — only whether one is present.
+
+    Also surfaces a loud warning when the configured model name doesn't
+    match the pricing constants — per chronos-model-tier policy, the
+    two have to move together so cost accounting stays honest. Without
+    this, switching to a preview model silently undercounts cost by 2-3x.
     """
     log = log or logger
     if _QUALITY_MODEL_NAME_DEPRECATED:
@@ -122,6 +167,28 @@ def startup_log(log: logging.Logger | None = None) -> None:
             CHRONOS_GEMINI_MODEL,
             CHRONOS_GEMINI_MAX_CONCURRENT,
         )
+        # Pricing-vs-model coherence check. The price-per-million tokens
+        # are hand-set to gemini-2.5-flash-lite by default; if the operator
+        # switches CHRONOS_GEMINI_MODEL to a preview model with different
+        # pricing, they MUST also update the constants below or the
+        # per-run cost cap silently shifts. We warn loudly rather than
+        # asserting: a preview-pricing key with stale constants will be
+        # *under*-counted, which lets the run blow past the EUR cap.
+        is_25_pricing = (
+            abs(GEMINI_3_1_FLASH_LITE_INPUT_PER_M_USD - 0.10) < 1e-6
+            and abs(GEMINI_3_1_FLASH_LITE_OUTPUT_PER_M_USD - 0.40) < 1e-6
+        )
+        if CHRONOS_GEMINI_MODEL != "gemini-2.5-flash-lite" and is_25_pricing:
+            log.warning(
+                "Model=%s but pricing constants are tuned for "
+                "gemini-2.5-flash-lite ($0.10 / $0.40 per M). Cost accounting "
+                "may be wrong by 2-3x; update "
+                "GEMINI_3_1_FLASH_LITE_INPUT_PER_M_USD / "
+                "GEMINI_3_1_FLASH_LITE_OUTPUT_PER_M_USD in backend/config.py "
+                "to match the model you're actually using, OR switch back "
+                "to gemini-2.5-flash-lite.",
+                CHRONOS_GEMINI_MODEL,
+            )
     else:
         log.warning(
             "GEMINI_API_KEY not set — all LLM calls will return NoOp responses. "

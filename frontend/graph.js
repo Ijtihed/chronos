@@ -938,6 +938,7 @@ const ChronosGraph = (function () {
       console.warn("interaction_graph fetch failed:", e);
       if (titleYear) titleYear.textContent = "Error";
       setStage("Failed to load");
+      container.classList.add("ready");
     }
   }
 

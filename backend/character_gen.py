@@ -102,7 +102,8 @@ async def _generate_player(
             schema=CharacterGenResponse,
             call_site="character_gen.player",
         )
-        data = CharacterGenResponse.model_validate(json.loads(raw))
+        from backend.utils import strip_json_fences
+        data = CharacterGenResponse.model_validate(json.loads(strip_json_fences(raw)))
     except (json.JSONDecodeError, ValidationError, Exception) as exc:
         logger.warning("Player character gen validation failed: %s", exc)
         data = character_gen_default(archetype["role"], start_location.name)
@@ -171,7 +172,8 @@ async def _generate_single_npc(
             schema=CharacterGenResponse,
             call_site="character_gen.npc",
         )
-        data = CharacterGenResponse.model_validate(json.loads(raw))
+        from backend.utils import strip_json_fences
+        data = CharacterGenResponse.model_validate(json.loads(strip_json_fences(raw)))
     except (json.JSONDecodeError, ValidationError, Exception) as exc:
         logger.warning("NPC gen validation failed (index %d): %s", index, exc)
         data = character_gen_default(archetype["role"], location.name, index=index)

@@ -166,6 +166,72 @@ async def test_create_pin_classifies_told_by(client: AsyncClient) -> None:
 
 
 @pytest.mark.asyncio
+async def test_create_pin_classifies_told_by_production_pov_key(client: AsyncClient) -> None:
+    """Regression test: the production orchestrator writes NPC speech under
+    the key `pov` (and `internal` for addressed-mode private thoughts), NOT
+    `text`. The classifier must accept the production shape, not just the
+    legacy shape used in the older test fixtures above. Without this, every
+    pin from a real NPC voice falls through to `inferred` (the most
+    conservative default) and the player-perspective design rule from
+    Phase 2.9 silently regresses."""
+    state = create_initial_state()
+    await persistence.save_session(state)
+    rid = state.run_id
+
+    await persistence.append_turn_log(
+        run_id=rid,
+        turn_number=1,
+        player_input="speak with the deacon",
+        parsed_action={"action_type": "speak"},
+        ambient_activity=[],
+        # Production shape: ambient mode writes `pov`; addressed mode writes
+        # `pov` (reply) PLUS `internal` (private thought). Both are rendered
+        # to the player and both should match for `told_by`.
+        npc_responses=[
+            {
+                "npc_id": "deacon_paulus",
+                "npc_name": "Deacon Paulus",
+                "npc_role": "Christian deacon",
+                "pov": "The barbarians are God's judgment on a sinful empire.",
+                "internal": "You doubt your own certainty as you say it.",
+                "mode": "addressed",
+            }
+        ],
+        state_changes={},
+        narrative_output="(player POV here)",
+        player_view_snapshot={},
+    )
+
+    # Pin a phrase that lives in the `pov` field (the spoken reply).
+    res = await client.post(
+        f"/api/run/{rid}/pin",
+        json={
+            "text": "barbarians are God's judgment",
+            "source_turn_id": "turn-1",
+        },
+    )
+    assert res.status_code == 200
+    pin = res.json()["pin"]
+    assert pin["source_confidence"] == "told_by"
+    assert pin["source_attribution"] == "Deacon Paulus"
+
+    # Pin a phrase that lives in the `internal` field (the private thought
+    # rendered as italic to the player). Should also be `told_by` since the
+    # NPC is the source even when the line is silent reflection.
+    res2 = await client.post(
+        f"/api/run/{rid}/pin",
+        json={
+            "text": "doubt your own certainty",
+            "source_turn_id": "turn-1",
+        },
+    )
+    assert res2.status_code == 200
+    pin2 = res2.json()["pin"]
+    assert pin2["source_confidence"] == "told_by"
+    assert pin2["source_attribution"] == "Deacon Paulus"
+
+
+@pytest.mark.asyncio
 async def test_create_pin_classifies_rumor(client: AsyncClient) -> None:
     state = create_initial_state()
     await persistence.save_session(state)

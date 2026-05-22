@@ -15,6 +15,7 @@ from backend.persistence import (
     init_db,
     insert_historical_event,
     query_historical_events,
+    seed_historical_events_if_empty,
 )
 
 
@@ -247,3 +248,71 @@ class TestBuildScriptHelpers:
         from scripts.build_events_db import STARTER_ERAS
         regions = {e["region"] for e in STARTER_ERAS}
         assert len(regions) >= 10, f"Only {len(regions)} regions — should cover diverse geography"
+
+
+class TestAutoSeedFromSeedsDir:
+    """Tests for the per-era seed bulk-loader.
+
+    `seed_historical_events_if_empty()` is called from the FastAPI
+    startup hook so a fresh install has a non-empty events table
+    even before someone runs `scripts/build_events_db.py`. The seed
+    files in seeds/*.json carry ~125 curated events across the 5
+    starter eras. The loader is idempotent and skips when the table
+    has data.
+    """
+
+    @pytest.mark.asyncio
+    async def test_loads_all_seed_files_on_empty_db(self):
+        assert await count_historical_events() == 0
+        await seed_historical_events_if_empty()
+        n = await count_historical_events()
+        assert n > 100, f"Expected ~125 seed events, got {n}"
+
+    @pytest.mark.asyncio
+    async def test_idempotent_on_non_empty_db(self):
+        await insert_historical_event(
+            year=410, region="Italia", event="A test event",
+            significance="local", event_type="war", affects=[],
+        )
+        count_before = await count_historical_events()
+        await seed_historical_events_if_empty()
+        count_after = await count_historical_events()
+        assert count_after == count_before, (
+            "Auto-seed should skip when table already has data"
+        )
+
+    @pytest.mark.asyncio
+    async def test_seeded_events_match_seed_schema(self):
+        await seed_historical_events_if_empty()
+        # Spot-check: pick a representative era window and verify the
+        # seeded rows have the canonical schema fields.
+        events = await query_historical_events(1400, 1460)
+        assert events, "Expected at least one Constantinople-era event"
+        e = events[0]
+        assert "year" in e
+        assert "region" in e
+        assert e["significance"] in {"local", "regional", "civilizational"}
+        assert e["type"] in {
+            "war", "epidemic", "famine", "political",
+            "religious", "economic", "natural_disaster", "cultural",
+        }
+        assert e["canonical"] is True
+
+    @pytest.mark.asyncio
+    async def test_seed_covers_all_five_starter_eras(self):
+        await seed_historical_events_if_empty()
+        # Sanity windows for each starter era. Each should have >= 5
+        # events; the seeds carry ~20-33 per era.
+        era_windows = [
+            ("Roman Late Empire", 360, 420),
+            ("Viking Age", 850, 900),
+            ("Crusader States", 1150, 1200),
+            ("Black Death", 1340, 1370),
+            ("Fall of Constantinople", 1430, 1460),
+        ]
+        for label, lo, hi in era_windows:
+            n = len(await query_historical_events(lo, hi))
+            assert n >= 5, (
+                f"{label} window {lo}-{hi} only has {n} seeded events; "
+                "the seed JSON for this era may be missing or malformed."
+            )

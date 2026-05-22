@@ -1,6 +1,6 @@
 # Character Generator
 
-> **Model tier:** Gemini (`CHRONOS_GEMINI_MODEL`, default `gemini-3-flash-preview`)
+> **Model tier:** Gemini (`CHRONOS_GEMINI_MODEL`, default `gemini-2.5-flash-lite`)
 > **Purpose:** Generate a historically grounded character from an era config + archetype
 > **Volume:** Called once per character at run initialization (15-20 calls batched, rate-limited via semaphore)
 

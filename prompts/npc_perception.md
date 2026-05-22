@@ -1,6 +1,6 @@
 # NPC Perception
 
-> **Model tier:** Gemini (`CHRONOS_GEMINI_MODEL`, default `gemini-3-flash-preview`)
+> **Model tier:** Gemini (`CHRONOS_GEMINI_MODEL`, default `gemini-2.5-flash-lite`)
 > **Purpose:** What the player character honestly thinks about an NPC. Raw, biased, human.
 > **Volume:** Called on click, cached per NPC per minute. Read-only endpoint -- cost is not aggregated to the run total.
 

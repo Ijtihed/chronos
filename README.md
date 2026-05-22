@@ -29,17 +29,26 @@ uvicorn backend.main:app --reload
 open http://localhost:8000
 ```
 
+> The first time the server starts it auto-seeds the historical events
+> table from `seeds/*.json` (~125 curated events across the five
+> starter eras). That keeps the map, region knowledge, and the
+> divergence check populated on day one. For the richer Wikidata-backed
+> ingest (~1,500+ events), run `python scripts/build_events_db.py --all`
+> after you have Ollama installed locally (the build script uses it for
+> classification). Seeds and Wikidata ingest are additive: the auto-seed
+> only fires when the table is empty.
+
 ## Environment variables
 
 | Variable | Purpose |
 |----------|---------|
 | `GEMINI_API_KEY` | Required. All LLM calls route to Gemini. Loaded from `.env` or the shell. **Never commit this.** |
-| `CHRONOS_GEMINI_MODEL` | Override the Gemini model ID. Default: `gemini-3-flash-preview`. |
+| `CHRONOS_GEMINI_MODEL` | Override the Gemini model ID. Default: `gemini-2.5-flash-lite` (stable / GA, $0.10 / $0.40 per M input/output). Set to `gemini-3-flash-preview` if your key has preview access — pricing constants in `backend/config.py` are tuned for 2.5, so update them too if you switch. |
 | `CHRONOS_GEMINI_MAX_CONCURRENT` | Cap on concurrent Gemini requests. Default: `15`. Hard ceiling: `20`. |
 
 ## How to play
 
-1. Click **Begin**. A random era is assigned. Wait for character generation (1-2 min).
+1. Click **Begin**. A random era is assigned. Wait a few seconds for character generation.
 2. Type anything in the text box. Anything at all — negotiate, flee, hoard, revolt, wait.
 3. The world simulates. NPCs do their own things. Your action is one thread among many.
 4. Press **M** to toggle the map. Click visited NPC markers for your impression of them.
@@ -133,7 +142,7 @@ frontend/             Browser UI
   geo/                    GeoJSON border files + Natural Earth coastlines + per-era DEM heightmaps (terrain/)
 prompts/              LLM prompt templates (design artifacts)
 context/              Game design docs (source of truth)
-tests/                ~820 automated tests
+tests/                921 automated tests (offline) + 13 live (Gemini)
 ```
 
 ## API
@@ -143,9 +152,13 @@ tests/                ~820 automated tests
 | POST | `/api/run/preview` | Get era info instantly (for loading screen) |
 | POST | `/api/run` | Create new run (generates characters via LLM) |
 | GET | `/api/run/{id}` | Get run state |
+| DELETE | `/api/run/{id}` | End the run manually (used at the hard cost cap) |
 | POST | `/api/run/{id}/turn` | Player types anything — action, travel, or inaction |
+| POST | `/api/run/{id}/inner_thought` | Phase 2.7 — single-sentence inner thought, fired in parallel with `/turn` for instant under-input rendering |
 | POST | `/api/run/{id}/skip` | Advance time N ticks (1-30) without player action |
 | GET | `/api/run/{id}/npc/{npc_id}/perception` | Character's subjective impression of an NPC |
+| GET | `/api/run/{id}/region/{polity_name}` | Region knowledge on map click — character-filtered facts + rumors |
+| POST | `/api/run/{id}/context` | Highlighted-passage historical context (2–3 sentences) |
 | GET | `/api/run/{id}/interaction_graph` | Player-centric NPC interaction graph (read-only snapshot) |
 | GET | `/api/run/{id}/events/visible` | Map event pins. Civilizational + regional events only, lifetime window, regional events constrained to era home region. |
 | POST | `/api/run/{id}/pin` | Phase 2.9 — create a single pin from a highlighted manuscript passage. Server classifies `source_confidence` (observed / told_by / rumor / inferred) by reading the source turn-log row. |
@@ -157,7 +170,8 @@ tests/                ~820 automated tests
 | GET | `/api/runs` | List all runs |
 | GET | `/api/geo/{era_key}` | Historical border GeoJSON for an era |
 | GET | `/api/geo/terrain/{era_key}` | DEM heightmap PNG for an era (war-table) |
-| GET | `/api/health` | Health check |
+| GET | `/api/geo/places/labels` | Cached centroid labels for map rendering (city / town / region tiers) |
+| GET | `/api/health` | Health check (live Gemini ping, returns NoOp status detail) |
 
 The turn endpoint handles everything. Type "go to Ravenna" and it routes to travel. Type "wait" and your character acts on their own. Type "start a revolt" and the simulation figures out what happens.
 
@@ -165,7 +179,7 @@ The turn endpoint handles everything. Type "go to Ravenna" and it routes to trav
 
 All-Gemini dispatch (see `.cursor/rules/chronos-model-tier.mdc` for the full policy).
 
-**All calls route to Gemini** (`CHRONOS_GEMINI_MODEL`, default `gemini-3-flash-preview`).
+**All calls route to Gemini** (`CHRONOS_GEMINI_MODEL`, default `gemini-2.5-flash-lite`; set the env var to `gemini-3-flash-preview` if your key has preview access).
 The historic fast/quality tier split is retired -- Ollama is no longer used at runtime.
 
 **NoOp fallback** -- when `GEMINI_API_KEY` is missing or the circuit breaker is open
@@ -216,3 +230,24 @@ python -m pytest tests/ --ignore=tests/test_live.py -q
 ```
 
 The database is recreated automatically on first run. Existing save games from before the schema change are not compatible — start a new run.
+
+## Renewing the Gemini API key
+
+The server reads `GEMINI_API_KEY` once at startup, so any change to `.env` requires a restart. There's a helper:
+
+```bash
+# 1. Edit .env, paste a fresh key
+# 2. Run:
+bash scripts/restart_server.sh
+
+# It will:
+#  - kill any stale uvicorn process holding port 8000
+#  - start a new uvicorn in the background
+#  - probe /api/health and report whether Gemini is OK
+```
+
+If Gemini is unreachable (expired key, 4xx, network), the game will still run — every LLM call falls back to NoOp ("..."), so turns advance with degraded prose. The frontend now shows a discreet red banner the first time you enter the game shell, so you know the prose is degraded rather than wondering why it's empty.
+
+## Reproducible randomness (tests / debugging)
+
+Set `CHRONOS_RANDOM_SEED=<int>` in the environment to seed Python's global `random` at config import. World drift, world events, character generation, and NPC personality sampling become deterministic for that process. Unset = real entropy (the production default). Used to reproduce a bug or pin behaviour in a test.

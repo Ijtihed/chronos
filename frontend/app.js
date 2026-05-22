@@ -131,12 +131,21 @@ function saveRunToStorage() {
 // Per-run localStorage keys that this app owns. Listed so we can
 // nuke everything for a given run_id consistently when the run is
 // abandoned or reset, instead of leaking garbage forever.
+//
+// `cost_soft_dismissed_` is keyed by the *PlayerView* `run_id`
+// (state.run_id), not the route param, so a per-run cleanup needs to
+// catch both. They are the same string in practice -- the route
+// `:run_id` and the PlayerView's `run_id` field are populated from
+// the same uuid -- so a single prefix covers both code paths.
 const _PER_RUN_KEY_PREFIXES = [
   "chronos_narrative_",
   "chronos_notes_",
   "chronos_map_view_",
+  "chronos_globe_view_",
+  "chronos_wartable_view_",
   "chronos_graph_pins_",
   "chronos_graph_view_",
+  "cost_soft_dismissed_",
 ];
 
 function clearRunStateFor(runId) {
@@ -258,6 +267,23 @@ if (continueBtn) {
       state = await res.json();
       runId = saved.runId;
       eraKey = saved.eraKey;
+      // Defensive: if the saved run has already ended (race between
+      // checkForExistingRun hiding the button and the player clicking
+      // it, or a direct URL hit), do NOT drop the player into the
+      // live game shell -- that path enables inputs that no longer
+      // route to a live run. Show the erasure screen instead.
+      if (state && state.run_status === "ended") {
+        clearRunFromStorage();
+        // Prefer the persisted closing passage if the backend has it
+        // (final_erasure_text is set the first time the run transitions
+        // to "ended"; older sessions or partial-failure cases fall back
+        // to the generic line).
+        const erasureText =
+          (state.final_erasure_text && String(state.final_erasure_text).trim()) ||
+          "The world has finished forgetting you. Begin a new run.";
+        showErasure(erasureText);
+        return;
+      }
       enterGame();
     } catch {
       clearRunFromStorage();
@@ -301,6 +327,11 @@ async function startNewRun() {
 
   try {
     const previewRes = await fetch("/api/run/preview", { method: "POST" });
+    if (!previewRes.ok) {
+      completeProgressBar();
+      $("#loading-era-desc").textContent = `Error: server returned ${previewRes.status}`;
+      return;
+    }
     const preview = await previewRes.json();
     eraKey = preview.era_key;
 
@@ -334,6 +365,11 @@ async function startNewRun() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ era: eraKey }),
     });
+    if (!runRes.ok) {
+      completeProgressBar();
+      $("#loading-era-desc").textContent = `Error: server returned ${runRes.status}`;
+      return;
+    }
     const runData = await runRes.json();
     runId = runData.run_id;
     eraKey = runData.era;
@@ -377,6 +413,11 @@ function enterGame() {
 
   updateTopBar();
   setupInput();
+  // Surface a banner if the Gemini key is missing / expired / the
+  // circuit is open. Without this the player sees turns advancing but
+  // every NPC voice rendering as "..." and has no idea why. Best-effort,
+  // never blocks the game; fires once per `enterGame` call.
+  _checkGeminiHealthAndWarn();
 
   const savedNarrative = runId
     ? localStorage.getItem("chronos_narrative_" + runId)
@@ -401,7 +442,16 @@ function enterGame() {
     // them into the right-hand panel.
     if (typeof ChronosPinboard !== "undefined" && state) {
       ChronosPinboard.show(runId);
-      ChronosPinboard.restore(state.pins || [], state.pin_connections || []);
+      ChronosPinboard.restore(
+        state.pins || [],
+        state.pin_connections || [],
+        // last_propose_turn is surfaced through PlayerView so the
+        // proposer cooldown survives a page reload. Default to -1
+        // ("never") if the field is missing from an older payload.
+        typeof state.last_propose_turn === "number"
+          ? state.last_propose_turn
+          : -1,
+      );
     }
     // Phase 3b: restore any dioramas this run has earned. They were
     // persisted on state.dioramas; the renderer mounts them inline
@@ -444,7 +494,13 @@ function enterGame() {
     // waits for the player to highlight text in the manuscript.
     if (typeof ChronosPinboard !== "undefined" && state) {
       ChronosPinboard.show(runId);
-      ChronosPinboard.restore(state.pins || [], state.pin_connections || []);
+      ChronosPinboard.restore(
+        state.pins || [],
+        state.pin_connections || [],
+        typeof state.last_propose_turn === "number"
+          ? state.last_propose_turn
+          : -1,
+      );
     }
     // Phase 3b: fresh runs start with no dioramas. The first major
     // turn (significance >= 0.85) will mint one via the trigger in
@@ -733,6 +789,56 @@ function updateCostIndicator() {
   }
 }
 
+// ── Gemini-down banner ────────────────────────────────────────────────
+//
+// One-shot health check on game-shell entry. The backend's /api/health
+// endpoint runs a tiny Gemini ping at startup and surfaces the result
+// inline (`gemini: false` + `gemini_detail` when the key is bad). We
+// hit the same endpoint here so the banner reflects the *currently
+// running* server, not whatever state was true on page load.
+//
+// Kept best-effort: any network error silently no-ops. Fires from
+// enterGame(), not on initial page load -- there's no point warning a
+// player about Gemini before they've even started a run.
+async function _checkGeminiHealthAndWarn() {
+  const banner = document.getElementById("gemini-down-banner");
+  if (!banner) return;
+  // Per-page-load dismissal: if the player has already dismissed
+  // during this tab's lifetime, leave the banner hidden.
+  if (banner.dataset.dismissedThisLoad === "1") return;
+  try {
+    const res = await fetch("/api/health");
+    if (!res.ok) return;
+    const body = await res.json();
+    // Note: `gemini` is the boolean `true` only when the smoke test
+    // passed. Missing key, expired key, or 4xx all yield `false`.
+    if (body && body.gemini === false) {
+      banner.classList.remove("hidden");
+      banner.classList.add("flex");
+    } else {
+      banner.classList.add("hidden");
+      banner.classList.remove("flex");
+    }
+  } catch (_) {
+    // Network blip -- ignore.
+  }
+}
+
+(function initGeminiBannerDismiss() {
+  document.addEventListener("DOMContentLoaded", () => {
+    const dismiss = document.getElementById("gemini-down-banner-dismiss");
+    if (!dismiss) return;
+    dismiss.addEventListener("click", () => {
+      const banner = document.getElementById("gemini-down-banner");
+      if (banner) {
+        banner.classList.add("hidden");
+        banner.classList.remove("flex");
+        banner.dataset.dismissedThisLoad = "1";
+      }
+    });
+  });
+})();
+
 (function initCostBannerHandlers() {
   document.addEventListener("DOMContentLoaded", () => {
     const dismiss = document.getElementById("cost-soft-banner-dismiss");
@@ -892,8 +998,11 @@ function updateClock() {
       // Don't collapse if input has content or is focused
       if (document.activeElement === input) return;
       if (input.value && input.value.length > 0) return;
-      // Or if a turn is in progress
-      if (window.turnInProgress) return;
+      // Or if a turn is in progress. `turnInProgress` is module-scoped
+      // (same <script>) — referencing it via the closure is correct;
+      // an earlier version checked `window.turnInProgress` which was
+      // never assigned and so always evaluated falsy.
+      if (turnInProgress) return;
       bar.classList.remove("expanded");
     }, 4000);
   }
@@ -995,8 +1104,19 @@ async function _fetchAndRenderInnerThought(rid, text, block) {
   } catch (e) {
     // Silent — the absence of an inner thought is acceptable.
   }
-  const slot = block.querySelector(".inner-thought-slot");
-  if (!slot) return;
+  let slot = block.querySelector(".inner-thought-slot");
+  if (!slot) {
+    // renderTurnStaggered may have replaced content before we arrived.
+    // Re-create the slot and insert it after the player's typed action.
+    slot = document.createElement("div");
+    slot.className = "inner-thought-slot pending";
+    const playerLine = block.querySelector("p.text-sm.italic");
+    if (playerLine && playerLine.nextSibling) {
+      block.insertBefore(slot, playerLine.nextSibling);
+    } else {
+      block.prepend(slot);
+    }
+  }
   if (thought) {
     slot.classList.remove("pending");
     slot.classList.add("resolved");
@@ -1367,6 +1487,37 @@ async function renderTurnStaggered(el, playerText, data) {
   const { npc_responses, player_view: pv } = data;
   const ambient = data.ambient_activity || [];
 
+  // Stamp the post-turn turn number on the block AND rename the DOM id
+  // to match. The block was created at submit time with
+  // `id="turn-<Date.now()>"` so the depth-stack and intra-turn
+  // styling have something to hang on; once /turn returns we know the
+  // authoritative turn_number and rewrite the id to
+  // `turn-<turn_number>`. That id is the same string the backend's
+  // turn_logs row uses (via its `turn_number` column), so:
+  //   - pin classifier (source_turn_id="turn-<n>") finds the right row
+  //   - diorama POST (turn_id="turn-<n>") finds the right row AND
+  //     re-mounts on reload via document.getElementById
+  // The dataset.turnNumber stamp is the source of truth that pinboard.js
+  // reads first; the renamed id is the fallback that survives even if
+  // the dataset attribute is dropped by an HTML round-trip.
+  // Backward compat: localStorage-restored manuscripts created before
+  // this commit retain their `turn-<Date.now()>` ids -- pin classifier
+  // falls back to the most recent row for those, the same behavior as
+  // before. New runs get the correct mapping immediately.
+  if (el && pv && typeof pv.turn === "number") {
+    const tn = String(pv.turn);
+    el.dataset.turnNumber = tn;
+    // Only rename if the id is the submit-time timestamp shape and is
+    // not already the canonical post-turn shape. Avoids stomping on
+    // intentional ids set elsewhere (e.g. the manuscript-intro block,
+    // which is not a turn-block at all) or on a block whose id already
+    // matches.
+    const desired = "turn-" + tn;
+    if (el.id && el.id.startsWith("turn-") && el.id !== desired) {
+      el.id = desired;
+    }
+  }
+
   let h = `<div class="text-[11px] uppercase tracking-[0.15em] text-white/55 mb-4 font-semibold">${_yearLink(pv.current_year)}</div>`;
 
   // ── Ambient activity (what people nearby are doing) ───────────────────
@@ -1401,6 +1552,18 @@ async function renderTurnStaggered(el, playerText, data) {
     )}</p>`;
   }
 
+  // Observation mode: backend returns a `memory_fade` line each turn —
+  // a single sentence framing how the player's memory is fading out of
+  // the world. Render it as quiet italic text so the dead player has a
+  // narrative thread until the run ends in erasure. Skipped when
+  // memory_fade is empty / NoOp.
+  if (data.memory_fade && typeof data.memory_fade === "string") {
+    const fadeText = data.memory_fade.trim();
+    if (fadeText && fadeText !== "...") {
+      h += `<p class="text-sm leading-loose italic text-white/40 mb-4">${esc(fadeText)}</p>`;
+    }
+  }
+
   const rumors = pv.rumors || [];
   if (rumors.length) {
     for (const r of rumors) {
@@ -1431,11 +1594,11 @@ async function renderTurnStaggered(el, playerText, data) {
 
   h += `<div class="mt-6 mb-2"><div class="w-full h-px bg-white/[0.03]"></div></div>`;
 
-  // Phase 2.7: preserve a resolved inner-thought slot across the
-  // re-render so the player can keep reading it as part of the
-  // permanent turn record. The slot is rendered between the player's
-  // typed action and the year stamp.
-  const existingThought = el.querySelector(".inner-thought-slot.resolved");
+  // Phase 2.7: preserve any inner-thought slot (pending OR resolved)
+  // across the re-render. A pending slot means the inner_thought fetch
+  // is still in flight — dropping it would cause the response to lose
+  // its target DOM node.
+  const existingThought = el.querySelector(".inner-thought-slot");
   let thoughtHtml = "";
   if (existingThought) {
     thoughtHtml = existingThought.outerHTML;
@@ -1845,13 +2008,6 @@ function applyDepthLayering() {
       block.style.transform = "";
       block.style.filter = "";
       block.removeAttribute("data-deep");
-      return;
-    }
-    // Phase 2.8: corridor owns the transform on its cards. Skip per-
-    // block transform writes when corridor is active. The block still
-    // gets the --turn-z / --turn-blur CSS variables for any code that
-    // reads them, but the inline transform/filter is left alone.
-    if (corridorActive) {
       return;
     }
     // Aggressive recession curve. Bumped from -300 to -360 because
@@ -2547,6 +2703,17 @@ async function executeSkip(ticks) {
     h += `<p class="text-sm leading-loose text-white/55 mb-3">${esc(data.regrounding)}</p>`;
     h += `<div class="mt-6 mb-2"><div class="w-full h-px bg-white/[0.03]"></div></div>`;
     block.innerHTML = h;
+    // Stamp the post-skip turn number so a pin lifted from the
+    // skip-block's regrounding text resolves to the right turn-log row
+    // server-side (same convention as renderTurnStaggered above).
+    if (state && typeof state.turn === "number") {
+      const tn = String(state.turn);
+      block.dataset.turnNumber = tn;
+      const desired = "turn-" + tn;
+      if (block.id && block.id.startsWith("turn-") && block.id !== desired) {
+        block.id = desired;
+      }
+    }
 
     updateTopBar();
     updateTurnDimming();
@@ -2574,7 +2741,15 @@ async function executeSkip(ticks) {
       input.style.pointerEvents = "";
       input.style.opacity = "";
       input.placeholder = "What do you do, think, or say?";
-      input.focus();
+      // Only focus the live-input when the run is still active. In
+      // observation mode the live input is hidden behind #obs-input
+      // and the bottom bar is collapsed; focusing here yanks the
+      // user's view back to a hidden control. The skip endpoint
+      // refuses non-active runs server-side, but a stale finally
+      // could still misfire after a death-during-skip.
+      if (state && state.run_status === "active") {
+        input.focus();
+      }
     }
   }
 }

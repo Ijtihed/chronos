@@ -28,6 +28,7 @@ async def _configure_connection(db: aiosqlite.Connection) -> None:
     await db.execute("PRAGMA busy_timeout = 5000")
     await db.execute("PRAGMA cache_size = -65536")
     await db.execute("PRAGMA temp_store = MEMORY")
+    await db.execute("PRAGMA foreign_keys = ON")
 
 
 @asynccontextmanager
@@ -37,6 +38,9 @@ async def _connect() -> AsyncIterator[aiosqlite.Connection]:
     async with aiosqlite.connect(str(DB_PATH)) as db:
         await _configure_connection(db)
         yield db
+
+
+SEEDS_DIR = Path(__file__).resolve().parent.parent / "seeds"
 
 
 async def init_db() -> None:
@@ -181,6 +185,76 @@ async def init_db() -> None:
         await db.commit()
 
 
+async def seed_historical_events_if_empty() -> None:
+    """Bulk-insert the per-era seed JSONs into `historical_events`.
+
+    Each seed entry has: year, region, event, significance, type,
+    affects, optional wikidata_qid. The QID column has a unique index
+    (`idx_he_qid_unique`) so re-running this with new seeds added later
+    will still succeed (existing QIDs are silently skipped).
+
+    Skips entirely when the table already has data — the build script
+    output should always win over the curated seed floor.
+    """
+    if not SEEDS_DIR.exists():
+        return
+    seed_files = sorted(SEEDS_DIR.glob("*.json"))
+    if not seed_files:
+        return
+
+    async with _connect() as db:
+        cursor = await db.execute("SELECT COUNT(*) FROM historical_events")
+        row = await cursor.fetchone()
+        existing = row[0] if row else 0
+        if existing > 0:
+            return
+
+        total = 0
+        for seed_path in seed_files:
+            try:
+                entries = json.loads(seed_path.read_text())
+            except Exception as exc:
+                logger.warning(
+                    "Skipping malformed seed file %s: %s", seed_path.name, exc,
+                )
+                continue
+            for entry in entries:
+                if not isinstance(entry, dict):
+                    continue
+                try:
+                    await db.execute(
+                        """
+                        INSERT OR IGNORE INTO historical_events
+                            (year, region, event, significance, type,
+                             affects, canonical, wikidata_qid, polity_context)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            int(entry["year"]),
+                            entry["region"],
+                            entry["event"],
+                            entry["significance"],
+                            entry["type"],
+                            json.dumps(entry.get("affects", []) or []),
+                            1 if entry.get("canonical", True) else 0,
+                            entry.get("wikidata_qid") or None,
+                            None,
+                        ),
+                    )
+                    total += 1
+                except Exception as exc:
+                    logger.warning(
+                        "Seed row in %s skipped (%s): %s",
+                        seed_path.name, exc, entry.get("event", "")[:60],
+                    )
+        await db.commit()
+        logger.info(
+            "Seeded %d historical events from %d per-era seed files; "
+            "run scripts/build_events_db.py for the richer Wikidata ingest.",
+            total, len(seed_files),
+        )
+
+
 async def save_session(state: WorldState) -> None:
     async with _connect() as db:
         await db.execute(
@@ -206,7 +280,22 @@ async def load_session(run_id: str) -> Optional[WorldState]:
         row = await cursor.fetchone()
         if row is None:
             return None
-        return WorldState.model_validate_json(row[0])
+        try:
+            return WorldState.model_validate_json(row[0])
+        except Exception as exc:
+            # Surfaced before this guard, a malformed state_json (mid-
+            # release schema break, partial save, on-disk bit flip)
+            # propagated up to _load_or_404 and turned into a 500. The
+            # API contract for an unknown / unloadable run is 404, so
+            # we log loudly and return None. The session row stays in
+            # the DB so the user can choose to delete the run, OR an
+            # operator can inspect the row.
+            logger.warning(
+                "load_session: corrupt or schema-mismatched state_json for "
+                "run_id=%s (%s: %s) — treating as not found.",
+                run_id, type(exc).__name__, exc,
+            )
+            return None
 
 
 async def delete_session(run_id: str) -> None:
@@ -241,7 +330,28 @@ async def list_sessions() -> List[dict]:
 def compute_state_diff(before: Dict[str, Any], after: Dict[str, Any]) -> Dict[str, Any]:
     """Compute a compact diff between two WorldState model_dump() dicts.
 
-    Returns only what changed — not full clones.
+    Returns only what changed — not full clones. The diff lands in
+    `turn_logs.state_changes` for every turn, so it is the primary
+    audit trail when something looks wrong post-run. Surface anything a
+    reader would reasonably want to see; omit anything that adds noise.
+
+    Coverage (besides the obvious turn / location / disposition):
+      - new_events / removed_events / event_count_delta — covers
+        compaction *and* growth, where the old `len > len` check
+        silently dropped removals.
+      - npc_changes — disposition / location / memory_of_player.
+      - location_changes — political_tension only (other fields are
+        either static per era or driven by ground_context refresh).
+      - cost_usd / cost_cap_state — surfaces the per-turn cost delta
+        and any soft/hard transition.
+      - pin_count / pin_connection_count / diorama_count deltas — so
+        a turn that creates a pin or mints a diorama is visible in
+        the audit log without parsing every pin payload.
+      - consequence_queue_depth — tracks the queue's growth /
+        firing / supersession in aggregate.
+      - new_historical_divergences — appended divergences this turn.
+      - ground_context_refreshed — true when ground_context object
+        identity changes (arrival or initial generation).
     """
     diff: Dict[str, Any] = {}
 
@@ -267,10 +377,17 @@ def compute_state_diff(before: Dict[str, Any], after: Dict[str, Any]) -> Dict[st
     if new_visited:
         diff["new_visited_locations"] = sorted(new_visited)
 
-    before_events = before.get("events", [])
-    after_events = after.get("events", [])
+    # ── Events: handle growth AND compaction ─────────────────────────
+    before_events = before.get("events", []) or []
+    after_events = after.get("events", []) or []
     if len(after_events) > len(before_events):
         diff["new_events"] = after_events[len(before_events):]
+    elif len(after_events) < len(before_events):
+        # state.events was compacted (world_engine compaction kicks in
+        # past a length cap). Surface the delta count so the audit log
+        # records "the engine pruned N events this turn" rather than
+        # silently looking like nothing happened.
+        diff["event_count_delta"] = len(after_events) - len(before_events)
 
     npc_changes = []
     before_npcs = {n["id"]: n for n in before.get("npcs", [])}
@@ -306,6 +423,76 @@ def compute_state_diff(before: Dict[str, Any], after: Dict[str, Any]) -> Dict[st
             })
     if loc_changes:
         diff["location_changes"] = loc_changes
+
+    # ── Cost cap transitions + per-turn cost delta ───────────────────
+    before_cap = before.get("cost_cap_state") or "none"
+    after_cap = after.get("cost_cap_state") or "none"
+    if before_cap != after_cap:
+        diff["cost_cap_state"] = {"from": before_cap, "to": after_cap}
+    before_cost = float(before.get("cumulative_cost_usd") or 0.0)
+    after_cost = float(after.get("cumulative_cost_usd") or 0.0)
+    if after_cost != before_cost:
+        # Round to 6 decimal places — Gemini cost is in fractions of a
+        # cent; longer floats would just be float-precision noise.
+        diff["cost_usd_delta"] = round(after_cost - before_cost, 6)
+
+    # ── Pinboard / diorama count deltas (audit, not full payload) ────
+    before_pin_count = len(before.get("pins") or [])
+    after_pin_count = len(after.get("pins") or [])
+    if after_pin_count != before_pin_count:
+        diff["pin_count"] = {"from": before_pin_count, "to": after_pin_count}
+    before_conn_count = len(before.get("pin_connections") or [])
+    after_conn_count = len(after.get("pin_connections") or [])
+    if after_conn_count != before_conn_count:
+        diff["pin_connection_count"] = {
+            "from": before_conn_count, "to": after_conn_count,
+        }
+    before_diorama_count = len(before.get("dioramas") or [])
+    after_diorama_count = len(after.get("dioramas") or [])
+    if after_diorama_count != before_diorama_count:
+        diff["diorama_count"] = {
+            "from": before_diorama_count, "to": after_diorama_count,
+        }
+
+    # ── Consequence queue depth ──────────────────────────────────────
+    # Tracks aggregate firing / supersession / scheduling without
+    # dumping every queue entry. If you need the per-row detail for a
+    # specific run you can pull it from the persisted state JSON.
+    before_cq = before.get("consequence_queue") or []
+    after_cq = after.get("consequence_queue") or []
+
+    def _cq_buckets(rows: list) -> Dict[str, int]:
+        pending = fired = superseded = 0
+        for r in rows:
+            if not isinstance(r, dict):
+                continue
+            if r.get("fired"):
+                fired += 1
+            elif r.get("superseded"):
+                superseded += 1
+            else:
+                pending += 1
+        return {"pending": pending, "fired": fired, "superseded": superseded}
+
+    before_buckets = _cq_buckets(before_cq)
+    after_buckets = _cq_buckets(after_cq)
+    if before_buckets != after_buckets:
+        diff["consequence_queue"] = {
+            "from": before_buckets, "to": after_buckets,
+        }
+
+    # ── Historical divergences ───────────────────────────────────────
+    before_divs = before.get("historical_divergences") or []
+    after_divs = after.get("historical_divergences") or []
+    if len(after_divs) > len(before_divs):
+        diff["new_historical_divergences"] = after_divs[len(before_divs):]
+
+    # ── Ground context refresh ───────────────────────────────────────
+    # Object identity (dict equality) is good enough — the HCE rebuilds
+    # the dict on initial generation and on travel arrival; otherwise
+    # it's stable across turns.
+    if before.get("ground_context") != after.get("ground_context"):
+        diff["ground_context_refreshed"] = True
 
     return diff
 
@@ -373,8 +560,7 @@ async def append_turn_log(
     `illustration_trigger` is a JSON blob from
     IllustrationTrigger.log_dict() or None if no trigger fired.
     `turn_cost_usd` is the sum of cost_usd across every LLM call made
-    during this turn (0.0 for turns that ran entirely on Ollama or had
-    no LLM activity at all).
+    during this turn (0.0 for turns with no LLM activity).
     """
     async with _connect() as db:
         await db.execute(
@@ -423,6 +609,15 @@ async def get_turn_logs(run_id: str) -> List[dict]:
         )
         rows = await cursor.fetchall()
         out: List[dict] = []
+        def _safe_json(raw: Any, default: Any = None) -> Any:
+            if raw is None:
+                return default
+            try:
+                return json.loads(raw)
+            except (json.JSONDecodeError, TypeError):
+                logger.warning("Corrupt JSON in turn log (run_id=%s): %r", run_id, raw[:120] if isinstance(raw, str) else raw)
+                return default
+
         for r in rows:
             keys = r.keys()
             trigger_raw = r["illustration_trigger"] if "illustration_trigger" in keys else None
@@ -431,15 +626,13 @@ async def get_turn_logs(run_id: str) -> List[dict]:
                 "run_id": r["run_id"],
                 "turn_number": r["turn_number"],
                 "player_input": r["player_input"],
-                "parsed_action": json.loads(r["parsed_action"]),
-                "ambient_activity": json.loads(r["ambient_activity"]),
-                "npc_responses": json.loads(r["npc_responses"]),
-                "state_changes": json.loads(r["state_changes"]),
+                "parsed_action": _safe_json(r["parsed_action"], {}),
+                "ambient_activity": _safe_json(r["ambient_activity"], []),
+                "npc_responses": _safe_json(r["npc_responses"], []),
+                "state_changes": _safe_json(r["state_changes"], {}),
                 "narrative_output": r["narrative_output"],
-                "player_view_snapshot": json.loads(r["player_view_snapshot"]),
-                "illustration_trigger": (
-                    json.loads(trigger_raw) if trigger_raw else None
-                ),
+                "player_view_snapshot": _safe_json(r["player_view_snapshot"], {}),
+                "illustration_trigger": _safe_json(trigger_raw),
                 "turn_cost_usd": (
                     float(r["turn_cost_usd"]) if "turn_cost_usd" in keys and r["turn_cost_usd"] is not None else 0.0
                 ),
@@ -513,21 +706,29 @@ async def query_historical_events(
             params,
         )
         rows = await cursor.fetchall()
-        return [
-            {
+        results = []
+        for r in rows:
+            try:
+                affects = json.loads(r["affects"])
+            except (json.JSONDecodeError, TypeError):
+                affects = []
+            try:
+                polity_context = json.loads(r["polity_context"]) if r["polity_context"] else None
+            except (json.JSONDecodeError, TypeError):
+                polity_context = None
+            results.append({
                 "id": r["id"],
                 "year": r["year"],
                 "region": r["region"],
                 "event": r["event"],
                 "significance": r["significance"],
                 "type": r["type"],
-                "affects": json.loads(r["affects"]),
+                "affects": affects,
                 "canonical": bool(r["canonical"]),
                 "wikidata_qid": r["wikidata_qid"],
-                "polity_context": json.loads(r["polity_context"]) if r["polity_context"] else None,
-            }
-            for r in rows
-        ]
+                "polity_context": polity_context,
+            })
+        return results
 
 
 async def count_historical_events() -> int:

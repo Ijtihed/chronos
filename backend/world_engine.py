@@ -12,11 +12,10 @@
 Stages 1-4 run inside simulate_turn(). Stages 5-7 are in main.py.
 The world advances whether or not the player acts.
 
-Model tier: QUALITY for active NPCs, player skip-turn, and arrival
-catch-up (all use prompts/autonomous_action.md — prose-critical, the
-player reads these directly). FAST (Ollama) for offscreen NPCs via
-prompts/autonomous_action_light.md — one-sentence ambient activity
-where model fidelity matters less than cost, fired many times per turn.
+All LLM calls route to Gemini (see chronos-model-tier.mdc). Active NPCs,
+player skip-turn, and arrival catch-up use prompts/autonomous_action.md
+(prose-critical). Offscreen NPCs use prompts/autonomous_action_light.md
+(one-sentence ambient activity, lower context).
 """
 
 from __future__ import annotations
@@ -55,9 +54,7 @@ from backend.world_state import (
     WorldState,
     apply_npc_effect,
     build_story_summary,
-    get_location,
     get_player_location,
-    npcs_at_location,
     npcs_near_player,
     shift_disposition,
 )
@@ -101,6 +98,15 @@ def should_simulate_npc(npc: NPC, tier: str, current_turn: int) -> bool:
     Active: every turn.
     Adjacent: every 2 turns (based on last_simulated_turn).
     Distant: every 5 turns (based on last_simulated_turn).
+
+    NOTE: the production simulation loop (`_run_npc_actions`) currently
+    runs *every* NPC every turn -- the throttling rule encoded here
+    isn't called from the live path. It's kept (and tested in
+    tests/test_npc_tiers.py) because re-introducing the throttle is a
+    likely future cost optimization once `state.npcs` grows past the
+    cheap-call threshold; the helper preserves the policy so we don't
+    have to reinvent it. If you remove this function, also delete its
+    tests and update the FINAL PRODUCT pacing notes in roadmap.md.
     """
     if tier == "active":
         return True
@@ -322,9 +328,17 @@ async def _npc_light_action(npc: NPC, state: WorldState) -> dict:
 async def _run_npc_actions(state: WorldState) -> List[dict]:
     """Stage 4: tiered NPC autonomous actions.
 
-    Every NPC gets an LLM call every turn — the world is always alive.
-    Active (player's location): full LLM call with rich context.
-    Adjacent/Distant: lighter LLM call with less context, 1 sentence output.
+    Every NPC gets an LLM call every turn -- the world is always alive.
+    Active (player's location): a sampled subset (2-4 per turn) gets the
+    full LLM call with rich context (`autonomous_action.md`); the
+    remaining active NPCs and every offscreen NPC get a light, 1-line
+    LLM call (`autonomous_action_light.md`).
+
+    The `should_simulate_npc` helper above encodes a stricter
+    every-N-turns throttle by tier; that policy is *not* applied here
+    today (we always simulate every NPC). The helper exists for a
+    future cost-optimization pass; the comment is here so a reader
+    looking at the helper doesn't conclude it's load-bearing.
     """
     active_npcs, adjacent_npcs, distant_npcs = get_npcs_by_tier(state)
     offscreen_npcs = adjacent_npcs + distant_npcs
@@ -429,7 +443,19 @@ async def advance_world_skip(state: WorldState, ticks: int = 1) -> WorldState:
 async def player_skip_turn(state: WorldState) -> dict:
     """The player chose inaction — their character acts autonomously."""
     raw_template = load_prompt(_AUTONOMOUS_TEMPLATE_PATH)
-    player_loc = get_player_location(state)
+    try:
+        player_loc = get_player_location(state)
+    except ValueError:
+        if state.locations:
+            player_loc = state.locations[0]
+        else:
+            return {
+                "action_type": "autonomous",
+                "target": None,
+                "intent": "inaction — character acts on their own",
+                "era_description": f"{state.player.name} waits.",
+                "npc_impacts": [],
+            }
     nearby = npcs_near_player(state)
     other_names = ", ".join(n.name for n in nearby) or "no one"
 

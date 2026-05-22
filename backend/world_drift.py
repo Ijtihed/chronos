@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import random
 import uuid
-from typing import List
 
 from backend.npc_personality import (
     ARCHETYPE_BASELINE_DISPOSITION,
@@ -19,7 +18,6 @@ from backend.utils import TENSION_LEVELS, tension_index, tension_numeric
 from backend.world_state import (
     ScheduledConsequence,
     WorldState,
-    shift_disposition,
 )
 
 
@@ -74,7 +72,12 @@ def _disposition_rank(disp: str) -> int:
 
 
 def tick_disposition_drift(state: WorldState) -> WorldState:
-    """Every 5 turns, each NPC's disposition drifts 1 step toward baseline."""
+    """Every 5 turns, each NPC's disposition drifts 1 step toward baseline.
+
+    Uses the linear ``_DISPOSITION_ORDER`` ladder directly rather than the
+    graph-based ``shift_disposition`` so the drift direction is always
+    consistent with the rank comparison.
+    """
     if state.turn % 5 != 0:
         return state
 
@@ -89,9 +92,11 @@ def tick_disposition_drift(state: WorldState) -> WorldState:
         baseline_rank = _disposition_rank(baseline)
 
         if current_rank < baseline_rank:
-            npc.disposition = shift_disposition(npc.disposition, 1)
+            new_rank = min(current_rank + 1, len(_DISPOSITION_ORDER) - 1)
+            npc.disposition = _DISPOSITION_ORDER[new_rank]
         elif current_rank > baseline_rank:
-            npc.disposition = shift_disposition(npc.disposition, -1)
+            new_rank = max(current_rank - 1, 0)
+            npc.disposition = _DISPOSITION_ORDER[new_rank]
 
     return state
 

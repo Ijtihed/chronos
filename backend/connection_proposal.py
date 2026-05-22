@@ -31,7 +31,7 @@ from pathlib import Path
 from string import Template
 from typing import Optional
 
-from backend.llm_provider import call_llm
+from backend.llm_provider import call_llm, load_prompt
 from backend.llm_schemas import ConnectionProposalResponse
 from backend.world_state import Pin
 
@@ -46,7 +46,7 @@ _TEMPLATE_CACHE: Optional[str] = None
 def _load_template() -> str:
     global _TEMPLATE_CACHE
     if _TEMPLATE_CACHE is None:
-        _TEMPLATE_CACHE = _TEMPLATE_PATH.read_text(encoding="utf-8")
+        _TEMPLATE_CACHE = load_prompt(_TEMPLATE_PATH)
     return _TEMPLATE_CACHE
 
 
@@ -92,7 +92,8 @@ async def generate_connection_proposal(
         # NoOp fallback emits "..." on llm_provider's degraded path.
         if raw.strip() in {"...", "…"}:
             return ""
-        parsed = ConnectionProposalResponse.model_validate(json.loads(raw))
+        from backend.utils import strip_json_fences
+        parsed = ConnectionProposalResponse.model_validate(json.loads(strip_json_fences(raw)))
         claim = (parsed.claim or "").strip()
         if not claim or claim in {"...", "…"}:
             return ""

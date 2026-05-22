@@ -1,6 +1,6 @@
 # NPC Point-of-View Response
 
-> **Model tier:** Gemini (`CHRONOS_GEMINI_MODEL`, default `gemini-3-flash-preview`)
+> **Model tier:** Gemini (`CHRONOS_GEMINI_MODEL`, default `gemini-2.5-flash-lite`)
 > **Purpose:** What an NPC thinks about what just happened. Maybe nothing.
 > **Volume:** Called per relevant NPC per turn. 2-3 sentences max.
 >

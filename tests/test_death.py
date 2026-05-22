@@ -95,3 +95,33 @@ class TestDeathWithAgingContext:
             state = apply_action(state, action)
         player_age = state.current_year - state.player.birth_year
         assert player_age > 30
+
+
+class TestFinalErasurePersistence:
+    """Phase: the closing erasure passage was previously only returned in
+    the response that ended the run -- reloading an ended run showed a
+    generic fallback. Now it's persisted on state and surfaced in
+    PlayerView so the manuscript can re-render the actual passage."""
+
+    def test_field_defaults_to_empty_on_new_run(self):
+        state = create_initial_state()
+        assert state.final_erasure_text == ""
+
+    def test_field_survives_roundtrip_through_pydantic(self):
+        state = create_initial_state()
+        state.final_erasure_text = "He died in the spring."
+        cloned = state.model_copy(deep=True)
+        assert cloned.final_erasure_text == "He died in the spring."
+
+    def test_player_view_surfaces_final_erasure_text(self):
+        from backend.player_knowledge import build_player_view
+        state = create_initial_state()
+        state.final_erasure_text = "No record remains."
+        pv = build_player_view(state, state.run_id)
+        assert pv.final_erasure_text == "No record remains."
+
+    def test_player_view_is_empty_for_active_run(self):
+        from backend.player_knowledge import build_player_view
+        state = create_initial_state()
+        pv = build_player_view(state, state.run_id)
+        assert pv.final_erasure_text == ""

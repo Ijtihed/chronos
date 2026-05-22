@@ -117,6 +117,41 @@ _SPLIT_REGEXES = [
     re.compile(r"\s*&\s*"),
 ]
 
+# Historical-naming aliases. The events DB carries Latin / English /
+# native-language variants ("Italia" vs "Italy", "Byzantium" vs
+# "Byzantine Empire"). The same map lives in main.py for event-region
+# matching; keep them in sync. Keys are lowercase; the resolver
+# matches case-insensitively against the original variant *and* the
+# alias-rewritten form.
+_REGION_ALIAS_REWRITES: dict[str, str] = {
+    "europa": "Europe",
+    "european": "Europe",
+    "italy": "Italia",
+    "italian": "Italia",
+    "byzantium": "Byzantine Empire",
+    "francia": "France",
+    "frankish": "France",
+    "gaul": "France",
+    "gallia": "France",
+    "germany": "Germania",
+    "german": "Germania",
+    "britain": "Britannia",
+    "british": "Britannia",
+    "england": "Britannia",
+    "english": "Britannia",
+    "spain": "Hispania",
+    "spanish": "Hispania",
+    "iberia": "Hispania",
+    "iberian": "Hispania",
+    "greek": "Greece",
+    "hellenic": "Greece",
+    "hellas": "Greece",
+    "nordic": "Scandinavia",
+    "scandinavian": "Scandinavia",
+    "palestine": "Levant",
+    "syria": "Levant",
+}
+
 
 # ---------------------------------------------------------------------------
 # Public API
@@ -129,7 +164,9 @@ def resolve_region(region: Optional[str]) -> Optional[Centroid]:
     """Look up a region's centroid.  None if no variant matches.
 
     Tries exact match first, then strips parentheticals, then splits
-    on "/" and "," and tries each part left-to-right.  Logs unmapped
+    on "/" and "," and tries each part left-to-right.  Each variant
+    is also rewritten through the historical-naming alias map so
+    "Europa" -> "Europe", "Italy" -> "Italia", etc.  Logs unmapped
     regions once per string for dev visibility (debug level).
     """
     if not region:
@@ -138,6 +175,13 @@ def resolve_region(region: Optional[str]) -> Optional[Centroid]:
     for key in _normalize_variants(region):
         if key in centroids:
             return centroids[key]
+        # Alias rewrite (case-insensitive). Lets the resolver follow
+        # the same Latin/English aliasing the events_visible endpoint
+        # uses, instead of every YAML entry having to list every
+        # historical spelling.
+        rewritten = _REGION_ALIAS_REWRITES.get(key.lower())
+        if rewritten and rewritten in centroids:
+            return centroids[rewritten]
     if region not in _unmapped_logged:
         logger.debug("Unmapped region: %r", region)
         _unmapped_logged.add(region)

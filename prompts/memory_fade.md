@@ -1,6 +1,6 @@
 # Memory Fade Framing
 
-> **Model tier:** Gemini (`CHRONOS_GEMINI_MODEL`, default `gemini-3-flash-preview`)
+> **Model tier:** Gemini (`CHRONOS_GEMINI_MODEL`, default `gemini-2.5-flash-lite`)
 > **Purpose:** One line showing the player's memory fading from the world during observation mode.
 > **Volume:** Once per observation turn. Must be fast.
 

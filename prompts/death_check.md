@@ -1,6 +1,6 @@
 # Death Check
 
-> **Model tier:** Gemini (`CHRONOS_GEMINI_MODEL`, default `gemini-3-flash-preview`)
+> **Model tier:** Gemini (`CHRONOS_GEMINI_MODEL`, default `gemini-2.5-flash-lite`)
 > **Purpose:** Evaluate whether the player's latest action could plausibly lead to their death
 > **Volume:** Called once per turn after player action
 

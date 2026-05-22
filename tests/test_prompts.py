@@ -158,3 +158,89 @@ class TestNpcPovPrompt:
         raw = load_prompt(PROMPTS_DIR / "npc_pov.md")
         assert "dark cloud" in raw
         assert "BANNED" in raw
+
+
+class TestPromptCallSiteCoverage:
+    """Catch the class of bug where a prompt template uses a $variable
+    that the corresponding call site doesn't actually substitute.
+
+    The contract: every $variable mentioned in the *body* of a prompt
+    (below the `---` metadata header) must be filled in by a
+    `safe_substitute(...)` call somewhere in `backend/`. `safe_substitute`
+    leaves unbound variables as literal `$name` strings in the rendered
+    prompt — which then goes to the LLM as noise. The fix is either to
+    pass the variable from the call site OR remove it from the template.
+
+    This test scans every prompt and the union of every safe_substitute
+    kwarg set in backend/, then fails if any prompt has a variable that
+    no call site provides.
+    """
+
+    def test_every_prompt_variable_is_provided_by_some_call_site(self):
+        import re
+
+        backend_dir = Path(__file__).resolve().parent.parent / "backend"
+
+        # Walk each safe_substitute(...) call using a paren-aware
+        # scanner. A naive regex with `(.*?)` would stop at the first
+        # `)` it finds, which is usually `build_story_summary(state)`
+        # nested inside the kwarg block — leaving most kwargs uncounted.
+        provided: set[str] = set()
+        for py_file in backend_dir.rglob("*.py"):
+            text = py_file.read_text()
+            i = 0
+            while True:
+                idx = text.find("safe_substitute", i)
+                if idx == -1:
+                    break
+                open_paren = text.find("(", idx)
+                if open_paren == -1:
+                    break
+                # Walk to the matching `)` accounting for nested parens.
+                depth = 0
+                pos = open_paren
+                while pos < len(text):
+                    ch = text[pos]
+                    if ch == "(":
+                        depth += 1
+                    elif ch == ")":
+                        depth -= 1
+                        if depth == 0:
+                            break
+                    pos += 1
+                if pos >= len(text):
+                    break
+                kw_block = text[open_paren + 1:pos]
+                # Match `name=` at top level (only when not inside a
+                # nested call's parens). Simpler: just collect every
+                # name=... whose `=` is followed by anything other than
+                # another `=` (so we avoid `==` comparisons).
+                for kw in re.findall(
+                    r"\b([a-zA-Z_][a-zA-Z0-9_]*)\s*=(?!=)",
+                    kw_block,
+                ):
+                    provided.add(kw)
+                i = pos + 1
+
+        # For each prompt template, compute the variable set used in
+        # the body (after the metadata header). Both `$var` and `${var}`
+        # syntaxes are valid for Python's Template.
+        var_pattern = re.compile(r"\$\{?([a-zA-Z_][a-zA-Z0-9_]*)\}?")
+        missing_by_prompt: dict[str, list[str]] = {}
+        for prompt_path in sorted(PROMPTS_DIR.glob("*.md")):
+            raw = load_prompt(prompt_path)
+            used = set(var_pattern.findall(raw))
+            missing = sorted(v for v in used if v not in provided)
+            if missing:
+                missing_by_prompt[prompt_path.name] = missing
+
+        assert not missing_by_prompt, (
+            "These prompt variables appear in a template body but no "
+            "safe_substitute() call in backend/ provides them. The LLM "
+            "will receive literal $var strings. Either pass the variable "
+            "from the call site or remove it from the prompt:\n"
+            + "\n".join(
+                f"  {name}: missing {vars}"
+                for name, vars in missing_by_prompt.items()
+            )
+        )

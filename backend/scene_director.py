@@ -32,7 +32,7 @@ from pathlib import Path
 from string import Template
 from typing import Any, Dict, List, Optional
 
-from backend.llm_provider import call_llm
+from backend.llm_provider import call_llm, load_prompt
 from backend.llm_schemas import SceneDirectorResponse
 
 logger = logging.getLogger("chronos.scene_director")
@@ -46,22 +46,40 @@ _TEMPLATE_CACHE: Optional[str] = None
 def _load_template() -> str:
     global _TEMPLATE_CACHE
     if _TEMPLATE_CACHE is None:
-        _TEMPLATE_CACHE = _TEMPLATE_PATH.read_text(encoding="utf-8")
+        _TEMPLATE_CACHE = load_prompt(_TEMPLATE_PATH)
     return _TEMPLATE_CACHE
 
 
 def _safe_npc_responses_payload(npc_responses: List[Dict[str, Any]]) -> str:
     """Compact JSON of the NPC responses for the prompt. Trims long
-    text bodies to keep the input cheap."""
+    text bodies to keep the input cheap.
+
+    The orchestrator (main.py _build_npc_responses / _build_npc_responses_mixed)
+    emits each entry with the NPC's prose under the key `pov` (and an
+    optional `internal` for addressed-mode private thoughts). An earlier
+    version of this module looked for a `text` key, which never existed
+    on the dict produced by the orchestrator -- so the diorama prompt
+    was always sent with empty NPC bodies. Read both keys: `pov` is the
+    canonical one; `text` is kept as a fallback for any future caller
+    that emits a different shape.
+    """
     out: List[Dict[str, Any]] = []
     for r in (npc_responses or [])[:6]:
         if not isinstance(r, dict):
             continue
+        body = r.get("pov") or r.get("text") or ""
+        # Fold an addressed-mode internal thought into the body when
+        # present so the diorama prompt sees both halves of a direct
+        # exchange. The internal thought is the "what they really
+        # think" line and is design-relevant for the spec.
+        internal = r.get("internal") or ""
+        if internal:
+            body = f"{body} (internal: {internal})"
         out.append({
             "npc_name": str(r.get("npc_name") or "")[:60],
             "npc_role": str(r.get("npc_role") or "")[:40],
             "sentiment": str(r.get("sentiment") or "neutral")[:20],
-            "text": str(r.get("text") or "")[:200],
+            "text": str(body)[:200],
         })
     return json.dumps(out, ensure_ascii=False)
 
@@ -133,7 +151,8 @@ async def generate_scene_spec(
             return SceneDirectorResponse()
         if raw.strip() in {"...", "…"}:
             return SceneDirectorResponse()
-        parsed = SceneDirectorResponse.model_validate(json.loads(raw))
+        from backend.utils import strip_json_fences
+        parsed = SceneDirectorResponse.model_validate(json.loads(strip_json_fences(raw)))
         return parsed
     except json.JSONDecodeError as exc:
         logger.warning(

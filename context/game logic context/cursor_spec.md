@@ -31,15 +31,15 @@
 |----------|----------|------:|
 | `context/game logic context/` | Full design narrative (this index + linked files); **living** — update when design decisions are made | 9 |
 | `context/other/` | Lessons learned, architectural post-mortems, design mistakes to avoid | 1 |
-| `backend/` | Python server (FastAPI) — action parser, NPC engine, world engine, NPC personality/needs, world drift, world events, world state, death engine, character gen, HCE, HKE, persistence, player knowledge, event vocabulary | 28 |
+| `backend/` | Python server (FastAPI) — action parser, NPC engine, world engine, NPC personality/needs, world drift, world events, world state, death engine, character gen, HCE, HKE, persistence, player knowledge, event vocabulary, inner thought, scene director, connection proposal, pin classifier, scene triggers, grounding extractor | 24 |
 | `backend/eras/` | Era config modules (5 eras + `__init__.py`) | 6 |
-| `backend/geo/` | Region centroid resolution for event markers — hand-curated YAML + normalizer | 3 |
+| `backend/geo/` | Region centroid resolution for event markers — hand-curated YAML + normalizer + terrain | 3 |
 | `backend/hke/` | Historical Knowledge Engine — RAG ingest, retrieval, vector store | 5 |
-| `frontend/` | Browser UI (vanilla JS + HTML + Tailwind CSS), Leaflet map | 4 |
-| `frontend/geo/` | GeoJSON border files (5 eras), coastlines, sources documentation | 7 |
-| `prompts/` | LLM prompt templates — design artifacts, reviewed separately from code | 11 |
-| `scripts/` | Build-time tools (`build_events_db.py`) | 1 |
+| `frontend/` | Browser UI (vanilla JS + HTML + Tailwind CSS), Leaflet map + Three.js globe/war-table/diorama, pinboard | 9 |
+| `frontend/geo/` | GeoJSON border files (5 eras), coastlines, sources documentation, DEM heightmaps | 7+ |
+| `prompts/` | LLM prompt templates — design artifacts, reviewed separately from code | 15 |
+| `scripts/` | Build-time tools (`build_events_db.py`, `restart_server.sh`) | 2 |
 | `seeds/` | Backbone event seed files per era (JSON) | 5 |
-| `tests/` | Automated test suite (unit, integration with mocked LLM, live with Gemini API) | ~33 |
+| `tests/` | Automated test suite (unit, integration with mocked LLM, live with Gemini API) | 42 |
 | `data/` | Runtime data (SQLite DB, Chroma embeddings) — **gitignored**, generated locally | — |
 | `.cursor/rules/` | AI collaborator rules: design constraints, dev protocol, roadmap gates, model tier policy | 6 |

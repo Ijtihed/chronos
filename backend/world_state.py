@@ -399,6 +399,11 @@ class WorldState(BaseModel):
     # capped at 30 per run. Persisted as the renderer-ready spec; the
     # frontend rebuilds the WebGL scene from this.
     dioramas: List[Diorama] = Field(default_factory=list)
+    # The final erasure passage generated when the last NPC's memory of
+    # the player reaches zero. Persisted so the frontend can re-show it
+    # if the player reloads an ended run (otherwise the text would only
+    # exist in the response that ended the run). Empty until then.
+    final_erasure_text: str = ""
 
 
 # ---------------------------------------------------------------------------
@@ -592,6 +597,28 @@ def create_initial_state() -> WorldState:
 
 
 # ---------------------------------------------------------------------------
+# NPC name matching
+# ---------------------------------------------------------------------------
+
+def _npc_name_matches(query: str, npc_name: str) -> bool:
+    """Match a query string against an NPC name using word-boundary logic.
+
+    Prevents false positives from short substrings (e.g. "al" matching
+    "Gallius"). Requires that every word in the query appears as a
+    complete word in the NPC name.
+    """
+    query_lower = query.lower().strip()
+    name_lower = npc_name.lower()
+    if not query_lower:
+        return False
+    if query_lower == name_lower:
+        return True
+    query_words = query_lower.split()
+    name_words = name_lower.split()
+    return all(qw in name_words for qw in query_words)
+
+
+# ---------------------------------------------------------------------------
 # State mutation
 # ---------------------------------------------------------------------------
 
@@ -636,7 +663,7 @@ def _apply_npc_impacts(state: WorldState, impacts: list) -> None:
         if not name:
             continue
         for npc in state.npcs:
-            if name in npc.name.lower():
+            if _npc_name_matches(name, npc.name):
                 if sentiment == "positive":
                     npc.disposition = _shift_positive(npc.disposition)
                 elif sentiment == "negative":
@@ -647,9 +674,7 @@ def _apply_target_fallback(state: WorldState, action: dict) -> None:
     target_raw = (action.get("target") or "").lower()
     action_type = action.get("action_type", "other")
     for npc in state.npcs:
-        if target_raw and (
-            target_raw in npc.name.lower() or target_raw in npc.role.lower()
-        ):
+        if target_raw and _npc_name_matches(target_raw, npc.name):
             if action_type in ("speak", "trade", "petition"):
                 npc.disposition = _shift_positive(npc.disposition)
             elif action_type in ("threaten",):
@@ -676,8 +701,7 @@ def _update_npc_memory(state: WorldState, action: dict) -> None:
     for npc in state.npcs:
         if npc.location != state.player.location:
             continue
-        name_lower = npc.name.lower()
-        if any(n in name_lower for n in affected_names if n):
+        if any(_npc_name_matches(n, npc.name) for n in affected_names if n):
             npc.memory_of_player = min(1.0, npc.memory_of_player + 0.15)
             npc.last_interaction_turn = state.turn
             # Log structured player-action record (replaces verbatim POV injection).
@@ -717,7 +741,13 @@ def build_story_summary(state: WorldState) -> str:
     if not state.events:
         return "The game has just begun. No actions have been taken yet."
 
-    player_loc = get_player_location(state)
+    try:
+        player_loc = get_player_location(state)
+    except ValueError:
+        player_loc = type("_FallbackLoc", (), {
+            "name": state.player.location or "an unknown place",
+            "political_tension": "unknown",
+        })()
     lines = [f"It is now turn {state.turn} (year {state.current_year} AD). Here is what has happened so far:"]
 
     # Two-tier event selection:

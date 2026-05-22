@@ -1,6 +1,6 @@
 # NPC Addressed Response
 
-> **Model tier:** Gemini (`CHRONOS_GEMINI_MODEL`, default `gemini-3-flash-preview`)
+> **Model tier:** Gemini (`CHRONOS_GEMINI_MODEL`, default `gemini-2.5-flash-lite`)
 > **Purpose:** What an NPC says and thinks when the player speaks or acts directly at them.
 > **Volume:** Called for the one NPC whose name matches parsed.target, if they are at the
 >   player's location. All other nearby NPCs use npc_pov.md (ambient mode).

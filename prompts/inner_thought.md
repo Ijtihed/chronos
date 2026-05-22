@@ -1,6 +1,6 @@
 # Inner Thought (player's first reaction)
 
-> **Model:** Gemini (`CHRONOS_GEMINI_MODEL`, default `gemini-3-flash-preview`)
+> **Model:** Gemini (`CHRONOS_GEMINI_MODEL`, default `gemini-2.5-flash-lite`)
 > **Call site:** `inner_thought`
 > **When fires:** the moment the player hits Enter on an action, BEFORE the world simulates. The thought renders under the input field while the rest of the turn loads.
 > **Cost contribution:** ~1 sentence output, ~$0.0002 / turn at Gemini Flash Lite. Adds ~€0.002 per 10-turn run; well under the €1.00 soft cap.
@@ -79,7 +79,6 @@ No additional fields. No preamble. The string is rendered verbatim under the pla
 - `$political_tension` — the location's tension level
 - `$era_feel` — the GroundContext's `era_feel` string (atmospheric)
 - `$material_conditions` — the GroundContext's `material_conditions` string
-- `$current_preoccupation` — the rotating thematic concern
 - `$story_so_far` — abbreviated history
 - `$player_input` — the action they just typed, verbatim
 
