@@ -22,5 +22,5 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements-dev.txt
 
-      - name: Run tests (excluding live Ollama tests)
+      - name: Run offline tests (excluding live LLM tests)
         run: python -m pytest tests/ -m "not live" -v --tb=short

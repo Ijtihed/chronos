@@ -93,7 +93,7 @@ COST_CAP_HARD_EUR: float = 2.00
 
 
 # ---------------------------------------------------------------------------
-# Circuit breaker (Gemini → Ollama fallback)
+# Circuit breaker (Gemini → NoOp fallback)
 # ---------------------------------------------------------------------------
 
 GEMINI_CIRCUIT_FAIL_THRESHOLD: int = 3

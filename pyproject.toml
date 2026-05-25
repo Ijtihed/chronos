@@ -1,5 +1,5 @@
 [tool.pytest.ini_options]
 asyncio_mode = "strict"
 markers = [
-    "live: requires a running Ollama instance (skipped in CI)",
+    "live: requires a real GEMINI_API_KEY and makes live network calls (skipped in CI)",
 ]

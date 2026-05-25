@@ -6,6 +6,16 @@ venv/
 .pytest_cache/
 data/
 
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Local dev/smoke run logs and one-off outputs
+*.log
+scripts/step_3_1_smoke_output.txt
+
 # scripts/imagegen_poc — local image generation POC (scratch-space)
 scripts/imagegen_poc/out/
 scripts/imagegen_poc/__pycache__/
