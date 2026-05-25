@@ -62,6 +62,15 @@ class TestDivergenceE2E:
         superseded (behavior of mark_consequence_superseded_mem)
     """
 
+    @pytest.mark.xfail(
+        reason=(
+            "Requires the historical_events table to be seeded (Sack of Rome 410). "
+            "`build_events_db.py` is not part of CI because it hits Wikidata SPARQL + "
+            "Wikipedia. Either add a fixture that inserts the minimum Roman canonical "
+            "events, or stand up a tiny seed-events JSON the harness can load."
+        ),
+        strict=False,
+    )
     @pytest.mark.asyncio
     async def test_prevent_sack_of_rome_registers_divergence(self):
         state = create_initial_state()
